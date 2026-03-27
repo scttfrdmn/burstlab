@@ -1,0 +1,7 @@
+{
+  "app": "go run main.go",
+  "context": {
+    "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
+    "@aws-cdk/core:enablePartitionLiterals": true
+  }
+}
