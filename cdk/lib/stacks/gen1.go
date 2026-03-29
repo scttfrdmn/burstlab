@@ -3,7 +3,7 @@
 //
 // Assembles all BurstLab constructs into a single CloudFormation stack that
 // produces IDENTICAL infrastructure to the Terraform implementation under
-// terraform/generations/gen1-slurm2205-centos8/.
+// terraform/generations/gen1-slurm2205-rocky8/.
 //
 // Infrastructure created:
 //   VPC (10.0.0.0/16) with 4 subnets and 3 route tables
@@ -23,7 +23,7 @@
 //   CloudFormation token ID can be embedded into partitions.json (which is
 //   written to the head node's EFS path by the init script UserData).
 //
-// Config templates are read from configs/gen1-slurm2205-centos8/ and rendered
+// Config templates are read from configs/gen1-slurm2205-rocky8/ and rendered
 // with the actual subnet IDs, cluster name, and other deploy-time values.
 //
 // CloudFormation Outputs:
@@ -153,7 +153,7 @@ func NewGen1Stack(scope constructs.Construct, id string, props *Gen1StackProps) 
 	// -------------------------------------------------------------------------
 	// 5. Render config templates
 	//
-	// Templates are read from configs/gen1-slurm2205-centos8/.
+	// Templates are read from configs/gen1-slurm2205-rocky8/.
 	// At CDK synth time, CFn token values (subnet IDs, LT ID) are embedded as
 	// token strings; CloudFormation resolves them before the instance launches.
 	// -------------------------------------------------------------------------
@@ -296,13 +296,13 @@ func NewGen1Stack(scope constructs.Construct, id string, props *Gen1StackProps) 
 // Template rendering helpers
 // -------------------------------------------------------------------------
 
-// findConfigDir returns the path to configs/gen1-slurm2205-centos8.
+// findConfigDir returns the path to configs/gen1-slurm2205-rocky8.
 // Tries several relative paths from the CDK app root (cdk/).
 func findConfigDir() string {
 	candidates := []string{
-		"../../configs/gen1-slurm2205-centos8",
-		"../configs/gen1-slurm2205-centos8",
-		"configs/gen1-slurm2205-centos8",
+		"../../configs/gen1-slurm2205-rocky8",
+		"../configs/gen1-slurm2205-rocky8",
+		"configs/gen1-slurm2205-rocky8",
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
@@ -310,7 +310,7 @@ func findConfigDir() string {
 		}
 	}
 	// Return the expected path even if not found; error surfaces at ReadFile time.
-	return "../../configs/gen1-slurm2205-centos8"
+	return "../../configs/gen1-slurm2205-rocky8"
 }
 
 // renderTemplate reads a template file and replaces all keys in vars.

@@ -5,7 +5,7 @@
 # Run this on the head node after terraform apply completes and cloud-init
 # finishes. Checks that every component is healthy before you demo anything.
 #
-# Usage: ssh centos@<head_node_ip> 'bash /opt/slurm/etc/validate-cluster.sh'
+# Usage: ssh rocky@<head_node_ip> 'bash /opt/slurm/etc/validate-cluster.sh'
 #   or after SSH: bash /opt/slurm/etc/validate-cluster.sh
 # =============================================================================
 

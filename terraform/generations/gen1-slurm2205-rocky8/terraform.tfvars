@@ -1,0 +1,5 @@
+aws_region   = "us-west-2"
+aws_profile  = "aws"
+cluster_name = "burstlab-gen1"
+key_name     = "burstlab-key"
+head_node_ami = "ami-06435bc8a2c0a8e5a"

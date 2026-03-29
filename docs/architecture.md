@@ -212,7 +212,7 @@ Burst nodes deliberately cannot launch, terminate, or describe other instances. 
 
 ### Why Pre-Bake vs Cloud-Init
 
-Building Slurm 22.05.11 from source on a CentOS 8 instance takes 8-12 minutes on an `m7a.xlarge` (`make -j4`). If this happened at every instance launch via cloud-init, burst node startup time would be unacceptable — Slurm's `ResumeTimeout` would need to be 15+ minutes, and the demo experience would be broken.
+Building Slurm 22.05.11 from source on a Rocky Linux 8 instance takes 8-12 minutes on an `m7a.xlarge` (`make -j4`). If this happened at every instance launch via cloud-init, burst node startup time would be unacceptable — Slurm's `ResumeTimeout` would need to be 15+ minutes, and the demo experience would be broken.
 
 Pre-baking the AMI with Packer means:
 - Burst nodes launch with Slurm already compiled and installed
@@ -223,9 +223,9 @@ A secondary benefit: the AMI is proof that the compilation worked. If `packer bu
 
 ### What's in the AMI
 
-The Packer template (`ami/centos8-slurm2205.pkr.hcl`) produces an AMI with:
+The Packer template (`ami/rocky8-slurm2205.pkr.hcl`) produces an AMI with:
 
-- CentOS 8 base with repos pointed at `vault.centos.org` (EOL fix)
+- Rocky Linux 8 base (CentOS 8 compatible; actively maintained repos — no vault redirect needed)
 - Slurm 22.05.11 compiled and installed to `/opt/slurm-baked/`
 - Systemd unit files for `slurmctld`, `slurmd`, `slurmdbd` with paths patched for `/opt/slurm-baked/`
 - `SLURM_CONF=/opt/slurm/etc/slurm.conf` set in all unit files (EFS path)
