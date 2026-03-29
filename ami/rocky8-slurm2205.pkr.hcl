@@ -87,16 +87,16 @@ source "amazon-ebs" "rocky8" {
   instance_type = var.instance_type
   ssh_username  = "rocky"
 
-  # Rocky Linux 8 SSH timing notes:
-  #   - The initial SSH probe succeeds quickly (~60s after boot).
-  #   - cloud-init then restarts sshd during its "final" modules stage,
-  #     making SSH temporarily unavailable. This window lasts ~60-90s.
-  #   - pause_before_connecting must be long enough to bridge this window.
-  #     30s was too short — packer's real connection attempt landed in
-  #     the cloud-init sshd restart window and timed out for 25 minutes.
-  #   - 3m pause ensures cloud-init has fully settled before provisioning.
+  # Rocky Linux 8 8.10 SSH timing on base AMI:
+  #   - cloud-init generates SSH host keys and restarts sshd at ~62s.
+  #   - SSH is available for a ~1 minute window starting at ~4 minutes
+  #     after launch, then appears to close again (likely an unrelated
+  #     service briefly blocking port 22 or the instance rebooting).
+  #   - DO NOT use pause_before_connecting: packer's probe lands in the
+  #     ~1 minute window; a pause would push the real connection past it.
+  #   - Instead: no pause, rely on ssh_timeout to keep retrying until the
+  #     window opens, and connect immediately when the probe succeeds.
   ssh_timeout              = "25m"
-  pause_before_connecting  = "3m"
   ssh_keep_alive_interval  = "10s"
   ssh_read_write_timeout   = "15m"
 
