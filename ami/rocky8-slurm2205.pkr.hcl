@@ -258,10 +258,11 @@ build {
       # Home is /u/home/alice (on EFS), created at runtime by head-node-init.
       # We pre-create the user here with a consistent UID/GID so that files
       # alice writes on EFS show the same ownership on ALL nodes (head, compute, burst).
-      # No -m flag: /u does not exist during AMI build (it's an EFS mount point at runtime).
-      # head-node-init creates /u/home/alice on EFS on first boot.
+      # -M: do NOT create home directory. /u does not exist during AMI build (EFS mount point).
+      # Rocky 8 /etc/default/useradd has CREATE_HOME=yes, so -M is required to prevent useradd
+      # from trying to create /u/home/alice and failing. head-node-init creates it on EFS at runtime.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice",
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -M alice",
 
       # =======================================================================
       # STEP 4: Download Slurm 22.05.11 source
