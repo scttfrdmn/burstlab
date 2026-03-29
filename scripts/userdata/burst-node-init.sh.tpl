@@ -78,12 +78,12 @@ echo "${head_node_ip} headnode" >> /etc/hosts
 # Burst nodes are in the cloud subnets, which have EFS mount targets.
 # Route to head node (NAT) is handled by the VPC route table.
 # -----------------------------------------------------------------------------
-mkdir -p /home /opt/slurm
+mkdir -p /u /opt/slurm
 
-echo "${efs_dns_name}:/ /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
-echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
-for dir in /home /opt/slurm; do
+for dir in /u /opt/slurm; do
   for attempt in $(seq 1 10); do
     mount "$dir" && break || {
       echo "EFS mount attempt $attempt for $dir failed, retrying in 10s..."

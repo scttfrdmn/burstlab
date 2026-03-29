@@ -57,13 +57,13 @@ ip route replace default via ${head_node_ip} 2>/dev/null || true
 # 5. Mount EFS
 # Wait for head node to have populated /opt/slurm before mounting.
 # -----------------------------------------------------------------------------
-mkdir -p /home /opt/slurm
+mkdir -p /u /opt/slurm
 
-echo "${efs_dns_name}:/ /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
-echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
 # Retry mounting — EFS and head node init may still be running
-for dir in /home /opt/slurm; do
+for dir in /u /opt/slurm; do
   for attempt in 1 2 3 4 5 6 7 8 9 10; do
     mount "$dir" && break || {
       echo "EFS mount attempt $attempt for $dir failed, retrying in 15s..."
