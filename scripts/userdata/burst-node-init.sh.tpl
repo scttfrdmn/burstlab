@@ -32,6 +32,10 @@ if [ "$OS_ID" = "centos" ]; then
   dnf clean all
 fi
 
+# Ensure cluster users exist with pinned UID/GID (alice = demo HPC user)
+getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
+getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+
 # -----------------------------------------------------------------------------
 # 2. Read node name from EC2 Name tag
 # InstanceMetadataTags=enabled is set in the launch template.
