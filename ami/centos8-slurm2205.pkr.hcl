@@ -242,14 +242,14 @@ build {
       "getent passwd slurm >/dev/null 2>&1 || sudo useradd -u 1001 -g slurm -s /sbin/nologin -d /var/lib/slurm -r slurm",
 
       # alice — demo HPC cluster user (UID/GID 2000)
-      # Home is /u/alice (on EFS), created at runtime by head-node-init.
+      # Home is /u/home/alice (on EFS), created at runtime by head-node-init.
       # We pre-create the user here with a consistent UID/GID so that files
       # alice writes on EFS show the same ownership on ALL nodes (head, compute, burst).
-      # /u/alice itself is NOT created here — EFS isn't mounted during AMI build.
+      # /u/home/alice itself is NOT created here — EFS isn't mounted during AMI build.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/alice -m alice",
-      # -m creates /home/alice locally during baking; we don't want that since home is /u/alice.
-      # Remove the local stub (it won't exist at /u/alice anyway, but clean it up).
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -m alice",
+      # -m creates /home/alice locally during baking; we don't want that since home is /u/home/alice.
+      # Remove the local stub (it won't exist at /u/home/alice anyway, but clean it up).
       "sudo rm -rf /home/alice 2>/dev/null || true",
 
       # =======================================================================

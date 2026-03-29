@@ -159,14 +159,15 @@ if [ -n "$_EC2_PUBKEY" ]; then
   echo "SSH key injected to local /home/rocky/.ssh/authorized_keys."
 fi
 
-# Set up alice's home directory on EFS (/u/alice).
+# Set up alice's home directory on EFS (/u/home/alice).
 # alice is the cluster demo user (UID 2000, created in AMI).
 # Her home is on EFS so it's accessible from all nodes — head, compute, burst.
 if mountpoint -q /u; then
-  mkdir -p /u/alice
-  chown alice:alice /u/alice
-  chmod 700 /u/alice
-  echo "Created /u/alice home directory on EFS."
+  mkdir -p /u/home/alice
+  # chown only if alice user exists in this AMI (she's added in the updated AMI build)
+  getent passwd alice >/dev/null 2>&1 && chown alice:alice /u/home/alice || true
+  chmod 700 /u/home/alice
+  echo "Created /u/home/alice home directory on EFS."
 fi
 
 # -----------------------------------------------------------------------------
@@ -272,7 +273,6 @@ export SLURM_CONF=/opt/slurm/etc/slurm.conf
 /opt/slurm/bin/sacctmgr -i add cluster ${cluster_name} || true
 /opt/slurm/bin/sacctmgr -i add account default description="Default account" organization="BurstLab" || true
 /opt/slurm/bin/sacctmgr -i add user root account=default || true
-/opt/slurm/bin/sacctmgr -i add user rocky account=default || true
 /opt/slurm/bin/sacctmgr -i add user alice account=default || true
 
 # -----------------------------------------------------------------------------
@@ -344,8 +344,15 @@ chmod 644 /etc/profile.d/slurm.sh
 # 12. Install change_state.py cron
 # -----------------------------------------------------------------------------
 echo "--- Installing change_state.py cron ---"
-# Must run as slurm user (owns the slurmctld socket)
-(crontab -u slurm -l 2>/dev/null; echo "* * * * * /opt/slurm/etc/aws/change_state.py >> /var/log/slurm/change_state.log 2>&1") | crontab -u slurm -
+# Must run as slurm user (owns the slurmctld socket).
+# Use || true: crontab -u slurm may fail on distros that restrict cron access
+# for nologin users via PAM/cron.allow. The cluster still works without it;
+# burst nodes will just need manual state management if change_state.py isn't running.
+# Note: `crontab -l` exits 1 when no crontab exists. With set -e inside the
+# subshell, that would exit before the echo runs, piping empty stdin and clearing
+# the crontab instead of adding to it. The `|| true` prevents that early exit.
+(crontab -u slurm -l 2>/dev/null || true; echo "* * * * * /opt/slurm/etc/aws/change_state.py >> /var/log/slurm/change_state.log 2>&1") | crontab -u slurm - || \
+  echo "[WARN] crontab install for slurm user failed — change_state.py cron not active"
 
 # -----------------------------------------------------------------------------
 # Done
@@ -353,4 +360,4 @@ echo "--- Installing change_state.py cron ---"
 echo "=== BurstLab head node init complete: $(date) ==="
 echo ""
 echo "Cluster status:"
-/opt/slurm/bin/sinfo
+/opt/slurm/bin/sinfo || true
