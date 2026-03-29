@@ -87,15 +87,22 @@ source "amazon-ebs" "rocky8" {
   instance_type = var.instance_type
   ssh_username  = "rocky"
 
-  # Rocky Linux 8 8.10 SSH timing on base AMI:
-  #   - cloud-init generates SSH host keys and restarts sshd at ~62s.
-  #   - SSH is available for a ~1 minute window starting at ~4 minutes
-  #     after launch, then appears to close again (likely an unrelated
-  #     service briefly blocking port 22 or the instance rebooting).
-  #   - DO NOT use pause_before_connecting: packer's probe lands in the
-  #     ~1 minute window; a pause would push the real connection past it.
-  #   - Instead: no pause, rely on ssh_timeout to keep retrying until the
-  #     window opens, and connect immediately when the probe succeeds.
+  # Rocky Linux 8 8.10 cloud-init reboot issue:
+  #   The base AMI runs `dnf update` on first boot via cloud-init modules:config,
+  #   installs a kernel update, and reboots the instance. SSH opens briefly during
+  #   first boot, then drops when the reboot hits. Packer gets a connection mid-
+  #   provisioning and dies with "Error uploading script: i/o timeout".
+  #
+  #   Fix: user_data with #cloud-config to disable package updates before they run.
+  #   cloud-config is processed in cloud-init's early (init) stage, before
+  #   modules:config where package_upgrade runs, so this prevents the update/reboot.
+  user_data = <<-EOF
+    #cloud-config
+    package_update: false
+    package_upgrade: false
+    package_reboot_if_required: false
+  EOF
+
   ssh_timeout              = "25m"
   ssh_keep_alive_interval  = "10s"
   ssh_read_write_timeout   = "15m"
