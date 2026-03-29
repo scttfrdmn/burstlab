@@ -42,6 +42,15 @@ fi
 dnf makecache --refresh || true
 
 # -----------------------------------------------------------------------------
+# 1b. Ensure cluster users exist with pinned UID/GID
+# alice (UID/GID 2000) is the demo HPC user. Her home is on EFS (/u/home/alice)
+# and is created in step 4. We create the user entry here so that UID/GID 2000
+# is consistent across all nodes regardless of whether it's in the AMI.
+# -----------------------------------------------------------------------------
+getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
+getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+
+# -----------------------------------------------------------------------------
 # 2. Set hostname
 # -----------------------------------------------------------------------------
 echo "--- Setting hostname ---"
