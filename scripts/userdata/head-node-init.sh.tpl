@@ -6,7 +6,7 @@
 #   1. Fix CentOS 8 EOL repos to vault.centos.org
 #   2. Set hostname
 #   3. Configure iptables NAT (head node is the cluster's internet gateway)
-#   4. Mount EFS: /home and /opt/slurm
+#   4. Mount EFS: /u and /opt/slurm
 #   5. Populate /opt/slurm on EFS from the AMI if first boot
 #   6. Configure munge key
 #   7. Write Slurm config files from Terraform-rendered templates
@@ -23,7 +23,6 @@ set -euo pipefail
 exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab head node init started: $(date) ==="
 
-# SSH key injection happens in step 4 (after EFS mount) so it persists on EFS.
 
 # -----------------------------------------------------------------------------
 # 1. Fix repos if needed

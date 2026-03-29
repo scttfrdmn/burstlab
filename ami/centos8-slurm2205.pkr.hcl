@@ -87,10 +87,16 @@ source "amazon-ebs" "centos8" {
   instance_type = var.instance_type
   ssh_username  = "rocky"
 
-  # Rocky Linux 8 can take 2-3 minutes to fully boot and start sshd.
-  # The default Packer SSH timeout is 5 minutes which is too tight.
+  # Rocky Linux 8 SSH timing notes:
+  #   - The initial SSH probe succeeds quickly (~60s after boot).
+  #   - cloud-init then restarts sshd during its "final" modules stage,
+  #     making SSH temporarily unavailable. This window lasts ~60-90s.
+  #   - pause_before_connecting must be long enough to bridge this window.
+  #     30s was too short — packer's real connection attempt landed in
+  #     the cloud-init sshd restart window and timed out for 25 minutes.
+  #   - 3m pause ensures cloud-init has fully settled before provisioning.
   ssh_timeout              = "25m"
-  pause_before_connecting  = "30s"
+  pause_before_connecting  = "3m"
   ssh_keep_alive_interval  = "10s"
   ssh_read_write_timeout   = "15m"
 
