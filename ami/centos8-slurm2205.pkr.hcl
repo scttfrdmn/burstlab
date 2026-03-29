@@ -251,12 +251,10 @@ build {
       # Home is /u/home/alice (on EFS), created at runtime by head-node-init.
       # We pre-create the user here with a consistent UID/GID so that files
       # alice writes on EFS show the same ownership on ALL nodes (head, compute, burst).
-      # /u/home/alice itself is NOT created here — EFS isn't mounted during AMI build.
+      # No -m flag: /u does not exist during AMI build (it's an EFS mount point at runtime).
+      # head-node-init creates /u/home/alice on EFS on first boot.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -m alice",
-      # -m creates /home/alice locally during baking; we don't want that since home is /u/home/alice.
-      # Remove the local stub (it won't exist at /u/home/alice anyway, but clean it up).
-      "sudo rm -rf /home/alice 2>/dev/null || true",
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice",
 
       # =======================================================================
       # STEP 4: Download Slurm 22.05.11 source
@@ -449,7 +447,7 @@ build {
       "sudo chown slurm:slurm /opt/slurm /opt/slurm/etc",
 
       # /u: EFS mount point for cluster user home directories.
-      # Cluster users (e.g. alice) have homes at /u/<username>.
+      # Cluster users (e.g. alice) have homes at /u/home/<username>.
       # Rocky's /home stays local so SSH access is never EFS-dependent.
       "sudo mkdir -p /u",
       "sudo chmod 755 /u",
