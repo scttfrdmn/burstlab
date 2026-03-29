@@ -15,7 +15,7 @@
 #   6. Copy munge key from EFS, start munge
 #   7. Start slurmd -N $SLURM_NODENAME
 #
-# Variables in ${ } are Terraform templatefile() substitutions.
+# Terraform templatefile() substitutions — see ALLCAPS vars replaced at deploy time.
 # =============================================================================
 
 set -euo pipefail
@@ -23,11 +23,14 @@ exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab burst node init started: $(date) ==="
 
 # -----------------------------------------------------------------------------
-# 1. Fix CentOS 8 EOL repos
+# 1. Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
 # -----------------------------------------------------------------------------
-sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
-sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
-dnf clean all
+OS_ID=$(. /etc/os-release && echo "$ID")
+if [ "$OS_ID" = "centos" ]; then
+  sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
+  sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+  dnf clean all
+fi
 
 # -----------------------------------------------------------------------------
 # 2. Read node name from EC2 Name tag
@@ -77,8 +80,8 @@ echo "${head_node_ip} headnode" >> /etc/hosts
 # -----------------------------------------------------------------------------
 mkdir -p /home /opt/slurm
 
-echo "${efs_dns_name}:/ /home efs _netdev,tls,noresvport 0 0" >> /etc/fstab
-echo "${efs_dns_name}:/slurm /opt/slurm efs _netdev,tls,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/ /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
 
 for dir in /home /opt/slurm; do
   for attempt in $(seq 1 10); do

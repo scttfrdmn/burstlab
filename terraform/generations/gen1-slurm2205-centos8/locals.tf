@@ -43,7 +43,7 @@ locals {
   # ---------------------------------------------------------------------------
   # path.module is this directory (generations/gen1-slurm2205-centos8/).
   # Configs live two levels up at the repo root under configs/.
-  config_dir = "${path.module}/../../configs/gen1-slurm2205-centos8"
+  config_dir = "${path.module}/../../../configs/gen1-slurm2205-centos8"
 
   # ---------------------------------------------------------------------------
   # slurm.conf

@@ -83,7 +83,7 @@ resource "aws_launch_template" "burst" {
   #   6. Start slurmd — it will register with slurmctld using the correct NodeName
   #
   # base64encode() is required because launch template UserData must be base64.
-  user_data = base64encode(templatefile("${path.module}/../../scripts/userdata/burst-node-init.sh.tpl", {
+  user_data = base64encode(templatefile("${path.module}/../../../scripts/userdata/burst-node-init.sh.tpl", {
     cluster_name              = var.cluster_name
     munge_key_b64             = var.munge_key_b64
     efs_dns_name              = var.efs_dns_name

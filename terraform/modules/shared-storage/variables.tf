@@ -14,17 +14,7 @@ variable "efs_sg_id" {
 }
 
 variable "management_subnet_id" {
-  description = "Subnet ID for the management subnet (head node). An EFS mount target is placed here so the head node can mount EFS locally (fast path, no cross-AZ traffic)."
-  type        = string
-}
-
-variable "onprem_subnet_id" {
-  description = "Subnet ID for the on-prem compute subnet. EFS mount target here serves compute01-04 with low-latency NFS access."
-  type        = string
-}
-
-variable "cloud_subnet_a_id" {
-  description = "Subnet ID for cloud burst subnet A. Burst nodes in us-west-2a use this mount target to avoid cross-AZ NFS traffic (latency + cost)."
+  description = "Subnet ID for the management subnet (us-west-2a). One EFS mount target here serves all us-west-2a subnets (management, onprem, cloud-a)."
   type        = string
 }
 

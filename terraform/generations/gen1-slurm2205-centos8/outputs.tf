@@ -10,7 +10,7 @@
 # -----------------------------------------------------------------------------
 
 output "head_node_public_ip" {
-  description = "Public IP (EIP) of the head node. SSH with: ssh -i ~/.ssh/<key>.pem centos@<this_ip>"
+  description = "Public IP (EIP) of the head node. SSH with: ssh -i ~/.ssh/<key>.pem rocky@<this_ip>"
   value       = module.head_node.public_ip
 }
 
@@ -122,5 +122,5 @@ output "munge_key_b64" {
 
 output "ssh_command" {
   description = "Ready-to-use SSH command for connecting to the head node. Replace <key_path> with the path to your private key file."
-  value       = "ssh -i ~/.ssh/${var.key_name}.pem centos@${module.head_node.public_ip}"
+  value       = "ssh -i ~/.ssh/${var.key_name}.pem rocky@${module.head_node.public_ip}"
 }

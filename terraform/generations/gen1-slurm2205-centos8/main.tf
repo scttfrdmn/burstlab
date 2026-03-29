@@ -15,7 +15,7 @@
 #   6. Burst launch template
 #
 # After `terraform apply`, SSH to the head node:
-#   ssh -i ~/.ssh/<key>.pem centos@$(terraform output -raw head_node_public_ip)
+#   ssh -i ~/.ssh/<key>.pem rocky@$(terraform output -raw head_node_public_ip)
 # =============================================================================
 
 terraform {
@@ -125,8 +125,6 @@ module "shared_storage" {
   vpc_id               = module.vpc.vpc_id
   efs_sg_id            = module.vpc.efs_sg_id
   management_subnet_id = module.vpc.management_subnet_id
-  onprem_subnet_id     = module.vpc.onprem_subnet_id
-  cloud_subnet_a_id    = module.vpc.cloud_subnet_a_id
   cloud_subnet_b_id    = module.vpc.cloud_subnet_b_id
 }
 
@@ -145,7 +143,7 @@ module "head_node" {
   key_name             = var.key_name
   subnet_id            = module.vpc.management_subnet_id
   sg_id                = module.vpc.head_node_sg_id
-  instance_profile_arn = module.iam.head_node_instance_profile_arn
+  instance_profile_name = module.iam.head_node_instance_profile_name
 
   # Static private IP — must match local.head_node_private_ip (var.head_node_static_ip).
   # This value is used in slurm.conf and the burst/compute node UserData, both of

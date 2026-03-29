@@ -29,8 +29,8 @@ variable "sg_id" {
   type        = string
 }
 
-variable "instance_profile_arn" {
-  description = "ARN of the head node IAM instance profile. Grants the head node permission to call EC2 Fleet APIs and pass the burst node role."
+variable "instance_profile_name" {
+  description = "Name of the head node IAM instance profile. Grants the head node permission to call EC2 Fleet APIs and pass the burst node role."
   type        = string
 }
 

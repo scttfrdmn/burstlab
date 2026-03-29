@@ -11,7 +11,7 @@
 #   6. Copy munge key from EFS, start munge
 #   7. Start slurmd with the correct node name
 #
-# Variables in ${ } are Terraform templatefile() substitutions.
+# Terraform templatefile() substitutions — see ALLCAPS vars replaced at deploy time.
 # =============================================================================
 
 set -euo pipefail
@@ -19,11 +19,14 @@ exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab compute node init started: $(date) ==="
 
 # -----------------------------------------------------------------------------
-# 1. Fix CentOS 8 EOL repos
+# 1. Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
 # -----------------------------------------------------------------------------
-sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
-sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
-dnf clean all
+OS_ID=$(. /etc/os-release && echo "$ID")
+if [ "$OS_ID" = "centos" ]; then
+  sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
+  sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+  dnf clean all
+fi
 
 # -----------------------------------------------------------------------------
 # 2. Set hostname
@@ -56,8 +59,8 @@ ip route replace default via ${head_node_ip} 2>/dev/null || true
 # -----------------------------------------------------------------------------
 mkdir -p /home /opt/slurm
 
-echo "${efs_dns_name}:/ /home efs _netdev,tls,noresvport 0 0" >> /etc/fstab
-echo "${efs_dns_name}:/slurm /opt/slurm efs _netdev,tls,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/ /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
 
 # Retry mounting — EFS and head node init may still be running
 for dir in /home /opt/slurm; do

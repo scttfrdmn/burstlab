@@ -1,14 +1,14 @@
 # =============================================================================
-# VPC MODULE — BurstLab Gen 1
+# VPC MODULE - BurstLab Gen 1
 # =============================================================================
 # Creates the full network topology for the "mock on-prem" HPC cluster.
 #
 # Topology:
 #   VPC 10.0.0.0/16
-#   ├── management  10.0.0.0/24  (us-west-2a) — head node, public EIP
-#   ├── on-prem     10.0.1.0/24  (us-west-2a) — compute01-04, no public IPs
-#   ├── cloud-a     10.0.2.0/24  (us-west-2a) — burst nodes
-#   └── cloud-b     10.0.3.0/24  (us-west-2b) — burst nodes, second AZ
+#   ├── management  10.0.0.0/24  (us-west-2a) - head node, public EIP
+#   ├── on-prem     10.0.1.0/24  (us-west-2a) - compute01-04, no public IPs
+#   ├── cloud-a     10.0.2.0/24  (us-west-2a) - burst nodes
+#   └── cloud-b     10.0.3.0/24  (us-west-2b) - burst nodes, second AZ
 #
 # The head node acts as a NAT router for the on-prem and cloud subnets.
 # Routes for 0.0.0.0/0 pointing to the head node ENI are added by the
@@ -62,7 +62,7 @@ resource "aws_internet_gateway" "main" {
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Management subnet — head node lives here
+# Management subnet - head node lives here
 # -----------------------------------------------------------------------------
 # map_public_ip_on_launch = false because the head node gets a static EIP
 # (allocated in the head-node module). Relying on auto-assigned IPs would
@@ -83,9 +83,9 @@ resource "aws_subnet" "management" {
 }
 
 # -----------------------------------------------------------------------------
-# On-prem subnet — simulated private compute network
+# On-prem subnet - simulated private compute network
 # -----------------------------------------------------------------------------
-# No public IPs — mimics a real HPC environment where compute nodes live on
+# No public IPs - mimics a real HPC environment where compute nodes live on
 # an isolated private network. Internet access flows through the head node NAT.
 resource "aws_subnet" "onprem" {
   vpc_id                  = aws_vpc.main.id
@@ -103,11 +103,11 @@ resource "aws_subnet" "onprem" {
 }
 
 # -----------------------------------------------------------------------------
-# Cloud burst subnet A — us-west-2a
+# Cloud burst subnet A - us-west-2a
 # -----------------------------------------------------------------------------
 # Burst nodes launched by the aws-plugin-for-slurm land here (or in subnet B).
 # Keeping burst nodes in the same VPC as the "on-prem" network means Slurm
-# can reach them directly over private IPs — no VPN or Direct Connect needed.
+# can reach them directly over private IPs - no VPN or Direct Connect needed.
 resource "aws_subnet" "cloud_a" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.cloud_subnet_a_cidr
@@ -124,7 +124,7 @@ resource "aws_subnet" "cloud_a" {
 }
 
 # -----------------------------------------------------------------------------
-# Cloud burst subnet B — us-west-2b
+# Cloud burst subnet B - us-west-2b
 # -----------------------------------------------------------------------------
 # A second AZ improves capacity availability. EC2 spot and on-demand pools are
 # independent per AZ, so spanning two AZs roughly doubles the chance of getting
@@ -149,7 +149,7 @@ resource "aws_subnet" "cloud_b" {
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Management route table — default route via IGW
+# Management route table - default route via IGW
 # -----------------------------------------------------------------------------
 # The head node needs outbound internet access for: AWS API calls (EC2 Fleet),
 # yum package repos, and any external services. The IGW provides this.
@@ -175,7 +175,7 @@ resource "aws_route_table_association" "management" {
 }
 
 # -----------------------------------------------------------------------------
-# On-prem route table — default route added later by head-node module
+# On-prem route table - default route added later by head-node module
 # -----------------------------------------------------------------------------
 # This table is created empty (no default route). The head-node module adds
 # aws_route.onprem_nat pointing 0.0.0.0/0 → head node ENI. We split it this
@@ -184,7 +184,7 @@ resource "aws_route_table" "onprem" {
   vpc_id = aws_vpc.main.id
 
   # Note: NO default route here. The head-node module adds it after EC2 launch.
-  # This is intentional — the route must reference the head node's ENI ID.
+  # This is intentional - the route must reference the head node's ENI ID.
 
   tags = {
     Name       = "${var.cluster_name}-onprem-rtb"
@@ -200,11 +200,11 @@ resource "aws_route_table_association" "onprem" {
 }
 
 # -----------------------------------------------------------------------------
-# Cloud route table — shared by both burst subnets, default route added later
+# Cloud route table - shared by both burst subnets, default route added later
 # -----------------------------------------------------------------------------
 # Both cloud subnets share one route table. Burst nodes need outbound internet
 # for yum, EFS mounts, and AWS API. Traffic goes through the head node NAT
-# (same as on-prem compute) — this is by design to mirror real cloud-bursting
+# (same as on-prem compute) - this is by design to mirror real cloud-bursting
 # architectures where burst nodes access the internet via the customer's gateway.
 resource "aws_route_table" "cloud" {
   vpc_id = aws_vpc.main.id
@@ -237,18 +237,18 @@ resource "aws_route_table_association" "cloud_b" {
 # Head node security group
 # -----------------------------------------------------------------------------
 # Allows:
-#   - SSH (22) from anywhere — for lab access. In production you'd restrict to
+#   - SSH (22) from anywhere - for lab access. In production you'd restrict to
 #     a bastion or VPN CIDR.
-#   - All traffic from within the VPC — Slurm, Munge, NFS/EFS, slurmctld,
+#   - All traffic from within the VPC - Slurm, Munge, NFS/EFS, slurmctld,
 #     slurmdbd, srun, squeue, etc. all run over private IPs.
-#   - All outbound — needed for AWS API (EC2 Fleet), yum, EFS.
+#   - All outbound - needed for AWS API (EC2 Fleet), yum, EFS.
 resource "aws_security_group" "head_node" {
   name        = "${var.cluster_name}-head-node-sg"
   description = "Head node: SSH from internet + all VPC traffic for Slurm/Munge/EFS"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "SSH from anywhere — lab access (restrict in production)"
+    description = "SSH from anywhere - lab access (restrict in production)"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -256,7 +256,7 @@ resource "aws_security_group" "head_node" {
   }
 
   ingress {
-    description = "All traffic from within VPC — Slurm (6817/6818/6819), Munge (no fixed port), EFS (2049), srun forwarding"
+    description = "All traffic from within VPC - Slurm (6817/6818/6819), Munge (no fixed port), EFS (2049), srun forwarding"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -264,7 +264,7 @@ resource "aws_security_group" "head_node" {
   }
 
   egress {
-    description = "All outbound — AWS API, yum repos, EFS, internet for updates"
+    description = "All outbound - AWS API, yum repos, EFS, internet for updates"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -284,14 +284,14 @@ resource "aws_security_group" "head_node" {
 # -----------------------------------------------------------------------------
 # On-prem compute nodes only talk to things inside the VPC. All traffic within
 # the VPC CIDR covers: Slurmd (6818), Munge auth, NFS/EFS (2049), and srun
-# I/O forwarding. No inbound from internet — these nodes have no public IPs.
+# I/O forwarding. No inbound from internet - these nodes have no public IPs.
 resource "aws_security_group" "compute_node" {
   name        = "${var.cluster_name}-compute-node-sg"
   description = "On-prem compute nodes: all VPC traffic only (no public ingress)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "All traffic from VPC — Slurmd (6818), Munge, EFS, job I/O"
+    description = "All traffic from VPC - Slurmd (6818), Munge, EFS, job I/O"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -299,7 +299,7 @@ resource "aws_security_group" "compute_node" {
   }
 
   egress {
-    description = "All outbound — internet via head node NAT for yum/updates"
+    description = "All outbound - internet via head node NAT for yum/updates"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -319,14 +319,14 @@ resource "aws_security_group" "compute_node" {
 # -----------------------------------------------------------------------------
 # Same logic as compute nodes: burst nodes only need VPC-internal access.
 # They communicate with slurmctld on the head node, mount EFS, and authenticate
-# via Munge — all over private IPs. Internet access goes through head node NAT.
+# via Munge - all over private IPs. Internet access goes through head node NAT.
 resource "aws_security_group" "burst_node" {
   name        = "${var.cluster_name}-burst-node-sg"
   description = "Cloud burst nodes: all VPC traffic only, internet via head-node NAT"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "All traffic from VPC — Slurmd, Munge, EFS, srun I/O"
+    description = "All traffic from VPC - Slurmd, Munge, EFS, srun I/O"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -334,7 +334,7 @@ resource "aws_security_group" "burst_node" {
   }
 
   egress {
-    description = "All outbound — goes through head node NAT for external access"
+    description = "All outbound - goes through head node NAT for external access"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -353,7 +353,7 @@ resource "aws_security_group" "burst_node" {
 # EFS security group
 # -----------------------------------------------------------------------------
 # EFS mount targets accept NFS traffic (TCP 2049) from any host in the VPC.
-# This covers the head node, on-prem compute nodes, and burst nodes — all of
+# This covers the head node, on-prem compute nodes, and burst nodes - all of
 # which need to mount /home and /opt/slurm from EFS.
 resource "aws_security_group" "efs" {
   name        = "${var.cluster_name}-efs-sg"
@@ -361,7 +361,7 @@ resource "aws_security_group" "efs" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "NFS from VPC — all nodes mount EFS for /home and /opt/slurm"
+    description = "NFS from VPC - all nodes mount EFS for /home and /opt/slurm"
     from_port   = 2049
     to_port     = 2049
     protocol    = "tcp"
@@ -369,7 +369,7 @@ resource "aws_security_group" "efs" {
   }
 
   egress {
-    description = "All outbound (standard AWS SG requirement, EFS doesn't initiate connections)"
+    description = "All outbound (standard AWS SG requirement, EFS does not initiate connections)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

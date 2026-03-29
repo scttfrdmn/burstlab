@@ -16,21 +16,30 @@
 #  11. Run generate_conf.py, append burst node config to slurm.conf
 #  12. Add change_state.py cron
 #
-# Variables in %{ } are Terraform templatefile() substitutions.
+# Terraform templatefile() substitutions: lowercase_vars are injected at deploy time.
 # =============================================================================
 
 set -euo pipefail
 exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab head node init started: $(date) ==="
 
+# SSH key injection happens in step 4 (after EFS mount) so it persists on EFS.
+
 # -----------------------------------------------------------------------------
-# 1. Fix CentOS 8 EOL repos
+# 1. Fix repos if needed
+# On CentOS 8 (TCU's actual OS): redirect EOL repos to vault.centos.org.
+# On Rocky Linux 8 (our AMI base): repos are active, no fix needed.
 # -----------------------------------------------------------------------------
-echo "--- Fixing CentOS 8 EOL repos ---"
-sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
-sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
-dnf clean all
-# EPEL is already installed in the AMI; ensure it points to vault too
+echo "--- Checking OS and fixing repos if needed ---"
+OS_ID=$(. /etc/os-release && echo "$ID")
+if [ "$OS_ID" = "centos" ]; then
+  echo "CentOS 8 detected — redirecting to vault.centos.org"
+  sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
+  sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+  dnf clean all
+else
+  echo "$OS_ID detected — repos are active, no vault redirect needed"
+fi
 dnf makecache --refresh || true
 
 # -----------------------------------------------------------------------------
@@ -48,45 +57,70 @@ echo "${cidrhost(onprem_cidr, i + 10)} compute0${i + 1}" >> /etc/hosts
 # 3. Configure iptables NAT (head node as cluster gateway)
 # -----------------------------------------------------------------------------
 echo "--- Configuring NAT ---"
+# Rocky Linux 8 does not install iptables by default (uses nftables).
+# Install iptables and iptables-services so we can persist NAT rules.
+# The head node has direct internet access via its EIP before this step.
+dnf install -y iptables iptables-services
+
 # Enable IP forwarding persistently
 echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-burstlab-forward.conf
 sysctl -p /etc/sysctl.d/99-burstlab-forward.conf
 
-# Masquerade traffic from on-prem and cloud subnets through eth0 (internet)
-# eth0 is the primary interface with the EIP on CentOS 8
-ETH=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
-iptables -t nat -A POSTROUTING -s ${onprem_cidr} -o "$ETH" -j MASQUERADE
-iptables -t nat -A POSTROUTING -s ${cloud_cidr_a} -o "$ETH" -j MASQUERADE
-iptables -t nat -A POSTROUTING -s ${cloud_cidr_b} -o "$ETH" -j MASQUERADE
-iptables -A FORWARD -i "$ETH" -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT || true
-iptables -A FORWARD -i eth1 -o "$ETH" -j ACCEPT || true
+# Flush iptables-services default rules (which include a REJECT catch-all that
+# breaks NAT and eventually exhausts conntrack, dropping new SSH connections).
+# We set all default policies to ACCEPT and only add the MASQUERADE rule needed.
+iptables -F
+iptables -F -t nat
+iptables -X
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
 
-# Persist iptables rules
-service iptables save || iptables-save > /etc/iptables/rules.v4 || true
-# Make it survive reboots via rc.local
-cat > /etc/rc.d/rc.local << 'RCEOF'
-#!/bin/bash
+# Masquerade outbound traffic from cluster subnets through the EIP interface.
+# The head node is the single internet gateway for all on-prem and cloud nodes.
 ETH=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
 iptables -t nat -A POSTROUTING -s ${onprem_cidr} -o "$ETH" -j MASQUERADE
 iptables -t nat -A POSTROUTING -s ${cloud_cidr_a} -o "$ETH" -j MASQUERADE
 iptables -t nat -A POSTROUTING -s ${cloud_cidr_b} -o "$ETH" -j MASQUERADE
-sysctl -w net.ipv4.ip_forward=1
-RCEOF
-chmod +x /etc/rc.d/rc.local
-systemctl enable rc-local
+
+# Persist these rules so iptables-services restores them on every boot.
+# This replaces the iptables-services default ruleset entirely.
+service iptables save
+systemctl enable iptables
 
 # -----------------------------------------------------------------------------
 # 4. Mount EFS
 # -----------------------------------------------------------------------------
-echo "--- Mounting EFS ---"
-# amazon-efs-utils is pre-installed in the AMI
+echo "--- Mounting EFS via NFSv4.1 ---"
+# EFS is mounted using plain nfs4 (nfs-utils). No amazon-efs-utils needed on Rocky/CentOS.
 mkdir -p /home /opt/slurm
 
 # /home — user home directories shared across all nodes
-echo "${efs_dns_name}:/ /home efs _netdev,tls,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/ /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
 
 # /opt/slurm — Slurm binaries, configs, and plugin shared across all nodes
-echo "${efs_dns_name}:/slurm /opt/slurm efs _netdev,tls,noresvport 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0" >> /etc/fstab
+
+# Bootstrap: create EFS /slurm subdirectory if it doesn't exist.
+# NFSv4 subpath mounts require the directory to exist on the server first.
+# Mount EFS root temporarily, create /slurm, then unmount before fstab mounts.
+mkdir -p /mnt/efs-bootstrap
+_EFS_BOOTSTRAP_MOUNTED=0
+for attempt in 1 2 3 4 5; do
+  mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
+    "${efs_dns_name}:/" /mnt/efs-bootstrap && { _EFS_BOOTSTRAP_MOUNTED=1; break; } || {
+    echo "EFS bootstrap mount attempt $attempt failed, retrying in 10s..."
+    sleep 10
+  }
+done
+if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
+  mkdir -p /mnt/efs-bootstrap/slurm
+  umount /mnt/efs-bootstrap
+  echo "EFS /slurm directory ensured."
+else
+  echo "WARN: EFS bootstrap mount failed — /slurm subpath mount may fail."
+fi
+rmdir /mnt/efs-bootstrap 2>/dev/null || true
 
 # Mount EFS — retry loop because EFS mount target may not be ready immediately
 for dir in /home /opt/slurm; do
@@ -97,6 +131,25 @@ for dir in /home /opt/slurm; do
     }
   done
 done
+
+# Inject the EC2 key pair's public key into rocky's authorized_keys on EFS.
+# We do this HERE (after EFS mount) so the key survives on EFS and is visible
+# to subsequent mounts. cloud-init's cc_ssh module may fail on AMIs where
+# SELinux is permissive/disabled (Operation not supported on setfilecon).
+_IMDS_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 300" || true)
+_EC2_PUBKEY=$(curl -sf -H "X-aws-ec2-metadata-token: $_IMDS_TOKEN" \
+  "http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key" || true)
+if [ -n "$_EC2_PUBKEY" ]; then
+  mkdir -p /home/rocky/.ssh
+  grep -qF "$_EC2_PUBKEY" /home/rocky/.ssh/authorized_keys 2>/dev/null || echo "$_EC2_PUBKEY" >> /home/rocky/.ssh/authorized_keys
+  chown rocky:rocky /home/rocky
+  chmod 755 /home/rocky
+  chown -R rocky:rocky /home/rocky/.ssh
+  chmod 700 /home/rocky/.ssh
+  chmod 600 /home/rocky/.ssh/authorized_keys
+  echo "SSH key injected to EFS /home/rocky/.ssh/authorized_keys."
+fi
 
 # -----------------------------------------------------------------------------
 # 5. Populate /opt/slurm on EFS from AMI (first boot only)
@@ -188,24 +241,32 @@ systemctl start slurmdbd
 sleep 5  # Give slurmdbd time to initialize the DB schema
 
 systemctl enable slurmctld
-systemctl start slurmctld
+# slurmctld may fail on first start because burst node definitions are not
+# yet in slurm.conf (generate_conf.py appends them in step 11). We allow
+# the failure here and do a hard restart after generate_conf.py completes.
+systemctl start slurmctld || echo "[WARN] slurmctld did not start on first attempt — will retry after generate_conf.py"
 sleep 3
 
 systemctl is-active slurmdbd || { echo "FATAL: slurmdbd failed"; journalctl -u slurmdbd --no-pager -n 30; exit 1; }
-systemctl is-active slurmctld || { echo "FATAL: slurmctld failed"; journalctl -u slurmctld --no-pager -n 30; exit 1; }
 
 # Create the default Slurm account (required for job submission)
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
 /opt/slurm/bin/sacctmgr -i add cluster ${cluster_name} || true
 /opt/slurm/bin/sacctmgr -i add account default description="Default account" organization="BurstLab" || true
 /opt/slurm/bin/sacctmgr -i add user root account=default || true
+/opt/slurm/bin/sacctmgr -i add user rocky account=default || true
 
 # -----------------------------------------------------------------------------
 # 10. Install Plugin v2
 # -----------------------------------------------------------------------------
 echo "--- Installing AWS Plugin for Slurm v2 ---"
 cd /opt/slurm/etc/aws
-git clone --branch plugin-v2 --depth 1 \
-  https://github.com/aws-samples/aws-plugin-for-slurm.git .
+if [ ! -d /opt/slurm/etc/aws/.git ]; then
+  git clone --branch plugin-v2 --depth 1 \
+    https://github.com/aws-samples/aws-plugin-for-slurm.git .
+else
+  echo "Plugin already installed on EFS, skipping git clone."
+fi
 
 chmod +x resume.py suspend.py change_state.py generate_conf.py
 
@@ -226,21 +287,39 @@ echo "--- Generating burst node config ---"
 cd /opt/slurm/etc/aws
 python3 generate_conf.py
 
-# Append the generated cloud node definitions to slurm.conf
+# Append only NodeName/PartitionName lines from slurm.conf.aws to slurm.conf.
+# generate_conf.py also outputs plugin directives (PrivateData, ResumeProgram, etc.)
+# which are already in the base slurm.conf template — appending them again causes
+# "specified more than once" fatal errors. We extract only the node/partition lines.
 if [ -f slurm.conf.aws ]; then
-  # Remove the placeholder line and append actual generated config
-  grep -v '^\$\{burst_node_conf\}' /opt/slurm/etc/slurm.conf > /tmp/slurm.conf.clean
-  cat /tmp/slurm.conf.clean slurm.conf.aws > /opt/slurm/etc/slurm.conf
-  echo "Appended burst node config to slurm.conf:"
+  echo "slurm.conf.aws generated:"
   cat slurm.conf.aws
+  grep -E "^(NodeName|PartitionName)=" slurm.conf.aws >> /opt/slurm/etc/slurm.conf
+  echo "Appended NodeName/PartitionName lines to slurm.conf."
 fi
 
 # Copy gres.conf if generated (needed even if empty)
 [ -f gres.conf.aws ] && cp gres.conf.aws /opt/slurm/etc/gres.conf || touch /opt/slurm/etc/gres.conf
 
-# Reload slurmctld to pick up the new node/partition definitions
+# Start or reload slurmctld now that burst node config is in slurm.conf
 sleep 2
-/opt/slurm/bin/scontrol reconfigure
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
+if systemctl is-active slurmctld; then
+  /opt/slurm/bin/scontrol reconfigure || systemctl restart slurmctld
+else
+  systemctl start slurmctld
+  sleep 3
+  systemctl is-active slurmctld || { echo "FATAL: slurmctld failed after generate_conf"; journalctl -u slurmctld --no-pager -n 50; exit 1; }
+fi
+
+# Set SLURM_CONF globally so interactive tools (sinfo, scontrol, etc.) work
+# without needing the env var set manually. The systemd service already has it,
+# but shell sessions need it via profile.d.
+cat > /etc/profile.d/slurm.sh << 'SLURMPROFILE'
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
+export PATH=/opt/slurm/bin:/opt/slurm/sbin:$PATH
+SLURMPROFILE
+chmod 644 /etc/profile.d/slurm.sh
 
 # -----------------------------------------------------------------------------
 # 12. Install change_state.py cron

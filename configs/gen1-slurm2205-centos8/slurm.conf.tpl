@@ -41,7 +41,6 @@ SelectTypeParameters=CR_Core_Memory
 AccountingStorageType=accounting_storage/slurmdbd
 AccountingStorageHost=headnode
 AccountingStoragePort=6819
-AccountingStoreTRES=gres/gpu
 AccountingStorageEnforce=associations,limits
 
 # --- Logging -----------------------------------------------------------------
@@ -90,6 +89,11 @@ ResumeTimeout=300
 # 350 = 300 (ResumeTimeout) + 50s buffer.
 SuspendTime=350
 
+# SuspendExcNodes: exclude static on-prem compute nodes from power-saving.
+# Without this, SuspendProgram is called on all idle nodes including the static
+# compute nodes — Slurm marks them POWERED_DOWN and they become unavailable.
+SuspendExcNodes=compute[01-0${compute_node_count}]
+
 # TreeWidth: how many nodes slurmctld fans out to simultaneously for messaging.
 # Set high for cloud environments — default (50) throttles burst signaling.
 TreeWidth=60000
@@ -107,7 +111,7 @@ DebugFlags=NO_CONF_HASH
 # --- On-Prem Compute Nodes ---------------------------------------------------
 # Static nodes — always present, never suspended.
 # RealMemory is total node RAM minus ~500MB OS overhead (m7a.large = 8192MB).
-NodeName=compute[01-0${compute_node_count}] CPUs=2 RealMemory=7500 State=IDLE
+NodeName=compute[01-0${compute_node_count}] CPUs=2 RealMemory=7400 State=IDLE
 PartitionName=local Nodes=compute[01-0${compute_node_count}] Default=YES MaxTime=INFINITE State=UP
 
 # --- AWS Burst Nodes ---------------------------------------------------------

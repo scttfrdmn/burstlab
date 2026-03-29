@@ -59,30 +59,17 @@ resource "aws_efs_file_system" "main" {
 # Instances connect to the mount target's DNS name, which resolves to the
 # correct mount target IP for the instance's AZ.
 
-# Management subnet — head node uses this mount target.
+# us-west-2a — covers management, onprem, and cloud-a subnets.
+# EFS allows only one mount target per AZ. All three subnets in us-west-2a
+# (management 10.0.0.0/24, onprem 10.0.1.0/24, cloud-a 10.0.2.0/24) reach
+# EFS via this single mount target; VPC routing handles intra-AZ delivery.
 resource "aws_efs_mount_target" "management" {
   file_system_id  = aws_efs_file_system.main.id
   subnet_id       = var.management_subnet_id
   security_groups = [var.efs_sg_id]
 }
 
-# On-prem subnet — compute01-04 use this mount target.
-resource "aws_efs_mount_target" "onprem" {
-  file_system_id  = aws_efs_file_system.main.id
-  subnet_id       = var.onprem_subnet_id
-  security_groups = [var.efs_sg_id]
-}
-
-# Cloud subnet A (us-west-2a) — burst nodes in AZ-A use this.
-resource "aws_efs_mount_target" "cloud_a" {
-  file_system_id  = aws_efs_file_system.main.id
-  subnet_id       = var.cloud_subnet_a_id
-  security_groups = [var.efs_sg_id]
-}
-
-# Cloud subnet B (us-west-2b) — burst nodes in AZ-B use this.
-# Without this mount target, burst nodes in us-west-2b would get an NFS
-# connection refusal or fall back to cross-AZ (which adds latency and cost).
+# us-west-2b — burst nodes launched in cloud-b subnet use this mount target.
 resource "aws_efs_mount_target" "cloud_b" {
   file_system_id  = aws_efs_file_system.main.id
   subnet_id       = var.cloud_subnet_b_id

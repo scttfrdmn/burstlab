@@ -32,7 +32,7 @@ resource "aws_instance" "head_node" {
 
   vpc_security_group_ids = [var.sg_id]
 
-  iam_instance_profile = var.instance_profile_arn
+  iam_instance_profile = var.instance_profile_name
 
   # source_dest_check = false is REQUIRED for the head node to act as a NAT router.
   # By default, AWS drops packets where the source or destination IP doesn't match
@@ -64,7 +64,10 @@ resource "aws_instance" "head_node" {
   #   4. Enables iptables NAT masquerade for compute and burst subnets
   #   5. Starts munge, slurmdbd, slurmctld
   #   6. Installs the cron job that runs change_state.py every minute
-  user_data = templatefile("${path.module}/../../scripts/userdata/head-node-init.sh.tpl", {
+  # Configs (slurm.conf, partitions.json, etc.) make UserData exceed the 16 KB
+  # plain-text limit. AWS supports gzip-compressed UserData — cloud-init detects
+  # and decompresses automatically. base64gzip renders → gzip → base64 in one call.
+  user_data_base64 = base64gzip(templatefile("${path.module}/../../../scripts/userdata/head-node-init.sh.tpl", {
     cluster_name              = var.cluster_name
     munge_key_b64             = var.munge_key_b64
     efs_dns_name              = var.efs_dns_name
@@ -80,7 +83,8 @@ resource "aws_instance" "head_node" {
     partitions_json           = var.partitions_json
     slurmdbd_db_password      = var.slurmdbd_db_password
     aws_region                = var.aws_region
-  })
+    compute_node_count        = var.compute_node_count
+  }))
 
   # Ensure instance replacement recreates the UserData (not just reboots).
   # Without this, changing UserData on an already-created instance has no effect.

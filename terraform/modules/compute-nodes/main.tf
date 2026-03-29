@@ -29,6 +29,10 @@ resource "aws_instance" "compute" {
   instance_type = var.instance_type
   key_name      = var.key_name
   subnet_id     = var.subnet_id
+  # Assign a deterministic static private IP so the head node's /etc/hosts
+  # (built with cidrhost(onprem_cidr, i+10)) resolves compute01..N correctly.
+  # compute01 → .10, compute02 → .11, etc.
+  private_ip    = cidrhost(var.onprem_cidr, count.index + 10)
 
   vpc_security_group_ids = [var.sg_id]
 
@@ -60,7 +64,7 @@ resource "aws_instance" "compute" {
   #
   # node_index is count.index + 1 (1-based) so compute01 gets node_index=1.
   # This is used in the init script to set the hostname: compute01, compute02...
-  user_data = templatefile("${path.module}/../../scripts/userdata/compute-node-init.sh.tpl", {
+  user_data = templatefile("${path.module}/../../../scripts/userdata/compute-node-init.sh.tpl", {
     cluster_name              = var.cluster_name
     node_index                = count.index + 1
     munge_key_b64             = var.munge_key_b64
