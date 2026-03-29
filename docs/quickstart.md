@@ -1,6 +1,6 @@
 # Quickstart: Deploy Your First BurstLab in 15 Minutes
 
-This guide walks through deploying a complete Gen 1 BurstLab cluster: CentOS 8, Slurm 22.05.11, and the AWS Plugin for Slurm v2 pre-configured for cloud bursting.
+This guide walks through deploying a complete Gen 1 BurstLab cluster: Rocky Linux 8 (CentOS 8 compatible), Slurm 22.05.11, and the AWS Plugin for Slurm v2 pre-configured for cloud bursting.
 
 Total time: 10-15 minutes for the Packer AMI build, then 3-5 minutes for Terraform.
 
@@ -44,11 +44,11 @@ The Packer build compiles Slurm 22.05.11 from source on a CentOS 8 instance and 
 ```bash
 cd ami/
 packer init .
-packer build -var "aws_profile=aws" centos8-slurm2205.pkr.hcl
+packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
 ```
 
 The build does the following on an `m7a.xlarge` build instance (see [architecture.md](architecture.md) for why we pre-bake vs cloud-init):
-- Fixes CentOS 8 EOL repos to point at `vault.centos.org`
+- Enables PowerTools repo (required for `-devel` packages on Rocky 8)
 - Installs build dependencies
 - Creates `slurm` (UID 1001) and `munge` (UID 985) users with pinned IDs
 - Downloads and compiles Slurm 22.05.11 to `/opt/slurm-baked/`
@@ -60,7 +60,7 @@ On success, Packer prints:
 
 ```
 ==> Builds finished. The artifacts of successful builds are:
---> amazon-ebs.centos8: AMIs were created:
+--> amazon-ebs.rocky8: AMIs were created:
 us-west-2: ami-XXXXXXXXXXXXXXXXX
 ```
 
@@ -68,14 +68,14 @@ us-west-2: ami-XXXXXXXXXXXXXXXXX
 ```bash
 aws --profile aws ec2 describe-images \
   --owners self \
-  --filters "Name=name,Values=burstlab-gen1-centos8-*" \
+  --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
   --query 'Images[0].ImageId' \
   --output text
 ```
 
 If the build fails, the most common causes are:
-- CentOS 8 AMI not found in the region — try pinning `source_ami` to a known CentOS 8 AMI ID
-- Network timeout during package downloads — retry; vault.centos.org can be slow
+- Rocky 8 AMI not found in the region — try pinning `source_ami` to a known Rocky 8 AMI ID from owner `792107900819`
+- Network timeout during package downloads — retry
 - Instance type not available — change `instance_type` to `m5.xlarge` or `c5.xlarge`
 
 ---
@@ -83,7 +83,7 @@ If the build fails, the most common causes are:
 ## Step 2: Configure Terraform
 
 ```bash
-cd terraform/generations/gen1-slurm2205-centos8/
+cd terraform/generations/gen1-slurm2205-rocky8/
 cp terraform.tfvars.example terraform.tfvars
 ```
 
@@ -141,7 +141,7 @@ burst_launch_template_id = "lt-XXXXXXXXXXXXXXXXX"
 The cluster is deployed but cloud-init still needs to finish configuring it. Give it 3-5 minutes before SSHing in, or SSH in immediately and tail the init log:
 
 ```bash
-ssh -i ~/.ssh/your-key.pem centos@<head_node_public_ip>
+ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
 sudo tail -f /var/log/burstlab-init.log
 ```
 
@@ -270,7 +270,7 @@ The instance will terminate automatically after `SuspendTime` expires — you do
 When you are done with the cluster:
 
 ```bash
-# From your local machine, in the terraform/generations/gen1-slurm2205-centos8/ directory
+# From your local machine, in the terraform/generations/gen1-slurm2205-rocky8/ directory
 terraform destroy
 # Type 'yes' to confirm
 ```
@@ -283,7 +283,7 @@ This destroys all Terraform-managed resources: VPC, EC2 instances, EFS filesyste
 # Get the AMI ID
 AMI_ID=$(aws --profile aws ec2 describe-images \
   --owners self \
-  --filters "Name=name,Values=burstlab-gen1-centos8-*" \
+  --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
   --query 'Images[0].ImageId' \
   --output text)
 

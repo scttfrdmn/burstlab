@@ -11,7 +11,7 @@
 #   outputs in one place, keeping the config rendering logic centralized.
 #
 # All config templates live under:
-#   configs/gen1-slurm2205-centos8/
+#   configs/gen1-slurm2205-rocky8/
 # relative to the repo root (two directories up from this file).
 # =============================================================================
 
@@ -41,9 +41,9 @@ locals {
   # ---------------------------------------------------------------------------
   # Config template base path
   # ---------------------------------------------------------------------------
-  # path.module is this directory (generations/gen1-slurm2205-centos8/).
+  # path.module is this directory (generations/gen1-slurm2205-rocky8/).
   # Configs live two levels up at the repo root under configs/.
-  config_dir = "${path.module}/../../../configs/gen1-slurm2205-centos8"
+  config_dir = "${path.module}/../../../configs/gen1-slurm2205-rocky8"
 
   # ---------------------------------------------------------------------------
   # slurm.conf

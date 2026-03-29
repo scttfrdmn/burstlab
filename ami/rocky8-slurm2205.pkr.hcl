@@ -1,6 +1,6 @@
 # =============================================================================
 # BurstLab Gen 1 — Packer AMI Template
-# CentOS 8 + Slurm 22.05.11 + AWS deps
+# Rocky Linux 8 + Slurm 22.05.11 + AWS deps
 #
 # This AMI is the base for ALL node roles: head, compute, and burst.
 # Node-role differentiation happens at cloud-init / boot time, not here.
@@ -11,7 +11,7 @@
 #   - On head node first boot: rsync /opt/slurm-baked/ → EFS, then mount EFS at /opt/slurm
 #   - On compute/burst nodes: EFS is mounted at /opt/slurm at boot (no local copy needed)
 #
-# Build: packer build centos8-slurm2205.pkr.hcl
+# Build: packer build rocky8-slurm2205.pkr.hcl
 # =============================================================================
 
 packer {
@@ -51,7 +51,7 @@ variable "instance_type" {
 # Source: Amazon EBS-backed instance
 # -----------------------------------------------------------------------------
 
-source "amazon-ebs" "centos8" {
+source "amazon-ebs" "rocky8" {
   profile = var.aws_profile
   region  = var.aws_region
 
@@ -159,7 +159,7 @@ source "amazon-ebs" "centos8" {
 # -----------------------------------------------------------------------------
 
 build {
-  sources = ["source.amazon-ebs.centos8"]
+  sources = ["source.amazon-ebs.rocky8"]
 
   provisioner "shell" {
     # Longer timeout for the Slurm compile step on slower instance types

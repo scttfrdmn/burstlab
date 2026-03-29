@@ -1,7 +1,7 @@
 # BurstLab Gen 1 AMI
 
 This directory contains the Packer template that builds the base AMI for all BurstLab nodes
-(head, compute, and burst). The AMI is CentOS 8 with Slurm 22.05.11 compiled from source.
+(head, compute, and burst). The AMI is Rocky Linux 8 (CentOS 8 compatible) with Slurm 22.05.11 compiled from source.
 
 ---
 
@@ -17,7 +17,7 @@ This directory contains the Packer template that builds the base AMI for all Bur
 Install the Packer Amazon plugin (one-time, per machine):
 
 ```bash
-packer init centos8-slurm2205.pkr.hcl
+packer init rocky8-slurm2205.pkr.hcl
 ```
 
 ### AWS Credentials
@@ -53,29 +53,29 @@ From this directory:
 
 ```bash
 # Initialize plugins (first time only)
-packer init centos8-slurm2205.pkr.hcl
+packer init rocky8-slurm2205.pkr.hcl
 
 # Validate the template
-packer validate centos8-slurm2205.pkr.hcl
+packer validate rocky8-slurm2205.pkr.hcl
 
 # Build
-packer build centos8-slurm2205.pkr.hcl
+packer build rocky8-slurm2205.pkr.hcl
 ```
 
 ### Common overrides
 
 ```bash
 # Different region
-packer build -var aws_region=us-east-1 centos8-slurm2205.pkr.hcl
+packer build -var aws_region=us-east-1 rocky8-slurm2205.pkr.hcl
 
 # Different AWS profile
-packer build -var aws_profile=myprofile centos8-slurm2205.pkr.hcl
+packer build -var aws_profile=myprofile rocky8-slurm2205.pkr.hcl
 
 # Use a larger instance for faster compile
-packer build -var instance_type=c7a.2xlarge centos8-slurm2205.pkr.hcl
+packer build -var instance_type=c7a.2xlarge rocky8-slurm2205.pkr.hcl
 
 # Use a var file
-packer build -var-file=my.pkrvars.hcl centos8-slurm2205.pkr.hcl
+packer build -var-file=my.pkrvars.hcl rocky8-slurm2205.pkr.hcl
 ```
 
 Example `my.pkrvars.hcl`:
@@ -109,7 +109,7 @@ Packer prints the AMI ID at the end of a successful build:
 
 ```
 ==> Builds finished. The artifacts of successful builds are:
---> amazon-ebs.centos8: AMIs were created:
+--> amazon-ebs.rocky8: AMIs were created:
 us-west-2: ami-0xxxxxxxxxxxxxxxx
 ```
 
@@ -186,11 +186,14 @@ The Slurm RPM spec does not cleanly support `--prefix` overrides via `--define`.
 from source with `./configure --prefix=...` gives a clean install under `/opt/slurm-baked/`
 with no files leaking to `/usr/` or `/etc/`.
 
-**Why CentOS 8 and not CentOS Stream / AlmaLinux / Rocky?**
+**Why Rocky Linux 8 and not CentOS 8?**
 
-BurstLab Gen 1 targets the CentOS 8 ecosystem for compatibility with existing HPC site configs.
-The repo vault fix makes the image buildable. Future generations should migrate to AlmaLinux 8
-or Rocky Linux 8, which have active update repositories and are binary-compatible with CentOS 8.
+CentOS 8 reached EOL in December 2021 and the official CentOS AWS account no longer publishes
+CentOS 8 AMIs. Rocky Linux 8 is the direct community successor: binary-compatible with RHEL 8,
+same package versions, same kernel series (4.18.x), same systemd. For BurstLab purposes it is
+functionally identical to CentOS 8. Rocky 8 repos are actively maintained — no vault redirect
+needed on the AMI itself (the vault fix is documented in UserData scripts for TCU's actual
+CentOS 8 machines).
 
 ---
 
@@ -198,13 +201,15 @@ or Rocky Linux 8, which have active update repositories and are binary-compatibl
 
 **`dnf makecache` fails with "Failed to download metadata"`**
 
-The vault.centos.org sed commands did not match all repo files. Check:
+Rocky Linux 8 repos are actively maintained — no vault redirect is needed. If this fails,
+check that the instance has outbound internet access and that the Rocky 8 mirrorlist is
+reachable. Verify the PowerTools repo name:
 
 ```bash
-grep -r baseurl /etc/yum.repos.d/
+dnf repolist --all | grep -i powertools
 ```
 
-All `baseurl=` values should point to `vault.centos.org`.
+On Rocky 8 it may be `powertools` (lowercase) or `PowerTools`; the Packer template tries both.
 
 **`./configure` fails with "munge not found"`**
 
@@ -228,5 +233,5 @@ aws ec2 copy-image \
   --source-region us-west-2 \
   --source-image-id ami-0xxxxxxxxxxxxxxxx \
   --region us-east-1 \
-  --name "burstlab-gen1-centos8-slurm22.05.11-copy"
+  --name "burstlab-gen1-rocky8-slurm22.05.11-copy"
 ```

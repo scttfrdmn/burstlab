@@ -13,17 +13,17 @@ BurstLab takes 10-15 minutes to build the AMI and 5-10 minutes to deploy via Ter
 ```bash
 # Build AMI (one-time, ~15 min)
 cd ami/
-packer build -var "aws_profile=aws" centos8-slurm2205.pkr.hcl
+packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
 
 # Deploy cluster (~5 min, morning of)
-cd terraform/generations/gen1-slurm2205-centos8/
+cd terraform/generations/gen1-slurm2205-rocky8/
 terraform apply -auto-approve
 ```
 
 After deploy, run the validation script to confirm everything is healthy before the call:
 
 ```bash
-ssh -i ~/.ssh/your-key.pem centos@<head_node_public_ip>
+ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
 bash /opt/slurm/etc/validate-cluster.sh
 ```
 
@@ -58,7 +58,7 @@ Run through this in sequence. Each step has a talking point. Adjust the depth ba
 ### 1. Show the Cluster is Running
 
 ```bash
-ssh -i ~/.ssh/your-key.pem centos@<head_node_public_ip>
+ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
 ```
 
 **Talking point:** "We're SSH'd into the head node — this is where slurmctld runs, the Slurm controller daemon. Think of it as the scheduler brain."
@@ -212,7 +212,7 @@ cloud        up    4:00:00     10  cloud~   cloud-burst-[0-9]
 
 To demonstrate with a Slurm version that matches the customer:
 
-1. Open `ami/centos8-slurm2205.pkr.hcl`
+1. Open `ami/rocky8-slurm2205.pkr.hcl`
 2. Change `default = "22.05.11"` in the `slurm_version` variable to the target version
 3. Update the download URL in the build steps if the version is significantly different
 4. Rebuild the AMI with Packer
@@ -221,11 +221,12 @@ For a version in the same 22.x family (22.05.7, 22.05.9, etc.), the only change 
 
 ### Changing the OS
 
-To demonstrate on Rocky 8 (closer to some customers' environments):
+BurstLab Gen 1 already uses Rocky Linux 8 as the base AMI. To demonstrate on a different OS
+(e.g., Rocky 9 or AlmaLinux 8):
 
-- The Packer source AMI filter should target Rocky 8 from RESF: `Name=Rocky-8-*` from owner `792107900819`
-- Replace `vault.centos.org` repo fixes with standard Rocky 8 repo setup (repos work out of the box)
-- Python 3 and other dependencies are available in Rocky 8 baserepos without EPEL
+- Update the `source_ami_filter` in `ami/rocky8-slurm2205.pkr.hcl` to target the desired OS AMI
+- Adjust any OS-specific package names or repo setup steps in the Packer provisioner
+- Python 3 and other dependencies are available in Rocky/Alma 8/9 baserepos without EPEL
 
 ### Changing the Burst Instance Type
 
@@ -240,7 +241,7 @@ Also update `SlurmSpecifications.CPUs` and `SlurmSpecifications.RealMemory` in `
 
 ### Demonstrating Spot Instances
 
-Edit `configs/gen1-slurm2205-centos8/partitions.json.tpl`:
+Edit `configs/gen1-slurm2205-rocky8/partitions.json.tpl`:
 
 ```json
 "PurchasingOption": "spot",
@@ -363,7 +364,7 @@ For BurstLab demos, local users (UIDs match across all nodes because all nodes u
 ## After the Meeting
 
 1. Share the BurstLab repo link with the customer
-2. Point them to `configs/gen1-slurm2205-centos8/` for the canonical config files
+2. Point them to `configs/gen1-slurm2205-rocky8/` for the canonical config files
 3. Run `terraform destroy` to clean up the BurstLab cluster
 4. Deregister the Packer AMI if you do not have a near-term follow-up meeting
 5. File a brief note in the engagement tracker: which Gen, which customer pain points were addressed, what questions came up

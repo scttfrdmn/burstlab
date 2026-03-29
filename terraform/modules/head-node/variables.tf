@@ -4,7 +4,7 @@ variable "cluster_name" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for the head node. Must be the output of the BurstLab Packer build (centos8-slurm2205). This AMI has Slurm 22.05.11, slurmctld, slurmdbd, and all dependencies pre-installed."
+  description = "AMI ID for the head node. Must be the output of the BurstLab Packer build (rocky8-slurm2205). This AMI has Slurm 22.05.11, slurmctld, slurmdbd, and all dependencies pre-installed."
   type        = string
 }
 

@@ -2,7 +2,7 @@
 
 This is the document an SA shows a customer. Every directive in the BurstLab Gen 1 `slurm.conf` is explained — what it does, why this specific value was chosen, and what breaks if you get it wrong.
 
-The full template lives at `configs/gen1-slurm2205-centos8/slurm.conf.tpl`. What follows is that template, section by section, with full explanation.
+The full template lives at `configs/gen1-slurm2205-rocky8/slurm.conf.tpl`. What follows is that template, section by section, with full explanation.
 
 ---
 
@@ -126,7 +126,7 @@ sacctmgr -i add account burstlab Description="BurstLab" Organization="BurstLab"
 sacctmgr -i add user centos account=burstlab adminlevel=None
 ```
 
-**slurmdbd.conf** is a separate configuration file (`configs/gen1-slurm2205-centos8/slurmdbd.conf.tpl`). Key points:
+**slurmdbd.conf** is a separate configuration file (`configs/gen1-slurm2205-rocky8/slurmdbd.conf.tpl`). Key points:
 - Must be owned by `slurm:slurm` with mode `0600` — slurmdbd refuses to start if permissions are wrong
 - `StorageType=accounting_storage/mysql` — slurmdbd uses MariaDB on the head node
 - `StoragePass` is substituted at deploy time from a Terraform-generated random password

@@ -46,14 +46,14 @@ burstlab/
 │   │   ├── iam/                     # Head node and burst node IAM roles
 │   │   └── burst-config/            # Plugin v2 config files rendered from templates
 │   └── generations/
-│       └── gen1-slurm2205-centos8/  # Complete Gen 1 root module
+│       └── gen1-slurm2205-rocky8/  # Complete Gen 1 root module
 │
 ├── cdk/                             # AWS CDK (TypeScript) — parallel IaC
 │   ├── lib/constructs/              # VPC, head node, storage, IAM constructs
 │   └── lib/stacks/                  # Per-generation stack entry points
 │
 ├── configs/
-│   └── gen1-slurm2205-centos8/      # Canonical Slurm config templates (source of truth)
+│   └── gen1-slurm2205-rocky8/      # Canonical Slurm config templates (source of truth)
 │       ├── slurm.conf.tpl
 │       ├── partitions.json.tpl
 │       ├── plugin_config.json.tpl
@@ -65,7 +65,7 @@ burstlab/
 │   └── userdata                     # Head node cloud-init bootstrap
 │
 └── ami/
-    └── centos8-slurm2205.pkr.hcl    # Packer template: CentOS 8 + Slurm 22.05.11
+    └── rocky8-slurm2205.pkr.hcl     # Packer template: Rocky Linux 8 + Slurm 22.05.11
 ```
 
 ---
@@ -98,16 +98,16 @@ Short version:
 ```bash
 # 1. Build the AMI (~10-15 minutes)
 cd ami/
-packer build -var "aws_profile=aws" centos8-slurm2205.pkr.hcl
+packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
 
 # 2. Configure and deploy
-cd terraform/generations/gen1-slurm2205-centos8/
+cd terraform/generations/gen1-slurm2205-rocky8/
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars: key_name, head_node_ami
 terraform init && terraform apply
 
 # 3. Validate
-ssh -i ~/.ssh/your-key.pem centos@<head_node_public_ip>
+ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
 sudo tail -f /var/log/burstlab-init.log  # wait for init
 sinfo                                     # should show local + cloud partitions
 ```
@@ -156,7 +156,7 @@ The immediate driver for this project was the TCU/Hannabyte engagement. TCU runs
 
 BurstLab is intentionally structured for extension:
 
-- **New Slurm version**: Copy `configs/gen1-slurm2205-centos8/` to a new directory, update the config templates, add a Packer template, add a Terraform generation module.
+- **New Slurm version**: Copy `configs/gen1-slurm2205-rocky8/` to a new directory, update the config templates, add a Packer template, add a Terraform generation module.
 - **New OS**: Swap the Packer source AMI and update the repo-fix steps. The rest of the provisioning logic is largely OS-agnostic.
 - **New instance type**: Change `burst_instance_type` in `terraform.tfvars` and update the CPU/memory values in `partitions.json.tpl`.
 - **Spot instances**: Set `"PurchasingOption": "spot"` in `partitions.json.tpl` and add a `SpotOptions` block with your interruption strategy.

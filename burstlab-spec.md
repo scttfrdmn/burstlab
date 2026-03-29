@@ -125,7 +125,7 @@ burstlab/
 │   │   └── burst-config/        # Plugin v2 configuration files
 │   │
 │   └── generations/
-│       ├── gen1-slurm2205-centos8/
+│       ├── gen1-slurm2205-rocky8/
 │       │   ├── main.tf
 │       │   ├── variables.tf
 │       │   ├── outputs.tf
@@ -147,7 +147,7 @@ burstlab/
 │   │   │   └── burstlab-burst-config.ts
 │   │   │
 │   │   └── stacks/
-│   │       ├── gen1-slurm2205-centos8-stack.ts
+│   │       ├── gen1-slurm2205-rocky8-stack.ts
 │   │       ├── gen2-slurm2311-rocky-stack.ts
 │   │       └── gen3-slurm2405-rocky9-stack.ts
 │   │
@@ -157,7 +157,7 @@ burstlab/
 │       └── gen3/
 │
 ├── configs/                     # Canonical Slurm configs (source of truth)
-│   ├── gen1-slurm2205-centos8/
+│   ├── gen1-slurm2205-rocky8/
 │   │   ├── slurm.conf.tpl
 │   │   ├── partitions.json.tpl
 │   │   ├── slurm_plugin.conf.tpl
@@ -172,7 +172,7 @@ burstlab/
 │   └── teardown.sh              # Clean shutdown
 │
 └── ami/                         # Optional: Packer templates for pre-baked AMIs
-    ├── centos8-slurm2205.pkr.hcl
+    ├── rocky8-slurm2205.pkr.hcl
     ├── rocky8-slurm2311.pkr.hcl
     └── rocky9-slurm2405.pkr.hcl
 ```

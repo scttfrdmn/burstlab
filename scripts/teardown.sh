@@ -7,7 +7,7 @@
 # avoids Slurm error states on next deploy.
 #
 # Run from the TERRAFORM DIRECTORY (not on the head node):
-#   cd terraform/generations/gen1-slurm2205-centos8/
+#   cd terraform/generations/gen1-slurm2205-rocky8/
 #   bash ../../../scripts/teardown.sh
 #
 # Or pass the head node IP to drain first:
@@ -25,7 +25,7 @@ _warn() { echo "[WARN] $1"; }
 # If we have SSH access to the head node, drain gracefully first
 if [ -n "$HEAD_NODE_IP" ]; then
   _info "Draining cluster on $HEAD_NODE_IP before destroy..."
-  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "centos@$HEAD_NODE_IP" "
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "rocky@$HEAD_NODE_IP" "
     set -e
     SBIN=/opt/slurm/bin
 
@@ -101,6 +101,6 @@ else
   echo "set HEAD_NODE_IP and run it manually. Terraform destroy not run."
   echo
   echo "To destroy manually:"
-  echo "  cd terraform/generations/gen1-slurm2205-centos8/"
+  echo "  cd terraform/generations/gen1-slurm2205-rocky8/"
   echo "  terraform destroy"
 fi

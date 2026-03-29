@@ -1,6 +1,6 @@
 # =============================================================================
 # ROOT MODULE — BurstLab Gen 1
-# Generation: gen1-slurm2205-centos8
+# Generation: gen1-slurm2205-rocky8
 # =============================================================================
 # This is the top-level Terraform configuration for BurstLab Gen 1.
 # It wires together all modules to produce a complete "mock on-prem" HPC

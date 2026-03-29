@@ -52,7 +52,7 @@ This log is on local disk (not EFS) so that plugin output is node-specific and d
 
 ## config.json Walkthrough
 
-Full template at `configs/gen1-slurm2205-centos8/plugin_config.json.tpl`:
+Full template at `configs/gen1-slurm2205-rocky8/plugin_config.json.tpl`:
 
 ```json
 {
@@ -95,7 +95,7 @@ ERROR: SlurmConf.ResumeTimeout in config.json (300) does not match
 
 ## partitions.json Walkthrough
 
-Full template at `configs/gen1-slurm2205-centos8/partitions.json.tpl`:
+Full template at `configs/gen1-slurm2205-rocky8/partitions.json.tpl`:
 
 ```json
 {

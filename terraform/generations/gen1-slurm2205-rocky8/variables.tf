@@ -29,7 +29,7 @@ variable "key_name" {
 }
 
 variable "head_node_ami" {
-  description = "AMI ID for the head node. Must be the output of: packer build ami/centos8-slurm2205.pkr.hcl. This AMI has CentOS 8, Slurm 22.05.11, MariaDB, and all dependencies pre-installed. The AMI ID changes every time you run Packer — get the latest from Packer output or: aws ec2 describe-images --owners self --filters Name=name,Values='burstlab-*'"
+  description = "AMI ID for the head node. Must be the output of: packer build ami/rocky8-slurm2205.pkr.hcl. This AMI has Rocky Linux 8, Slurm 22.05.11, MariaDB, and all dependencies pre-installed. The AMI ID changes every time you run Packer — get the latest from Packer output or: aws ec2 describe-images --owners self --filters Name=name,Values='burstlab-*'"
   type        = string
   # No default — AMI is region-specific and built by Packer.
 }
