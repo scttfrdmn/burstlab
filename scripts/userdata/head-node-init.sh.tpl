@@ -124,9 +124,8 @@ for attempt in 1 2 3 4 5; do
 done
 if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
   mkdir -p /mnt/efs-bootstrap/slurm
-  mkdir -p /mnt/efs-bootstrap/alice
   umount /mnt/efs-bootstrap
-  echo "EFS /slurm and /alice directories ensured."
+  echo "EFS /slurm directory ensured."
 else
   echo "WARN: EFS bootstrap mount failed — /slurm subpath mount may fail."
 fi
