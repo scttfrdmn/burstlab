@@ -13,7 +13,7 @@ output "efs_dns_name" {
 }
 
 output "efs_home_access_point_id" {
-  description = "Access point ID for the /home export. Used in mount options: mount -t efs -o tls,accesspoint=APID fs-XXX:/ /home"
+  description = "Access point ID for the /u (home) export."
   value       = aws_efs_access_point.home.id
 }
 

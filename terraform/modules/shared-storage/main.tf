@@ -1,7 +1,7 @@
 # =============================================================================
 # SHARED STORAGE MODULE — BurstLab Gen 1
 # =============================================================================
-# Creates an EFS filesystem with mount targets in all four subnets.
+# Creates an EFS filesystem with mount targets in two AZs.
 #
 # Why EFS?
 #   Slurm requires that /opt/slurm (binaries, config, plugins) is identical
@@ -9,13 +9,14 @@
 #   on-prem cluster this is typically an NFS server. EFS gives us managed NFS
 #   that scales automatically and survives node reboots/replacements.
 #
-# Two logical exports (enforced by access points):
-#   /      → mounted as /home on all nodes     (user home directories)
-#   /slurm → mounted as /opt/slurm on all nodes (Slurm install + config)
+# Two mount points:
+#   /      → mounted as /u on all nodes          (cluster user home directories)
+#   /slurm → mounted as /opt/slurm on all nodes  (Slurm install + config)
 #
-# Mount targets in all 4 subnets ensure:
-#   - No cross-AZ NFS traffic (burst nodes in us-west-2b use the cloud-b target)
-#   - All nodes can mount immediately without routing through another AZ
+# Two mount targets (one per AZ):
+#   - us-west-2a covers management, onprem, and cloud-a subnets
+#     (EFS allows one target per AZ; VPC routing handles all three subnets)
+#   - us-west-2b covers cloud-b subnet for multi-AZ burst nodes
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -84,11 +85,11 @@ resource "aws_efs_mount_target" "cloud_b" {
 # keeping them isolated at the NFS level.
 
 # -----------------------------------------------------------------------------
-# /home access point
+# /u access point (cluster home directories)
 # -----------------------------------------------------------------------------
-# root_directory path = "/" means the access point's root IS the EFS root.
-# POSIX UID/GID 0 (root) with permissions 755 — the OS manages per-user dirs
-# under /home normally once mounted.
+# root_directory path = "/home" creates the /home directory on EFS.
+# When EFS root is mounted at /u, alice's home is /u/home/alice.
+# POSIX UID/GID 0 (root) with permissions 755 — alice's own dir is 700.
 resource "aws_efs_access_point" "home" {
   file_system_id = aws_efs_file_system.main.id
 

@@ -30,6 +30,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.9"
+    }
   }
 
   # State is stored locally for BurstLab Gen 1.
@@ -128,6 +132,21 @@ module "shared_storage" {
   cloud_subnet_b_id    = module.vpc.cloud_subnet_b_id
 }
 
+# -----------------------------------------------------------------------------
+# EFS DNS propagation wait
+# -----------------------------------------------------------------------------
+# AWS creates EFS mount targets asynchronously. Even after the mount target
+# reaches the "available" state, DNS for the EFS hostname may not resolve for
+# up to 90 seconds. Without this wait, head-node-init.sh and compute-node-init.sh
+# will start attempting to mount before DNS is ready, wasting retries.
+#
+# 90 seconds is the AWS-documented upper bound for EFS mount target DNS propagation.
+# The init scripts also have their own retry loop (30 × 20s = 600s) as a fallback.
+resource "time_sleep" "efs_dns" {
+  create_duration = "90s"
+  depends_on      = [module.shared_storage]
+}
+
 # =============================================================================
 # MODULE: HEAD NODE
 # =============================================================================
@@ -161,10 +180,8 @@ module "head_node" {
   # slurmdbd password — injected into slurmdbd.conf
   slurmdbd_db_password = random_password.slurmdbd_db.result
 
-  # EFS — head node mounts these to /home and /opt/slurm
-  efs_dns_name              = module.shared_storage.efs_dns_name
-  efs_home_access_point_id  = module.shared_storage.efs_home_access_point_id
-  efs_slurm_access_point_id = module.shared_storage.efs_slurm_access_point_id
+  # EFS — head node mounts /u and /opt/slurm via plain NFSv4
+  efs_dns_name = module.shared_storage.efs_dns_name
 
   # Network info for iptables NAT configuration
   onprem_cidr  = module.vpc.onprem_subnet_cidr
@@ -180,6 +197,14 @@ module "head_node" {
 
   compute_node_count = var.compute_node_count
   aws_region         = var.aws_region
+
+  # Helper scripts — plain text, written to EFS via quoted heredoc during init
+  validate_script = local.validate_script
+  demo_script     = local.demo_script
+
+  # Wait for EFS DNS to propagate before launching the head node.
+  # Without this, UserData starts mount attempts before the EFS hostname resolves.
+  depends_on = [time_sleep.efs_dns]
 }
 
 # =============================================================================
@@ -211,9 +236,7 @@ module "burst_config" {
   munge_key_b64 = random_bytes.munge_key.base64
 
   # EFS
-  efs_dns_name              = module.shared_storage.efs_dns_name
-  efs_home_access_point_id  = module.shared_storage.efs_home_access_point_id
-  efs_slurm_access_point_id = module.shared_storage.efs_slurm_access_point_id
+  efs_dns_name = module.shared_storage.efs_dns_name
 
   # Head node IP — burst nodes add this to /etc/hosts so they can reach slurmctld.
   # Uses local.head_node_private_ip (static 10.0.0.10) so the launch template
@@ -242,9 +265,7 @@ module "compute_nodes" {
 
   munge_key_b64 = random_bytes.munge_key.base64
 
-  efs_dns_name              = module.shared_storage.efs_dns_name
-  efs_home_access_point_id  = module.shared_storage.efs_home_access_point_id
-  efs_slurm_access_point_id = module.shared_storage.efs_slurm_access_point_id
+  efs_dns_name = module.shared_storage.efs_dns_name
 
   # Uses local.head_node_private_ip (static 10.0.0.10) — same reason as burst_config.
   # Compute nodes are launched concurrently with the head node, so we can't
@@ -254,4 +275,6 @@ module "compute_nodes" {
   # onprem_cidr is used by the compute node init script to build /etc/hosts
   # entries for all nodes (using cidrhost()) so they resolve each other.
   onprem_cidr = module.vpc.onprem_subnet_cidr
+
+  depends_on = [time_sleep.efs_dns]
 }

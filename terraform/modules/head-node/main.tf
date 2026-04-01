@@ -59,7 +59,7 @@ resource "aws_instance" "head_node" {
 
   # UserData runs once at first boot. It:
   #   1. Writes the Munge key to /etc/munge/munge.key
-  #   2. Mounts EFS (/home and /opt/slurm)
+  #   2. Mounts EFS (/u and /opt/slurm)
   #   3. Writes Slurm config files to /opt/slurm/etc/
   #   4. Enables iptables NAT masquerade for compute and burst subnets
   #   5. Starts munge, slurmdbd, slurmctld
@@ -71,8 +71,6 @@ resource "aws_instance" "head_node" {
     cluster_name              = var.cluster_name
     munge_key_b64             = var.munge_key_b64
     efs_dns_name              = var.efs_dns_name
-    efs_home_access_point_id  = var.efs_home_access_point_id
-    efs_slurm_access_point_id = var.efs_slurm_access_point_id
     onprem_cidr               = var.onprem_cidr
     cloud_cidr_a              = var.cloud_cidr_a
     cloud_cidr_b              = var.cloud_cidr_b
@@ -84,6 +82,8 @@ resource "aws_instance" "head_node" {
     slurmdbd_db_password      = var.slurmdbd_db_password
     aws_region                = var.aws_region
     compute_node_count        = var.compute_node_count
+    validate_script           = var.validate_script
+    demo_script               = var.demo_script
   }))
 
   # Ensure instance replacement recreates the UserData (not just reboots).

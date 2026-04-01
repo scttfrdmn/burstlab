@@ -354,14 +354,14 @@ resource "aws_security_group" "burst_node" {
 # -----------------------------------------------------------------------------
 # EFS mount targets accept NFS traffic (TCP 2049) from any host in the VPC.
 # This covers the head node, on-prem compute nodes, and burst nodes - all of
-# which need to mount /home and /opt/slurm from EFS.
+# which need to mount /u and /opt/slurm from EFS.
 resource "aws_security_group" "efs" {
   name        = "${var.cluster_name}-efs-sg"
   description = "EFS mount targets: NFS (2049) from VPC CIDR only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "NFS from VPC - all nodes mount EFS for /home and /opt/slurm"
+    description = "NFS from VPC - all nodes mount EFS for /u and /opt/slurm"
     from_port   = 2049
     to_port     = 2049
     protocol    = "tcp"

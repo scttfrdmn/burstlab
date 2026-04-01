@@ -212,8 +212,10 @@ build {
       # on the head node (controlled by systemd unit enable/disable at boot).
       "sudo dnf install -y mariadb mariadb-server mariadb-devel",
 
-      # iptables + iptables-services: needed for head node NAT masquerade rules.
-      # Rocky 8 defaults to nftables; iptables is not installed by default.
+      # iptables + iptables-services: kept for AMI compatibility.
+      # NOTE: head-node-init uses nftables for NAT and explicitly disables iptables-services.
+      # compute/burst init scripts also disable iptables-services on boot.
+      # TODO: remove iptables-services in a future AMI rebuild once nftables-only is validated.
       "sudo dnf install -y iptables iptables-services",
 
       # Python 3 and pip
@@ -359,8 +361,7 @@ build {
       # private link. For a demo cluster inside a private subnet this is fine.
       # nfs-utils was already installed in step 2, but ensure stunnel is present
       # for documentation completeness (not used with plain NFS4).
-      "sudo dnf install -y stunnel || true",  # optional, for reference only
-      "sudo dnf install -y stunnel",
+      "sudo dnf install -y stunnel || true",  # optional — not used with plain NFS4
 
       # =======================================================================
       # STEP 9: Install Python packages

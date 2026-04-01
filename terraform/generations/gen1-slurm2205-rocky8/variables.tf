@@ -42,15 +42,15 @@ variable "compute_node_ami" {
 }
 
 variable "head_node_instance_type" {
-  description = "EC2 instance type for the head node. m7a.large (2 vCPU / 8 GB) runs slurmctld + slurmdbd + aws-plugin-for-slurm comfortably for a small demo cluster."
+  description = "EC2 instance type for the head node. m7a.2xlarge (8 vCPU / 32 GB) runs slurmctld + slurmdbd + aws-plugin-for-slurm comfortably for a small demo cluster."
   type        = string
-  default     = "m7a.large"
+  default     = "m7a.2xlarge"
 }
 
 variable "compute_node_instance_type" {
-  description = "EC2 instance type for on-prem compute nodes. m7a.large matches the head node for simplicity. In a real cluster these would typically be larger or specialized (HPC, GPU) instances."
+  description = "EC2 instance type for on-prem compute nodes."
   type        = string
-  default     = "m7a.large"
+  default     = "m7a.2xlarge"
 }
 
 variable "compute_node_count" {
@@ -60,9 +60,9 @@ variable "compute_node_count" {
 }
 
 variable "burst_node_instance_type" {
-  description = "EC2 instance type for cloud burst nodes. m7a.xlarge (4 vCPU / 16 GB) is intentionally larger than the on-prem compute nodes to demonstrate that burst nodes can have a different — often better — spec than on-prem hardware."
+  description = "EC2 instance type for cloud burst nodes."
   type        = string
-  default     = "m7a.xlarge"
+  default     = "m7a.2xlarge"
 }
 
 variable "max_burst_nodes" {

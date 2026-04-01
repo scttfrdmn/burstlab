@@ -9,9 +9,9 @@ variable "ami_id" {
 }
 
 variable "burst_node_instance_type" {
-  description = "EC2 instance type for burst nodes. m7a.xlarge (4 vCPU / 16 GB) is larger than compute nodes to demonstrate that burst nodes can have a different spec — common in real cloud-burst setups where you want more powerful nodes in the cloud."
+  description = "EC2 instance type for burst nodes. m7a.2xlarge (8 vCPU / 32 GB) matches the compute nodes so job resource requests work identically on both partitions."
   type        = string
-  default     = "m7a.xlarge"
+  default     = "m7a.2xlarge"
 }
 
 variable "burst_node_instance_profile_name" {
@@ -46,19 +46,10 @@ variable "munge_key_b64" {
 }
 
 variable "efs_dns_name" {
-  description = "EFS DNS name. Burst nodes mount /home and /opt/slurm from EFS just like compute nodes — this is what makes them 'configuration-free': everything they need is on the shared filesystem."
+  description = "EFS DNS name. Burst nodes mount /u and /opt/slurm from EFS just like compute nodes — this is what makes them 'configuration-free': everything they need is on the shared filesystem."
   type        = string
 }
 
-variable "efs_home_access_point_id" {
-  description = "EFS access point ID for the /home export."
-  type        = string
-}
-
-variable "efs_slurm_access_point_id" {
-  description = "EFS access point ID for the /opt/slurm export."
-  type        = string
-}
 
 variable "head_node_private_ip" {
   description = "Private IP of the head node. Written to /etc/hosts on burst nodes so slurmd can reach slurmctld by hostname."
@@ -69,4 +60,10 @@ variable "aws_region" {
   description = "AWS region. Written into the burst node init script for any region-specific AWS CLI calls."
   type        = string
   default     = "us-west-2"
+}
+
+variable "generation" {
+  description = "BurstLab generation label (gen1, gen2, gen3). Applied to EC2 resource tags so burst nodes from different generations can be identified and cleaned up independently."
+  type        = string
+  default     = "gen1"
 }

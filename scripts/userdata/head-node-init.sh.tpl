@@ -5,7 +5,7 @@
 # What this script does (in order):
 #   1. Fix CentOS 8 EOL repos to vault.centos.org
 #   2. Set hostname
-#   3. Configure iptables NAT (head node is the cluster's internet gateway)
+#   3. Configure NAT (iptables MASQUERADE, no firewall service — services have DROP defaults)
 #   4. Mount EFS: /u and /opt/slurm
 #   5. Populate /opt/slurm on EFS from the AMI if first boot
 #   6. Configure munge key
@@ -58,25 +58,32 @@ hostnamectl set-hostname headnode
 echo "127.0.0.1 headnode" >> /etc/hosts
 # Compute node entries — all nodes need to resolve each other by short name
 %{ for i in range(compute_node_count) ~}
-echo "${cidrhost(onprem_cidr, i + 10)} compute0${i + 1}" >> /etc/hosts
+echo "${cidrhost(onprem_cidr, i + 10)} compute${format("%02d", i + 1)}" >> /etc/hosts
 %{ endfor ~}
 
 # -----------------------------------------------------------------------------
-# 3. Configure iptables NAT (head node as cluster gateway)
+# 3. Configure NAT (head node as cluster gateway)
 # -----------------------------------------------------------------------------
 echo "--- Configuring NAT ---"
-# Rocky Linux 8 does not install iptables by default (uses nftables).
-# Install iptables and iptables-services so we can persist NAT rules.
-# The head node has direct internet access via its EIP before this step.
-dnf install -y iptables iptables-services
+# Root cause of SSH instability: both iptables-services and nftables.service ship
+# default configs with DROP/REJECT catch-all rules. When either service starts or
+# restarts, it clobbers the in-memory ACCEPT rules and kills SSH.
+# Fix: disable BOTH services, apply MASQUERADE directly via iptables, then save
+# rules to /etc/sysconfig/iptables-burstlab.rules and restore via a dedicated
+# systemd service (burstlab-nat.service) on every boot. No service with DROP
+# defaults ever runs.
+
+# Disable both firewall services so they can never reload DROP rules
+systemctl stop iptables 2>/dev/null || true
+systemctl disable iptables 2>/dev/null || true
+systemctl stop nftables 2>/dev/null || true
+systemctl disable nftables 2>/dev/null || true
 
 # Enable IP forwarding persistently
 echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-burstlab-forward.conf
 sysctl -p /etc/sysctl.d/99-burstlab-forward.conf
 
-# Flush iptables-services default rules (which include a REJECT catch-all that
-# breaks NAT and eventually exhausts conntrack, dropping new SSH connections).
-# We set all default policies to ACCEPT and only add the MASQUERADE rule needed.
+# Flush all rules and set permissive defaults (ACCEPT everything)
 iptables -F
 iptables -F -t nat
 iptables -X
@@ -84,17 +91,36 @@ iptables -P INPUT ACCEPT
 iptables -P FORWARD ACCEPT
 iptables -P OUTPUT ACCEPT
 
-# Masquerade outbound traffic from cluster subnets through the EIP interface.
-# The head node is the single internet gateway for all on-prem and cloud nodes.
-ETH=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
+# Add MASQUERADE rules for cluster subnets — rules stay in memory, no service
+ETH=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5; exit}')
+[ -z "$ETH" ] && ETH=$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')
+[ -z "$ETH" ] && { echo "FATAL: could not detect network interface for NAT"; exit 1; }
+echo "Using interface $ETH for NAT masquerade"
 iptables -t nat -A POSTROUTING -s ${onprem_cidr} -o "$ETH" -j MASQUERADE
 iptables -t nat -A POSTROUTING -s ${cloud_cidr_a} -o "$ETH" -j MASQUERADE
 iptables -t nat -A POSTROUTING -s ${cloud_cidr_b} -o "$ETH" -j MASQUERADE
+echo "NAT configured on $ETH"
 
-# Persist these rules so iptables-services restores them on every boot.
-# This replaces the iptables-services default ruleset entirely.
-service iptables save
-systemctl enable iptables
+# Persist NAT rules so they survive head node reboot.
+# We don't use iptables-services (it has DROP defaults that kill SSH), so we
+# save the rules manually and restore them via a dedicated systemd service.
+iptables-save > /etc/sysconfig/iptables-burstlab.rules
+cat > /etc/systemd/system/burstlab-nat.service << 'NATSERVICE'
+[Unit]
+Description=BurstLab NAT rules (iptables masquerade for cluster nodes)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iptables-restore /etc/sysconfig/iptables-burstlab.rules
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+NATSERVICE
+systemctl enable burstlab-nat.service
+echo "NAT rules persisted to /etc/sysconfig/iptables-burstlab.rules"
 
 # -----------------------------------------------------------------------------
 # 4. Mount EFS
@@ -123,11 +149,11 @@ echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,w
 # Mount EFS root temporarily, create /slurm, then unmount before fstab mounts.
 mkdir -p /mnt/efs-bootstrap
 _EFS_BOOTSTRAP_MOUNTED=0
-for attempt in 1 2 3 4 5; do
+for attempt in $(seq 1 30); do
   mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
     "${efs_dns_name}:/" /mnt/efs-bootstrap && { _EFS_BOOTSTRAP_MOUNTED=1; break; } || {
-    echo "EFS bootstrap mount attempt $attempt failed, retrying in 10s..."
-    sleep 10
+    echo "EFS bootstrap mount attempt $attempt/30 failed, retrying in 20s..."
+    sleep 20
   }
 done
 if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
@@ -135,18 +161,20 @@ if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
   umount /mnt/efs-bootstrap
   echo "EFS /slurm directory ensured."
 else
-  echo "WARN: EFS bootstrap mount failed — /slurm subpath mount may fail."
+  echo "FATAL: EFS bootstrap mount failed after 30 attempts (10 minutes) — cannot continue."
+  exit 1
 fi
 rmdir /mnt/efs-bootstrap 2>/dev/null || true
 
-# Mount EFS — retry loop because EFS mount target may not be ready immediately
+# Mount EFS — retry loop because EFS mount target DNS may take several minutes to propagate
 for dir in /u /opt/slurm; do
-  for attempt in 1 2 3 4 5; do
+  for attempt in $(seq 1 30); do
     mount "$dir" && break || {
-      echo "EFS mount attempt $attempt for $dir failed, retrying in 10s..."
-      sleep 10
+      echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."
+      sleep 20
     }
   done
+  mountpoint -q "$dir" || { echo "FATAL: could not mount $dir after 30 attempts"; exit 1; }
 done
 
 # Inject the EC2 key pair's public key into rocky's authorized_keys on LOCAL disk.
@@ -169,11 +197,18 @@ fi
 # Set up alice's home directory on EFS (/u/home/alice).
 # alice is the cluster demo user (UID 2000, created in AMI).
 # Her home is on EFS so it's accessible from all nodes — head, compute, burst.
+# Install the same EC2 key pair so alice can SSH in directly.
 if mountpoint -q /u; then
-  mkdir -p /u/home/alice
-  # chown only if alice user exists in this AMI (she's added in the updated AMI build)
+  mkdir -p /u/home/alice/.ssh
   getent passwd alice >/dev/null 2>&1 && chown alice:alice /u/home/alice || true
   chmod 700 /u/home/alice
+  if [ -n "$_EC2_PUBKEY" ]; then
+    echo "$_EC2_PUBKEY" > /u/home/alice/.ssh/authorized_keys
+    chown -R alice:alice /u/home/alice/.ssh
+    chmod 700 /u/home/alice/.ssh
+    chmod 600 /u/home/alice/.ssh/authorized_keys
+    echo "SSH key installed for alice."
+  fi
   echo "Created /u/home/alice home directory on EFS."
 fi
 
@@ -186,7 +221,6 @@ echo "--- Populating EFS /opt/slurm from AMI ---"
 if [ ! -f /opt/slurm/.burstlab-populated ]; then
   echo "First boot: copying Slurm binaries to EFS..."
   rsync -a /opt/slurm-baked/ /opt/slurm/
-  touch /opt/slurm/.burstlab-populated
   echo "EFS /opt/slurm populated from AMI."
 else
   echo "EFS /opt/slurm already populated, skipping."
@@ -200,6 +234,14 @@ mkdir -p /opt/slurm/etc/munge
 mkdir -p /var/spool/slurm/ctld /var/spool/slurm/d
 mkdir -p /var/log/slurm
 chown slurm:slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
+# Pre-create log files owned by slurm. With SlurmUser=slurm in slurm.conf,
+# slurmctld drops to the slurm user after startup and must be able to write its
+# own log. resume.py/suspend.py also run under slurmctld's user, so aws_plugin.log
+# must also be slurm-owned. Without pre-creation, the first run creates them as
+# root, and the slurm user can never write to them.
+touch /var/log/slurm/slurmctld.log
+touch /var/log/slurm/aws_plugin.log
+chown slurm:slurm /var/log/slurm/slurmctld.log /var/log/slurm/aws_plugin.log
 
 # -----------------------------------------------------------------------------
 # 6. Configure munge
@@ -210,9 +252,13 @@ echo "${munge_key_b64}" | base64 -d > /etc/munge/munge.key
 chown munge:munge /etc/munge/munge.key
 chmod 0400 /etc/munge/munge.key
 
-# Also store on EFS so compute/burst nodes can copy it
+# Also store on EFS so it's accessible as a backup
 cp /etc/munge/munge.key /opt/slurm/etc/munge/munge.key
 chmod 0400 /opt/slurm/etc/munge/munge.key
+# Sentinel written HERE (after munge key) — compute/burst nodes poll for this.
+# Must come after both rsync AND munge key write so any node seeing the sentinel
+# is guaranteed to find both Slurm binaries AND the munge key on EFS.
+touch /opt/slurm/.burstlab-populated
 
 systemctl enable munge
 systemctl start munge
@@ -264,7 +310,24 @@ MYSQLEOF
 echo "--- Starting Slurm services ---"
 systemctl enable slurmdbd
 systemctl start slurmdbd
-sleep 5  # Give slurmdbd time to initialize the DB schema
+
+# Wait for slurmdbd to fully initialize DB schema.
+# On first boot slurmdbd creates all tables — can take 10-20s.
+# Check: SLURM_CONF must be set inline (profile.d not yet sourced in cloud-init).
+# Use 'show account' not 'show cluster' — fresh DB has no clusters yet, so
+# 'show cluster' returns empty output. We check exit code (0 = connected), not content.
+echo "Waiting for slurmdbd to be ready..."
+for attempt in $(seq 1 30); do
+  SLURM_CONF=/opt/slurm/etc/slurm.conf /opt/slurm/bin/sacctmgr -n show account > /dev/null 2>&1 && break
+  echo "  slurmdbd not ready yet (attempt $attempt/30), waiting 5s..."
+  sleep 5
+done
+SLURM_CONF=/opt/slurm/etc/slurm.conf /opt/slurm/bin/sacctmgr -n show account > /dev/null 2>&1 || {
+  echo "FATAL: slurmdbd failed to become ready after 150s"
+  journalctl -u slurmdbd --no-pager -n 30
+  exit 1
+}
+echo "slurmdbd is ready."
 
 systemctl enable slurmctld
 # slurmctld may fail on first start because burst node definitions are not
@@ -279,7 +342,7 @@ systemctl is-active slurmdbd || { echo "FATAL: slurmdbd failed"; journalctl -u s
 export SLURM_CONF=/opt/slurm/etc/slurm.conf
 /opt/slurm/bin/sacctmgr -i add cluster ${cluster_name} || true
 /opt/slurm/bin/sacctmgr -i add account default description="Default account" organization="BurstLab" || true
-/opt/slurm/bin/sacctmgr -i add user root account=default || true
+/opt/slurm/bin/sacctmgr -i add user root  account=default || true
 /opt/slurm/bin/sacctmgr -i add user alice account=default || true
 
 # -----------------------------------------------------------------------------
@@ -296,6 +359,28 @@ fi
 
 chmod +x resume.py suspend.py change_state.py generate_conf.py
 
+# Patch plugin script shebangs to use a Python interpreter that has boto3.
+# Rocky 8: system python3 (3.6) lacks boto3 — patch to /usr/local/bin/python3 (3.8 wrapper).
+# Rocky 9/10: system python3 (3.9/3.12) has boto3 installed directly — no patch needed.
+_OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
+if [ "$_OS_MAJOR" = "8" ]; then
+  for _pf in resume.py suspend.py change_state.py generate_conf.py common.py; do
+    [ -f "$_pf" ] && sed -i 's|#!/usr/bin/python3|#!/usr/local/bin/python3|g' "$_pf" 2>/dev/null || true
+    [ -f "$_pf" ] && sed -i 's|#!/usr/bin/env python3|#!/usr/local/bin/python3|g' "$_pf" 2>/dev/null || true
+  done
+  echo "Rocky 8: patched plugin shebangs to /usr/local/bin/python3 (Python 3.8 with boto3)"
+else
+  echo "Rocky $${_OS_MAJOR}: system python3 has boto3, shebang patch not needed"
+fi
+
+# Fix change_state.py rule #3: upstream uses "'POWER' in node_states" which is a
+# list-membership check and never matches because Slurm emits "POWERED_DOWN" not "POWER".
+# Patch to any('POWER' in s for s in node_states) so POWERED_DOWN, POWER_DOWN, etc. all match.
+# This ensures DOWN+CLOUD+POWERED_DOWN nodes (e.g. after ResumeTimeout) get auto-reset to IDLE.
+sed -i \
+  "s|'POWER' in node_states|any('POWER' in s for s in node_states)|g" \
+  change_state.py 2>/dev/null || true
+
 # Write plugin config.json (rendered by Terraform)
 cat > /opt/slurm/etc/aws/config.json << 'PLUGINCONF'
 ${plugin_config_json}
@@ -311,7 +396,13 @@ PARTITIONSCONF
 # -----------------------------------------------------------------------------
 echo "--- Generating burst node config ---"
 cd /opt/slurm/etc/aws
-python3 generate_conf.py
+python3 generate_conf.py || {
+  echo "FATAL: generate_conf.py failed — burst nodes will not be configured."
+  echo "Common causes: boto3 not installed, invalid partitions.json, wrong python3 path."
+  python3 -c "import boto3" 2>&1 | sed 's/^/  boto3 check: /' || true
+  echo "  python3 is: $(which python3) ($(python3 --version 2>&1))"
+  exit 1
+}
 
 # Append only NodeName/PartitionName lines from slurm.conf.aws to slurm.conf.
 # generate_conf.py also outputs plugin directives (PrivateData, ResumeProgram, etc.)
@@ -320,7 +411,10 @@ python3 generate_conf.py
 if [ -f slurm.conf.aws ]; then
   echo "slurm.conf.aws generated:"
   cat slurm.conf.aws
+  # Wrap with sentinels so manage-partitions.sh can replace this section cleanly.
+  echo "# BEGIN BURST PARTITIONS — managed by manage-partitions.sh" >> /opt/slurm/etc/slurm.conf
   grep -E "^(NodeName|PartitionName)=" slurm.conf.aws >> /opt/slurm/etc/slurm.conf
+  echo "# END BURST PARTITIONS" >> /opt/slurm/etc/slurm.conf
   echo "Appended NodeName/PartitionName lines to slurm.conf."
 fi
 
@@ -351,15 +445,35 @@ chmod 644 /etc/profile.d/slurm.sh
 # 12. Install change_state.py cron
 # -----------------------------------------------------------------------------
 echo "--- Installing change_state.py cron ---"
-# Must run as slurm user (owns the slurmctld socket).
-# Use || true: crontab -u slurm may fail on distros that restrict cron access
-# for nologin users via PAM/cron.allow. The cluster still works without it;
-# burst nodes will just need manual state management if change_state.py isn't running.
-# Note: `crontab -l` exits 1 when no crontab exists. With set -e inside the
-# subshell, that would exit before the echo runs, piping empty stdin and clearing
-# the crontab instead of adding to it. The `|| true` prevents that early exit.
-(crontab -u slurm -l 2>/dev/null || true; echo "* * * * * /opt/slurm/etc/aws/change_state.py >> /var/log/slurm/change_state.log 2>&1") | crontab -u slurm - || \
+# Must run as slurm user: with SlurmUser=slurm in slurm.conf, slurmctld drops to
+# the slurm user after startup, and scontrol node updates are permitted for the
+# SlurmUser. SLURM_CONF must be set explicitly as a crontab env var — cron
+# inherits a minimal environment that does not include it.
+# Note: `crontab -l` exits 1 when no crontab exists; `|| true` prevents that
+# from clearing the crontab instead of appending to it.
+(crontab -u slurm -l 2>/dev/null || true; printf 'SLURM_CONF=/opt/slurm/etc/slurm.conf\n* * * * * /opt/slurm/etc/aws/change_state.py >> /var/log/slurm/change_state.log 2>&1\n') | crontab -u slurm - || \
   echo "[WARN] crontab install for slurm user failed — change_state.py cron not active"
+
+# -----------------------------------------------------------------------------
+# 13. Deploy helper scripts to EFS
+# -----------------------------------------------------------------------------
+echo "--- Deploying helper scripts ---"
+# validate-cluster.sh and demo-burst.sh are injected as plain text via quoted
+# heredocs. The quoted delimiter (<<'MARKER') prevents bash from expanding
+# dollar-brace variables during the write step — scripts are written verbatim.
+# correctly when executed later.
+cat > /opt/slurm/etc/validate-cluster.sh << 'VALIDATESCRIPT'
+${validate_script}
+VALIDATESCRIPT
+chmod 755 /opt/slurm/etc/validate-cluster.sh
+
+cat > /opt/slurm/etc/demo-burst.sh << 'DEMOSCRIPT'
+${demo_script}
+DEMOSCRIPT
+chmod 755 /opt/slurm/etc/demo-burst.sh
+
+echo "Helper scripts deployed to /opt/slurm/etc/"
+echo "(manage-partitions.sh is deployed separately — see scripts/deploy-admin-tools.sh)"
 
 # -----------------------------------------------------------------------------
 # Done
