@@ -13,8 +13,8 @@
     "SuspendProgram": "/opt/slurm/etc/aws/suspend.py",
     "ResumeRate": 100,
     "SuspendRate": 100,
-    "ResumeTimeout": 300,
-    "SuspendTime": 350,
+    "ResumeTimeout": 600,
+    "SuspendTime": 650,
     "TreeWidth": 60000
   }
 }
