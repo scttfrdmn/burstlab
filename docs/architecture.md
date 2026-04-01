@@ -183,7 +183,7 @@ The head node runs `slurmctld` and the Plugin v2 resume/suspend scripts. It need
 | `ec2:CreateFleet` | Plugin v2 uses EC2 Fleet as the launch API. Fleet supports multi-AZ launch strategies and mixed instance types in a single call. |
 | `ec2:RunInstances` | Called internally by CreateFleet; also used for direct launch fallback. |
 | `ec2:TerminateInstances` | `suspend.py` terminates burst instances when `SuspendTime` expires. |
-| `ec2:CreateTags` | `resume.py` tags new burst instances with their Slurm node name (`Name=cloud-burst-0`). This tag is how the burst node knows its own identity at boot. |
+| `ec2:CreateTags` | `resume.py` tags new burst instances with their Slurm node name (`Name=aws-burst-0`). This tag is how the burst node knows its own identity at boot. |
 | `ec2:DescribeInstances` | Plugin v2 checks instance state after launch to confirm nodes came up correctly. |
 | `ec2:DescribeInstanceStatus` | Used to verify an instance is in `running` state before Slurm marks it `IDLE`. |
 | `ec2:ModifyInstanceAttribute` | May be needed post-launch for certain instance configurations. |
@@ -199,7 +199,7 @@ Burst nodes run only `slurmd`. They need:
 
 | Permission | Why |
 |---|---|
-| `ec2:DescribeTags` | The burst node reads its own `Name` tag to discover its Slurm node name (e.g., `cloud-burst-0`). This tag is set by `resume.py` at launch time and read at boot via IMDS (with `InstanceMetadataTags=enabled` in the launch template) or via `DescribeTags` as a fallback. |
+| `ec2:DescribeTags` | The burst node reads its own `Name` tag to discover its Slurm node name (e.g., `aws-burst-0`). This tag is set by `resume.py` at launch time and read at boot via IMDS (with `InstanceMetadataTags=enabled` in the launch template) or via `DescribeTags` as a fallback. |
 | `AmazonSSMManagedInstanceCore` | SSM access for debugging. Burst nodes have no SSH from the internet; SSM provides a shell without requiring bastion access or key management. |
 
 `ec2:DescribeTags` does not support resource-level restrictions in IAM — the `resources = ["*"]` is unavoidable. This is a known AWS limitation, not a design gap.

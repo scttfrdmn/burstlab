@@ -1,8 +1,32 @@
 # Quickstart: Deploy Your First BurstLab Cluster
 
-This guide walks you through building and deploying a complete Gen 1 BurstLab cluster from scratch — no prior HPC or AWS experience required. By the end you will have a running Slurm cluster with four compute nodes and cloud bursting configured.
+This guide walks you through building and deploying a complete **Gen 1** BurstLab cluster
+(Rocky Linux 8 + Slurm 22.05) from scratch. Gen 1 is the recommended starting point —
+it matches the environment most university HPC teams are actually running today.
+
+Gen 2 (Rocky 9 + Slurm 23.11) and Gen 3 (Rocky 10 + Slurm 24.05) follow the **identical
+workflow** with different AMIs and `terraform/generations/` paths. See
+[generations.md](generations.md) to choose the right generation for your customer.
 
 **Total time: about 30-40 minutes** (most of that is waiting, not working).
+
+---
+
+## Before You Start
+
+Run the pre-flight quota check to catch AWS quota issues before they interrupt a deploy:
+
+```bash
+bash scripts/check-quotas.sh --profile YOUR_PROFILE --region us-west-2
+```
+
+Replace `YOUR_PROFILE` with your AWS CLI profile name (`aws configure list-profiles` shows
+available profiles). BurstLab uses `aws` as its default profile name throughout — substitute
+yours wherever you see it.
+
+This takes about 10 seconds and will catch the most common blocker (On-Demand Standard
+vCPU quota too low). See [prerequisites.md](prerequisites.md) for the full requirements
+and how to request quota increases if needed.
 
 ---
 
@@ -148,6 +172,11 @@ head_node_ami = "ami-0abc1234def56789a"   # AMI ID from Step 1
 
 Everything else has reasonable defaults. Leave them as-is.
 
+> **Deploying Gen 2 or Gen 3?** The workflow is identical — just use the corresponding
+> directory: `terraform/generations/gen2-slurm2311-rocky9/` or
+> `terraform/generations/gen3-slurm2405-rocky10/`. Build the matching AMI in Step 1:
+> `rocky9-slurm2311.pkr.hcl` or `rocky10-slurm2405.pkr.hcl`.
+
 ---
 
 ## Step 3: Deploy the Cluster
@@ -212,7 +241,7 @@ Wait until you see:
 Cluster status:
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-cloud        up    4:00:00     10  idle~ cloud-burst-[0-9]
+aws          up    4:00:00      8  idle~ aws-burst-[0-7]
 ```
 
 Press `Ctrl+C` to stop tailing, then open a new shell for the next steps.
@@ -243,16 +272,16 @@ Expected output (all green):
 === Slurm Cluster State ===
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-cloud        up    4:00:00     10  idle~ cloud-burst-[0-9]
+aws          up    4:00:00      8  idle~ aws-burst-[0-7]
   [PASS] local partition is UP
-  [PASS] cloud partition is UP
+  [PASS] burst partition 'aws' is UP
   [PASS] No compute nodes are DOWN
 
-Results: 20 passed, 0 warnings, 0 failed
+Results: 40 passed, 0 warnings, 0 failed
 Cluster is ready. Run demo-burst.sh to test bursting.
 ```
 
-The `idle~` state for cloud nodes is correct — it means the nodes are registered with Slurm but no EC2 instances exist yet. They launch on demand when jobs are submitted.
+The `idle~` state for aws-burst nodes is correct — it means the nodes are registered with Slurm but no EC2 instances exist yet. They launch on demand when jobs are submitted.
 
 > **Compute nodes showing DOWN?** Give them 2-3 more minutes — they are still running their own init. Run `scontrol show node compute01` to see the reason.
 
@@ -298,7 +327,7 @@ Mon Mar 30 02:20:15 UTC 2026
 ### Burst job (triggers an EC2 instance to launch)
 
 ```bash
-sbatch --partition=cloud --wrap="hostname && date" -o ~/test-burst.out
+sbatch --partition=aws --wrap="hostname && date" -o ~/test-burst.out
 ```
 
 Watch the burst lifecycle:
@@ -311,21 +340,21 @@ Over 2-3 minutes you will see the node transition:
 
 ```
 # Immediately after submit — Slurm calls resume.py → EC2 CreateFleet API
-cloud   up  4:00:00   1  alloc~  cloud-burst-0
-cloud   up  4:00:00   9  idle~   cloud-burst-[1-9]
+aws     up  4:00:00   1  alloc~  aws-burst-0
+aws     up  4:00:00   7  idle~   aws-burst-[1-7]
 
 # ~2 minutes — EC2 instance running, slurmd registered
-cloud   up  4:00:00   1  alloc   cloud-burst-0
+aws     up  4:00:00   1  alloc   aws-burst-0
 
-# Job finishes — node idles, then powers down after ~6 minutes
-cloud   up  4:00:00  10  idle~   cloud-burst-[0-9]
+# Job finishes — node idles, then powers down after SuspendTime
+aws     up  4:00:00   8  idle~   aws-burst-[0-7]
 ```
 
 Check the result:
 
 ```bash
 cat ~/test-burst.out
-# cloud-burst-0
+# aws-burst-0
 # Mon Mar 30 02:23:07 UTC 2026
 ```
 
@@ -376,9 +405,9 @@ echo "AMI and snapshot deleted."
 |---|---|
 | SSH times out for more than 3 minutes | Instance is still booting. Check the EC2 console — wait for both Status Checks to pass. |
 | Init log shows EFS mount retrying for 5+ minutes | Normal. EFS DNS propagation takes up to 10 minutes. Do not interrupt. |
-| `sinfo` shows no cloud partition | `generate_conf.py` may have failed. Check: `grep -i "error\|fatal" /var/log/burstlab-init.log` |
+| `sinfo` shows no `aws` partition | `generate_conf.py` may have failed. Check: `grep -i "error\|fatal" /var/log/burstlab-init.log` |
 | Compute nodes stuck in DOWN after 10 minutes | `scontrol show node compute01` — read the `Reason` field. Check `/var/log/burstlab-init.log` on that node via head node: `ssh compute01 sudo cat /var/log/burstlab-init.log` |
-| Cloud node stuck in `alloc~` for more than 5 minutes | IAM issue or instance launch failure. `scontrol show node cloud-burst-0` then check EC2 console for failed launches. |
+| Burst node stuck in `alloc~` for more than 5 minutes | IAM issue or instance launch failure. `scontrol show node aws-burst-0` then check EC2 console for failed launches. |
 | Job stuck in PD (pending) with no node assigned | `scontrol show job <jobid>` — read the `Reason` field. |
 | `squeue` shows job running but no output file | Check the job was submitted with an output path under `/u/home/alice/` so it writes to shared storage. |
 
