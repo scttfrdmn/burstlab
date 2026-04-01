@@ -38,7 +38,7 @@ sbatch --wrap="hostname && date"
 sbatch my-job.sh
 
 # Specify resources explicitly
-sbatch --partition=cloud --cpus-per-task=4 --mem=8G --time=1:00:00 my-job.sh
+sbatch --partition=aws --cpus-per-task=4 --mem=8G --time=1:00:00 my-job.sh
 ```
 
 The output of `sbatch` is a job ID:
@@ -88,7 +88,7 @@ If your job is pending, `scontrol show job 42` will tell you why (look for `Reas
 ```bash
 scancel 42          # cancel job 42
 scancel --me        # cancel all your jobs
-scancel -p cloud    # cancel all cloud partition jobs
+scancel -p aws      # cancel all aws partition jobs
 ```
 
 ---
@@ -104,7 +104,7 @@ sinfo -p local     # show only the 'local' partition
 
 In BurstLab:
 - `local` — always-on compute nodes; jobs run immediately; no time limit
-- `cloud` — burst nodes; jobs trigger EC2 launches; 4-hour time limit
+- `aws` — burst nodes; jobs trigger EC2 launches; 4-hour time limit
 
 The `*` in `sinfo` output marks the default partition (where jobs go if you don't specify `--partition`).
 
@@ -122,7 +122,7 @@ The `*` in `sinfo` output marks the default partition (where jobs go if you don'
 | `drain` | Being taken offline (jobs finish, no new ones start) |
 | `idle~` | Powered off (cloud node, no EC2 instance) |
 | `alloc~` | Powering on — job assigned, instance launching |
-| `cloud` | Registered but explicitly powered-off state |
+| `idle~` | Powered-off cloud node (same as first `idle~` row — CLOUD-state alias) |
 
 The `~` suffix means the node is in power-saving mode (no EC2 instance running).
 
@@ -170,7 +170,7 @@ done
 
 # Submit 4 more — these will burst to cloud nodes
 for i in $(seq 1 4); do
-  sbatch --partition=cloud --cpus-per-task=8 --wrap="sleep 60"
+  sbatch --partition=aws --cpus-per-task=8 --wrap="sleep 60"
 done
 
 watch -n5 sinfo   # watch nodes come and go
@@ -201,8 +201,8 @@ exit        # release the node
 
 ## What Happens When You Submit a Burst Job
 
-1. You run `sbatch --partition=cloud ...`
-2. Slurm marks the job `PD` (pending) and picks a cloud node to allocate
+1. You run `sbatch --partition=aws ...`
+2. Slurm marks the job `PD` (pending) and picks an aws-burst node to allocate
 3. Slurm calls `resume.py` (the Plugin v2 ResumeProgram) with the node name
 4. `resume.py` calls the EC2 `CreateFleet` API to launch an instance
 5. The instance boots, runs cloud-init, starts `slurmd`

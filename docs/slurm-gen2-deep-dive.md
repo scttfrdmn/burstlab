@@ -89,7 +89,7 @@ In Slurm 22.05 and Gen 1, a powered-down cloud node shows as `idle~` in sinfo:
 ```
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4  idle  compute[01-04]
-cloud        up    4:00:00      8  idle~ cloud-burst-[0-7]
+aws          up    4:00:00      8  idle~ aws-burst-[0-7]
 ```
 
 The `~` suffix means "idle, but in power-save state." Every SA demo prompted the question:
@@ -101,11 +101,11 @@ show as plain `idle`:
 ```
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4  idle  compute[01-04]
-cloud        up    4:00:00      8  idle  cloud-burst-[0-7]
+aws          up    4:00:00      8  idle  aws-burst-[0-7]
 ```
 
 The node is still powered down. The only difference is the display. When a job is submitted to
-the `cloud` partition, Slurm still calls `ResumeProgram` to boot the node.
+the `aws` partition, Slurm still calls `ResumeProgram` to boot the node.
 
 **When to mention this in a demo:** After the first `sinfo`, say: *"Unlike our on-prem cluster
 where DOWN means broken, cloud nodes show idle because they're ready — they just need to boot.

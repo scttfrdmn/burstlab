@@ -31,10 +31,14 @@ The head node is the cluster's NAT gateway — on-prem compute and burst nodes r
 burstlab/
 ├── README.md                        # This file
 ├── docs/
-│   ├── quickstart.md                # Step-by-step: zero to running cluster
+│   ├── prerequisites.md             # AWS quota requirements and pre-flight check
+│   ├── quickstart.md                # Step-by-step: zero to running cluster (Gen 1)
+│   ├── generations.md               # Why three generations exist; which to choose
 │   ├── slurm-intro.md               # Slurm concepts and commands from zero
 │   ├── architecture.md              # Network, EFS, NAT, IAM, and security design
-│   ├── slurm-gen1-deep-dive.md      # Every slurm.conf directive explained
+│   ├── slurm-gen1-deep-dive.md      # Every slurm.conf directive explained (Gen 1)
+│   ├── slurm-gen2-deep-dive.md      # Gen 2 config changes from Gen 1
+│   ├── slurm-gen3-deep-dive.md      # Gen 3 config changes, cloud_reg_addrs
 │   ├── plugin-v2-setup.md           # Plugin v2 setup: configs, debugging, IAM
 │   └── sa-guide.md                  # How to use BurstLab with customers
 │
@@ -47,19 +51,24 @@ burstlab/
 │   │   ├── iam/                     # Head node and burst node IAM roles
 │   │   └── burst-config/            # Plugin v2 config files and launch template
 │   └── generations/
-│       └── gen1-slurm2205-rocky8/  # Complete Gen 1 root module
+│       ├── gen1-slurm2205-rocky8/   # Complete Gen 1 root module (Rocky 8 + Slurm 22.05)
+│       ├── gen2-slurm2311-rocky9/   # Complete Gen 2 root module (Rocky 9 + Slurm 23.11)
+│       └── gen3-slurm2405-rocky10/  # Complete Gen 3 root module (Rocky 10 + Slurm 24.05)
 │
 ├── configs/
-│   └── gen1-slurm2205-rocky8/      # Slurm config templates (source of truth)
-│       ├── slurm.conf.tpl
-│       ├── partitions.json.tpl
-│       ├── plugin_config.json.tpl
-│       ├── slurmdbd.conf.tpl
-│       └── cgroup.conf
+│   ├── gen1-slurm2205-rocky8/       # Gen 1 Slurm config templates
+│   │   ├── slurm.conf.tpl
+│   │   ├── partitions.json.tpl
+│   │   ├── plugin_config.json.tpl
+│   │   ├── slurmdbd.conf.tpl
+│   │   └── cgroup.conf
+│   ├── gen2-slurm2311-rocky9/       # Gen 2 Slurm config templates
+│   └── gen3-slurm2405-rocky10/      # Gen 3 Slurm config templates
 │
 ├── scripts/
-│   ├── validate-cluster.sh          # Post-deploy health check
-│   ├── demo-burst.sh                # Interactive burst demo (run on head node)
+│   ├── check-quotas.sh              # Pre-flight AWS quota check
+│   ├── validate-cluster.sh          # Post-deploy health check (40 checks)
+│   ├── demo-burst.sh                # Interactive burst demo (run as alice via SSH)
 │   ├── teardown.sh                  # Graceful cluster shutdown + terraform destroy
 │   └── userdata/                    # Cloud-init scripts for each node type
 │       ├── head-node-init.sh.tpl
@@ -67,16 +76,29 @@ burstlab/
 │       └── burst-node-init.sh.tpl
 │
 └── ami/
-    └── rocky8-slurm2205.pkr.hcl     # Packer template: Rocky Linux 8 + Slurm 22.05.11
+    ├── rocky8-slurm2205.pkr.hcl     # Packer: Rocky Linux 8 + Slurm 22.05 (Gen 1)
+    ├── rocky9-slurm2311.pkr.hcl     # Packer: Rocky Linux 9 + Slurm 23.11 (Gen 2)
+    └── rocky10-slurm2405.pkr.hcl    # Packer: Rocky Linux 10 + Slurm 24.05 (Gen 3)
 ```
 
 ---
 
 ## Getting Started
 
+**Before deploying**, check your AWS quota headroom — a low vCPU quota is the most common
+reason a deploy fails partway through:
+
+```bash
+bash scripts/check-quotas.sh --profile aws --region us-west-2
+```
+
+See [docs/prerequisites.md](docs/prerequisites.md) for full requirements and how to request
+quota increases. See [docs/generations.md](docs/generations.md) to choose the right generation
+for your customer.
+
 See [docs/quickstart.md](docs/quickstart.md) for the full step-by-step walkthrough with time estimates.
 
-Short version:
+Short version (Gen 1 — the recommended default):
 
 ```bash
 # 1. Build the AMI (~15-20 minutes)
@@ -99,13 +121,20 @@ sinfo                                      # should show local + cloud partition
 
 ## Slurm Generations
 
-| Generation | OS | Slurm | Cloud Model | When to Use |
-|---|---|---|---|---|
-| **Gen 1** | Rocky Linux 8 | 22.05.x | SuspendProgram / ResumeProgram scripts | Customers on RHEL/Rocky 8, Slurm ≤ 23.02, or any legacy HPC environment |
-| **Gen 2** _(planned)_ | Rocky 8/9 | 23.11.x | Updated power save with dynamic node support | Customers who migrated off CentOS 8 but haven't reached 24.x |
-| **Gen 3** _(planned)_ | Rocky 9 | 24.05.x | Stateless — no pre-enumerated burst nodes in slurm.conf | Greenfield deployments; cleanest bursting model |
+All three generations are fully built and tested. Each is an independently deployable
+cluster matching a specific customer environment.
 
-**Start with Gen 1** unless you know the customer is on Slurm 23.11+. Most university HPC environments actively struggling with cloud bursting today are running Slurm 22.x on RHEL/Rocky 8.
+| Generation | OS | Slurm | Key Difference | When to Use |
+|---|---|---|---|---|
+| **Gen 1** | Rocky Linux 8 | 22.05.x | Python 3.6 boto3 shim; cgroup v1; pre-enumerated burst nodes | Customers on RHEL/Rocky 8, Slurm 22.x — the largest installed base |
+| **Gen 2** | Rocky Linux 9 | 23.11.x | Python 3.9 native; cgroup v2; `idle_on_node_suspend` | Customers on RHEL/Rocky 9, Slurm 23.x |
+| **Gen 3** | Rocky Linux 10 | 24.05.x | `cloud_reg_addrs` — burst nodes self-register with actual EC2 IP | Customers on RHEL/Rocky 10, Slurm 24.x; greenfield deployments |
+
+**Start with Gen 1** unless you know the customer's OS and Slurm version. Most university
+HPC teams actively struggling with cloud bursting today are on Rocky 8 with Slurm 22.05.
+
+See [docs/generations.md](docs/generations.md) for the full narrative: why three generations
+exist, what each one solves, and a decision table for matching a customer to the right generation.
 
 ---
 
@@ -137,10 +166,14 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 
 | Doc | Audience | Contents |
 |---|---|---|
-| [quickstart.md](docs/quickstart.md) | Everyone | Step-by-step deploy with time estimates |
+| [prerequisites.md](docs/prerequisites.md) | Everyone | AWS quota requirements and pre-flight check |
+| [quickstart.md](docs/quickstart.md) | Everyone | Step-by-step deploy with time estimates (Gen 1) |
+| [generations.md](docs/generations.md) | Everyone | Why three generations exist; which to choose |
 | [slurm-intro.md](docs/slurm-intro.md) | Everyone | Slurm concepts and commands from zero |
 | [architecture.md](docs/architecture.md) | SAs, technical customers | Network, EFS, NAT, IAM deep dive |
 | [slurm-gen1-deep-dive.md](docs/slurm-gen1-deep-dive.md) | SAs, HPC admins | Every slurm.conf directive for Gen 1 |
+| [slurm-gen2-deep-dive.md](docs/slurm-gen2-deep-dive.md) | SAs, HPC admins | Gen 2 config changes from Gen 1 |
+| [slurm-gen3-deep-dive.md](docs/slurm-gen3-deep-dive.md) | SAs, HPC admins | Gen 3 config changes, `cloud_reg_addrs` |
 | [plugin-v2-setup.md](docs/plugin-v2-setup.md) | SAs, HPC admins | Plugin v2 setup, configs, debugging |
 | [sa-guide.md](docs/sa-guide.md) | SAs | How to run a customer demo |
 

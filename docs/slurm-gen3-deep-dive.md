@@ -119,10 +119,10 @@ the node's `NodeAddr` (or `NodeHostname`) in `slurm.conf` to verify the registra
 Gen 1/2, the NodeName entries for cloud nodes look like:
 
 ```
-NodeName=cloud-burst-0 CPUs=8 RealMemory=31000 State=CLOUD
+NodeName=aws-burst-0 CPUs=8 RealMemory=31000 State=CLOUD
 ```
 
-No `NodeAddr` is specified. Slurm resolves the address by doing a DNS lookup on `cloud-burst-0`
+No `NodeAddr` is specified. Slurm resolves the address by doing a DNS lookup on `aws-burst-0`
 (the NodeName). On a cloud instance, this name doesn't resolve — only the EC2 hostname
 (`ip-10-0-2-X.us-west-2.compute.internal`) resolves. slurmctld can refuse the registration
 if the connection comes from an IP that doesn't match what it expects.
@@ -147,14 +147,14 @@ This means:
 **What this looks like in `sinfo -o "%N %T %A"` after a burst job:**
 ```
 NODELIST    STATE       REASON
-cloud-burst-0   allocated   None
+aws-burst-0   allocated   None
 ```
 
-And in `scontrol show node cloud-burst-0`:
+And in `scontrol show node aws-burst-0`:
 ```
-NodeName=cloud-burst-0 Arch=x86_64 CoresPerSocket=4
+NodeName=aws-burst-0 Arch=x86_64 CoresPerSocket=4
    ...
-   NodeAddr=10.0.2.47 NodeHostName=cloud-burst-0
+   NodeAddr=10.0.2.47 NodeHostName=aws-burst-0
    ...
 ```
 
@@ -162,7 +162,7 @@ The `NodeAddr` is populated at registration time — it wasn't in `slurm.conf`.
 
 **Demo talking point:**
 *"In Gen 3, burst nodes don't need pre-configured IPs. When they boot, they just connect to
-the controller and say 'I'm cloud-burst-0 and my IP is 10.0.2.47.' The controller records
+the controller and say 'I'm aws-burst-0 and my IP is 10.0.2.47.' The controller records
 that and uses it. This is how production cloud-bursting should work."*
 
 ### `TaskPlugin=task/cgroup` — unchanged from Gen 2

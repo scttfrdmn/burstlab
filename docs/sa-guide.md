@@ -31,16 +31,19 @@ You should see all PASSes. Fix any failures before the meeting. A non-functional
 
 ### Choose the Right Generation
 
-For most current engagements involving Slurm cloud bursting:
+All three generations are fully built and tested. Match the customer's environment:
 
-| Customer Environment | Use |
-|---|---|
-| CentOS 8 or RHEL 8, Slurm 22.x | Gen 1 (this repo) |
-| CentOS 7 or RHEL 7, older Slurm | Gen 1 as a reference; note the OS differences |
-| Rocky 8/9, Slurm 23.x | Gen 2 (planned) |
-| Rocky 9, Slurm 24.x, modern deployment | Gen 3 (planned) |
+| Customer Environment | Use | Why |
+|---|---|---|
+| CentOS 8, Rocky 8, RHEL 8 — Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm, same Python 3.6 boto3 shim they need |
+| Rocky 9, AlmaLinux 9, RHEL 9 — Slurm 23.x | **Gen 2** | Exact match — Python 3.9 native, cgroup v2 |
+| Rocky 10, RHEL 10 — Slurm 24.05+ | **Gen 3** | Exact match — `cloud_reg_addrs`, cgroup v2 only |
+| Not sure / first contact | **Gen 1** | Covers the largest installed base; most relatable config problems |
+| CentOS 7 or older RHEL | **Gen 1** as reference | Note the OS differences; the Slurm and Plugin v2 config is identical |
 
 For TCU specifically: Gen 1 is exactly right — CentOS 8, Slurm 22.05, Plugin v2.
+
+See [generations.md](generations.md) for the full narrative on each generation.
 
 ### Have These Open in Separate Windows
 
@@ -77,10 +80,10 @@ Expected output:
 ```
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-cloud        up    4:00:00     10  cloud~ cloud-burst-[0-9]
+aws          up    4:00:00      8  idle~ aws-burst-[0-7]
 ```
 
-**Talking point:** "Two partitions. The `local` partition has four static compute nodes that are always running — these simulate your on-prem cluster. The `cloud` partition has ten burst nodes in `cloud~` state — powered off, ready to launch. The `*` on local means it is the default partition."
+**Talking point:** "Two partitions. The `local` partition has four static compute nodes that are always running — these simulate your on-prem cluster. The `aws` partition has eight burst nodes in `idle~` state — powered off, ready to launch. The `*` on local means it is the default partition."
 
 If the customer's sinfo looks different (nodes in DOWN, no cloud partition), this is actually a useful teaching moment — it means the current cluster has a configuration problem and BurstLab shows what the correct state looks like.
 
@@ -96,8 +99,8 @@ Point to these directives specifically:
 PrivateData=CLOUD
 ResumeProgram=/opt/slurm/etc/aws/resume.py
 SuspendProgram=/opt/slurm/etc/aws/suspend.py
-ResumeTimeout=300
-SuspendTime=350
+ResumeTimeout=600
+SuspendTime=650
 ReturnToService=2
 DebugFlags=NO_CONF_HASH
 ```
@@ -112,7 +115,7 @@ If the customer had a diverged slurm.conf: "One thing we see regularly is these 
 cat /opt/slurm/etc/aws/partitions.json
 ```
 
-**Talking point:** "This is the AWS side of the bursting config. When `resume.py` is called with a node name like `cloud-burst-0`, it looks up this file, finds the right partition and node group, and constructs an EC2 CreateFleet request. The subnet IDs here span two AZs — the Fleet API will pick whichever AZ has available capacity."
+**Talking point:** "This is the AWS side of the bursting config. When `resume.py` is called with a node name like `aws-burst-0`, it looks up this file, finds the right partition and node group, and constructs an EC2 CreateFleet request. The subnet IDs here span two AZs — the Fleet API will pick whichever AZ has available capacity."
 
 Point out `PartitionName` and `NodeGroupName`:
 
@@ -143,7 +146,7 @@ cat slurm-1.out
 ### 5. Submit a Burst Job
 
 ```bash
-sbatch --partition=cloud --wrap="hostname && sleep 60"
+sbatch --partition=aws --wrap="hostname && sleep 60"
 ```
 
 Immediately open a second terminal (or use `tmux`) and run:
@@ -156,32 +159,32 @@ watch -n 5 sinfo
 
 **T+0s** (immediately after submit):
 ```
-cloud        up    4:00:00      1  alloc~   cloud-burst-0
-cloud        up    4:00:00      9  cloud~   cloud-burst-[1-9]
+aws          up    4:00:00      1  alloc~   aws-burst-0
+aws          up    4:00:00      7  idle~    aws-burst-[1-7]
 ```
 
-"Slurm immediately called `resume.py` for `cloud-burst-0`. The `~` suffix means the node is in a power-saving transition. Right now, EC2 CreateFleet is being called."
+"Slurm immediately called `resume.py` for `aws-burst-0`. The `~` suffix means the node is in a power-saving transition. Right now, EC2 CreateFleet is being called."
 
 **T+30s** (instance pending):
-"The EC2 console should show a new instance spinning up." (Switch to browser, show EC2 console with the `cloud-burst-0` instance in pending state, tagged `Project=burstlab`.)
+"The EC2 console should show a new instance spinning up." (Switch to browser, show EC2 console with the `aws-burst-0` instance in pending state, tagged `Project=burstlab`.)
 
 **T+90s** (instance running, cloud-init running):
 "The instance is running. Cloud-init is now mounting EFS, copying the munge key, and starting slurmd. This takes about 60-90 seconds."
 
 **T+120s** (node registers):
 ```
-cloud        up    4:00:00      1  alloc    cloud-burst-0
+aws          up    4:00:00      1  alloc    aws-burst-0
 ```
 
-"The `~` dropped — `cloud-burst-0` is now fully online and the job is running on it."
+"The `~` dropped — `aws-burst-0` is now fully online and the job is running on it."
 
 **Check the job output after it finishes:**
 ```bash
 cat slurm-2.out
-# cloud-burst-0
+# aws-burst-0
 ```
 
-**Talking point:** "The job ran on a cloud burst node. From the user's perspective, they submitted a job to the cloud partition and it ran. They did not need to provision anything, configure anything, or know anything about EC2. This is transparent HPC cloud bursting."
+**Talking point:** "The job ran on a cloud burst node. From the user's perspective, they submitted a job to the aws partition and it ran. They did not need to provision anything, configure anything, or know anything about EC2. This is transparent HPC cloud bursting."
 
 ### 6. Watch the Node Power Down
 
@@ -189,18 +192,18 @@ After the job finishes (hostname + sleep 60, so about 70 seconds), continue watc
 
 ```
 # Immediately after job completion (node idle):
-cloud        up    4:00:00      1  idle     cloud-burst-0
+aws          up    4:00:00      1  idle     aws-burst-0
 
-# After SuspendTime=350 seconds (~6 minutes later):
-cloud        up    4:00:00      1  power_down  cloud-burst-0
+# After SuspendTime=650 seconds (~11 minutes later):
+aws          up    4:00:00      1  power_down  aws-burst-0
 
 # After termination completes:
-cloud        up    4:00:00     10  cloud~   cloud-burst-[0-9]
+aws          up    4:00:00      8  idle~    aws-burst-[0-7]
 ```
 
-**Talking point:** "After `SuspendTime` seconds with no jobs (350 in our config), Slurm automatically calls `suspend.py`, which terminates the EC2 instance. The node goes back to `cloud~` state, ready for the next burst."
+**Talking point:** "After `SuspendTime` seconds with no jobs (650 in our config), Slurm automatically calls `suspend.py`, which terminates the EC2 instance. The node goes back to `idle~` state, ready for the next burst."
 
-(Show EC2 console — the `cloud-burst-0` instance should be terminated or shutting-down.)
+(Show EC2 console — the `aws-burst-0` instance should be terminated or shutting-down.)
 
 **Talking point:** "No manual cleanup required. This is the full lifecycle: job submitted → node launched → job runs → node powers down. The customer only pays for the EC2 instance while the job is running."
 
