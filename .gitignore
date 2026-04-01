@@ -1,0 +1,21 @@
+# Terraform state and local config — never commit these
+terraform/generations/*/terraform.tfvars
+terraform/generations/*/.terraform/
+terraform/generations/*/.terraform.lock.hcl
+terraform/generations/*/terraform.tfstate
+terraform/generations/*/terraform.tfstate.backup
+terraform/generations/*/.terraform.tfstate.lock.info
+
+# SSH private keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+*.swp
+*~

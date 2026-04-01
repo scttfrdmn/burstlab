@@ -7,8 +7,8 @@
 #   2. Set hostname based on instance index (compute01, compute02, ...)
 #   3. Add /etc/hosts entries for all cluster nodes
 #   4. Configure default route via head node (NAT)
-#   5. Mount EFS: /home and /opt/slurm
-#   6. Copy munge key from EFS, start munge
+#   5. Mount EFS: /u and /opt/slurm
+#   6. Write munge key from Terraform-injected base64, start munge
 #   7. Start slurmd with the correct node name
 #
 # Terraform templatefile() substitutions — see ALLCAPS vars replaced at deploy time.
@@ -32,6 +32,15 @@ fi
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
 getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
 
+# Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
+# that blocks munge (873), slurmctld (6817), and NFS (2049).
+systemctl stop iptables 2>/dev/null || true
+systemctl disable iptables 2>/dev/null || true
+iptables -F 2>/dev/null || true
+iptables -P INPUT ACCEPT 2>/dev/null || true
+iptables -P FORWARD ACCEPT 2>/dev/null || true
+iptables -P OUTPUT ACCEPT 2>/dev/null || true
+
 # -----------------------------------------------------------------------------
 # 2. Set hostname
 # Terraform passes node_index (1-based) so compute01, compute02, etc.
@@ -46,7 +55,7 @@ echo "127.0.0.1 $NODE_NAME" >> /etc/hosts
 # -----------------------------------------------------------------------------
 echo "${head_node_ip} headnode" >> /etc/hosts
 %{ for i in range(compute_node_count) ~}
-echo "${cidrhost(onprem_cidr, i + 10)} compute0${i + 1}" >> /etc/hosts
+echo "${cidrhost(onprem_cidr, i + 10)} compute${format("%02d", i + 1)}" >> /etc/hosts
 %{ endfor ~}
 
 # -----------------------------------------------------------------------------
@@ -66,15 +75,15 @@ mkdir -p /u /opt/slurm
 echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
-# Retry mounting — EFS and head node init may still be running
+# Retry mounting — EFS DNS propagation and head node init may still be running
 for dir in /u /opt/slurm; do
-  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  for attempt in $(seq 1 30); do
     mount "$dir" && break || {
-      echo "EFS mount attempt $attempt for $dir failed, retrying in 15s..."
-      sleep 15
+      echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."
+      sleep 20
     }
   done
-  mountpoint -q "$dir" || { echo "FATAL: could not mount $dir"; exit 1; }
+  mountpoint -q "$dir" || { echo "FATAL: could not mount $dir after 30 attempts"; exit 1; }
 done
 
 # Wait for head node to finish populating EFS (poll for the sentinel file)
@@ -88,12 +97,14 @@ done
 
 # -----------------------------------------------------------------------------
 # 6. Configure munge
-# Key lives on EFS at /opt/slurm/etc/munge/munge.key (written by head node)
+# Key is injected by Terraform as base64 in munge_key_b64 (same key on all nodes)
 # -----------------------------------------------------------------------------
 mkdir -p /var/log/slurm /var/spool/slurm/d
 chown slurm:slurm /var/log/slurm /var/spool/slurm/d
 
-cp /opt/slurm/etc/munge/munge.key /etc/munge/munge.key
+# Write munge key directly from Terraform-injected base64 — no EFS dependency.
+# This eliminates the race where the head node hasn't written the key to EFS yet.
+echo "${munge_key_b64}" | base64 -d > /etc/munge/munge.key
 chown munge:munge /etc/munge/munge.key
 chmod 0400 /etc/munge/munge.key
 
@@ -103,7 +114,7 @@ systemctl is-active munge || { echo "FATAL: munge failed"; exit 1; }
 
 # Verify munge can reach the head node before starting slurmd
 for attempt in 1 2 3 4 5; do
-  munge -n | unmunge -s headnode && break || {
+  munge -n | unmunge && break || {
     echo "Munge connectivity attempt $attempt failed, retrying in 10s..."
     sleep 10
   }
@@ -123,5 +134,12 @@ systemctl is-active slurmd || {
   journalctl -u slurmd --no-pager -n 30
   exit 1
 }
+
+# Set SLURM_CONF and PATH for interactive shells (SSH sessions, alice, etc.)
+cat > /etc/profile.d/slurm.sh << 'SLURMPROFILE'
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
+export PATH=/opt/slurm/bin:/opt/slurm/sbin:$PATH
+SLURMPROFILE
+chmod 644 /etc/profile.d/slurm.sh
 
 echo "=== BurstLab compute node $NODE_NAME init complete: $(date) ==="

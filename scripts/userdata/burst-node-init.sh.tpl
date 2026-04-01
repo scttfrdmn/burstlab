@@ -11,8 +11,8 @@
 #   2. Read SLURM_NODENAME from EC2 Name tag via IMDS
 #   3. Set hostname to match Slurm node name
 #   4. Add /etc/hosts entries for cluster nodes
-#   5. Mount EFS: /home and /opt/slurm
-#   6. Copy munge key from EFS, start munge
+#   5. Mount EFS: /u and /opt/slurm
+#   6. Write munge key from Terraform-injected base64, start munge
 #   7. Start slurmd -N $SLURM_NODENAME
 #
 # Terraform templatefile() substitutions — see ALLCAPS vars replaced at deploy time.
@@ -36,6 +36,15 @@ fi
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
 getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
 
+# Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
+# that blocks munge (873), slurmctld (6817), and NFS (2049).
+systemctl stop iptables 2>/dev/null || true
+systemctl disable iptables 2>/dev/null || true
+iptables -F 2>/dev/null || true
+iptables -P INPUT ACCEPT 2>/dev/null || true
+iptables -P FORWARD ACCEPT 2>/dev/null || true
+iptables -P OUTPUT ACCEPT 2>/dev/null || true
+
 # -----------------------------------------------------------------------------
 # 2. Read node name from EC2 Name tag
 # InstanceMetadataTags=enabled is set in the launch template.
@@ -45,7 +54,7 @@ getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d 
 TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" \
   -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
 
-for attempt in $(seq 1 10); do
+for attempt in $(seq 1 60); do
   SLURM_NODENAME=$(curl -sf \
     -H "X-aws-ec2-metadata-token: $TOKEN" \
     "http://169.254.169.254/latest/meta-data/tags/instance/Name") && break || {
@@ -88,13 +97,13 @@ echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
 for dir in /u /opt/slurm; do
-  for attempt in $(seq 1 10); do
+  for attempt in $(seq 1 30); do
     mount "$dir" && break || {
-      echo "EFS mount attempt $attempt for $dir failed, retrying in 10s..."
-      sleep 10
+      echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."
+      sleep 20
     }
   done
-  mountpoint -q "$dir" || { echo "FATAL: could not mount $dir"; exit 1; }
+  mountpoint -q "$dir" || { echo "FATAL: could not mount $dir after 30 attempts"; exit 1; }
 done
 
 # Wait for /opt/slurm to be populated (head node may still be initializing)
@@ -113,7 +122,9 @@ chown slurm:slurm /var/spool/slurm/d /var/log/slurm
 # -----------------------------------------------------------------------------
 # 6. Configure munge
 # -----------------------------------------------------------------------------
-cp /opt/slurm/etc/munge/munge.key /etc/munge/munge.key
+# Write munge key directly from Terraform-injected base64 — no EFS dependency.
+# This eliminates the race where the head node hasn't written the key to EFS yet.
+echo "${munge_key_b64}" | base64 -d > /etc/munge/munge.key
 chown munge:munge /etc/munge/munge.key
 chmod 0400 /etc/munge/munge.key
 
@@ -123,7 +134,7 @@ systemctl is-active munge || { echo "FATAL: munge failed"; exit 1; }
 
 # Verify munge connectivity to head node
 for attempt in $(seq 1 5); do
-  munge -n | unmunge -s headnode && break || {
+  munge -n | unmunge && break || {
     echo "Munge connectivity attempt $attempt failed, retrying..."
     sleep 10
   }
@@ -136,13 +147,18 @@ done
 # Without -N, slurmd uses the OS hostname, which may differ or not be in conf.
 # -----------------------------------------------------------------------------
 
-# Override the systemd unit to pass the correct node name
+# Override the systemd unit to pass the correct node name.
+# The base slurmd.service uses Type=forking — slurmd daemonizes.
+# MUST NOT use -D here: -D runs slurmd in foreground (no fork), which causes
+# systemd to time out waiting for the PID file and mark the service failed.
+# Use the AMI binary path (/opt/slurm-baked/sbin/slurmd) to match the base unit.
+# SLURM_CONF is already set in the base service Environment= directive.
 mkdir -p /etc/systemd/system/slurmd.service.d
 cat > /etc/systemd/system/slurmd.service.d/nodename.conf << EOF
 [Service]
 EnvironmentFile=/etc/sysconfig/slurmd
 ExecStart=
-ExecStart=/opt/slurm/sbin/slurmd -N \$SLURM_NODENAME -D \$SLURMD_OPTIONS
+ExecStart=/opt/slurm-baked/sbin/slurmd -N \$SLURM_NODENAME \$SLURMD_OPTIONS
 EOF
 systemctl daemon-reload
 
@@ -155,5 +171,12 @@ systemctl is-active slurmd || {
   journalctl -u slurmd --no-pager -n 30
   exit 1
 }
+
+# Set SLURM_CONF and PATH for interactive shells (SSH sessions, alice, etc.)
+cat > /etc/profile.d/slurm.sh << 'SLURMPROFILE'
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
+export PATH=/opt/slurm/bin:/opt/slurm/sbin:$PATH
+SLURMPROFILE
+chmod 644 /etc/profile.d/slurm.sh
 
 echo "=== BurstLab burst node $SLURM_NODENAME init complete: $(date) ==="

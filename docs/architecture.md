@@ -270,7 +270,7 @@ The AMI is role-agnostic. The cloud-init script at first boot determines the nod
 4. Start `munge`, then `slurmd`
 5. `slurmd` registers with `slurmctld` — node transitions from `CLOUD*` to `IDLE`
 
-The entire burst node startup sequence (launch → cloud-init → slurmd register) completes in 90-120 seconds on `m7a.xlarge`. `ResumeTimeout=300` accounts for variance.
+The entire burst node startup sequence (launch → cloud-init → slurmd register) completes in 90-120 seconds on `m7a.2xlarge`. `ResumeTimeout=300` accounts for variance.
 
 ---
 

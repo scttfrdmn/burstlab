@@ -12,7 +12,7 @@
 # All nodes share:
 #   - Same AMI as the head node (ensures Slurm version match)
 #   - Same Munge key (shared secret for authentication)
-#   - EFS mounts for /home and /opt/slurm
+#   - EFS mounts for /u and /opt/slurm
 #   - No public IP — internet access goes through head node NAT
 # =============================================================================
 
@@ -58,7 +58,7 @@ resource "aws_instance" "compute" {
 
   # UserData runs once at first boot. Each compute node:
   #   1. Writes the Munge key and starts munge
-  #   2. Mounts EFS (/home and /opt/slurm)
+  #   2. Mounts EFS (/u and /opt/slurm)
   #   3. Adds head node IP to /etc/hosts so Slurm can resolve slurmctld hostname
   #   4. Starts slurmd
   #
@@ -69,8 +69,6 @@ resource "aws_instance" "compute" {
     node_index                = count.index + 1
     munge_key_b64             = var.munge_key_b64
     efs_dns_name              = var.efs_dns_name
-    efs_home_access_point_id  = var.efs_home_access_point_id
-    efs_slurm_access_point_id = var.efs_slurm_access_point_id
     # The template uses head_node_ip (shorter name) — kept consistent with the
     # existing script convention.
     head_node_ip              = var.head_node_private_ip

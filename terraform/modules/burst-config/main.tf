@@ -6,8 +6,7 @@
 #
 # The launch template captures everything about a burst node's configuration:
 #   - AMI (same as compute nodes — identical Slurm install)
-#   - Instance type (m7a.xlarge — larger than on-prem compute, demonstrating
-#     that cloud burst nodes can have a different spec)
+#   - Instance type (m7a.2xlarge — matches compute nodes)
 #   - IAM instance profile (burst node role — allows DescribeTags)
 #   - Security group (burst_node_sg — intra-VPC only)
 #   - Metadata options (InstanceMetadataTags=enabled — HOW slurmd gets its name)
@@ -78,7 +77,7 @@ resource "aws_launch_template" "burst" {
   #   1. Read node name from IMDS tags (requires InstanceMetadataTags=enabled)
   #   2. Set OS hostname to the Slurm node name
   #   3. Write Munge key and start munge
-  #   4. Mount EFS (/home and /opt/slurm)
+  #   4. Mount EFS (/u and /opt/slurm)
   #   5. Add head node IP to /etc/hosts
   #   6. Start slurmd — it will register with slurmctld using the correct NodeName
   #
@@ -87,8 +86,6 @@ resource "aws_launch_template" "burst" {
     cluster_name              = var.cluster_name
     munge_key_b64             = var.munge_key_b64
     efs_dns_name              = var.efs_dns_name
-    efs_home_access_point_id  = var.efs_home_access_point_id
-    efs_slurm_access_point_id = var.efs_slurm_access_point_id
     # The burst-node-init template uses head_node_ip (matching compute-node
     # convention). We accept head_node_private_ip as a variable name to be
     # explicit, then map it to what the template expects.
@@ -96,18 +93,21 @@ resource "aws_launch_template" "burst" {
     aws_region                = var.aws_region
   }))
 
-  # Tag the launch template resource itself.
+  # Tag burst node instances at launch. DO NOT set Name here.
+  # resume.py sets Name=<slurm-node-name> (e.g., "aws-burst-0") via EC2 CreateFleet.
+  # If Name is set in the launch template, the instance starts with the wrong name
+  # and burst-node-init.sh reads it from IMDS before resume.py can correct it —
+  # causing slurmd to register with the wrong node name and fail. Without a default
+  # Name, the IMDS tag endpoint returns 404 until resume.py sets the correct name,
+  # which causes the retry loop in burst-node-init.sh to wait as intended.
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name       = "${var.cluster_name}-burst-node"
       Project    = "burstlab"
-      Generation = "gen1"
+      Cluster    = var.cluster_name
+      Generation = var.generation
       ManagedBy  = "terraform"
       Role       = "burst-node"
-      # Note: The aws-plugin-for-slurm will OVERWRITE the Name tag with the
-      # Slurm node name (e.g., "cloud-burst-0") when it launches the instance.
-      # This tag here is just a fallback default.
     }
   }
 
@@ -116,7 +116,7 @@ resource "aws_launch_template" "burst" {
     tags = {
       Name       = "${var.cluster_name}-burst-node-root"
       Project    = "burstlab"
-      Generation = "gen1"
+      Generation = var.generation
       ManagedBy  = "terraform"
     }
   }

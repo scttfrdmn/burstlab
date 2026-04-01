@@ -34,9 +34,9 @@ key_name = "your-key-pair-name"
 head_node_ami = "ami-XXXXXXXX"
 
 # Instance types (optional — defaults shown)
-# head_node_instance_type    = "m7a.large"
-# compute_node_instance_type = "m7a.large"
-# burst_node_instance_type   = "m7a.xlarge"
+# head_node_instance_type    = "m7a.2xlarge"
+# compute_node_instance_type = "m7a.2xlarge"
+# burst_node_instance_type   = "m7a.2xlarge"
 
 # Cluster size (optional — defaults shown)
 # compute_node_count = 4   # Number of always-on "on-prem" nodes

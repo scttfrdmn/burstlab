@@ -9,9 +9,9 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for on-prem compute nodes. m7a.large matches the head node for consistency. In a real HPC cluster you might use memory-optimized or compute-optimized types."
+  description = "EC2 instance type for on-prem compute nodes. m7a.2xlarge (8 vCPU / 32 GB) matches the head and burst nodes for consistency."
   type        = string
-  default     = "m7a.large"
+  default     = "m7a.2xlarge"
 }
 
 variable "key_name" {
@@ -36,19 +36,10 @@ variable "munge_key_b64" {
 }
 
 variable "efs_dns_name" {
-  description = "EFS DNS name for mounting /home and /opt/slurm. Compute nodes get identical Slurm binaries and config by mounting the same EFS as the head node."
+  description = "EFS DNS name for mounting /u and /opt/slurm. Compute nodes get identical Slurm binaries and config by mounting the same EFS as the head node."
   type        = string
 }
 
-variable "efs_home_access_point_id" {
-  description = "EFS access point ID for /home."
-  type        = string
-}
-
-variable "efs_slurm_access_point_id" {
-  description = "EFS access point ID for /opt/slurm."
-  type        = string
-}
 
 variable "compute_node_count" {
   description = "Number of on-prem compute nodes to create (compute01..N). These are always-on nodes that simulate a real on-prem HPC cluster. Default 4 matches a typical small demo cluster."

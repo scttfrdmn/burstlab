@@ -37,7 +37,7 @@ done
 _section "EFS Mounts"
 # -----------------------------------------------------------------------------
 
-for mount in /home /opt/slurm; do
+for mount in /u /opt/slurm; do
   if mountpoint -q "$mount"; then
     _pass "$mount is mounted"
     # Check it's actually EFS (nfs4)
@@ -62,7 +62,7 @@ fi
 _section "Munge Authentication"
 # -----------------------------------------------------------------------------
 
-if munge -n | unmunge -q 2>/dev/null; then
+if munge -n | unmunge > /dev/null 2>&1; then
   _pass "Local munge encode/decode works"
 else
   _fail "Local munge encode/decode FAILED"
@@ -84,6 +84,24 @@ for f in resume.py suspend.py change_state.py generate_conf.py common.py config.
     _pass "$f exists"
   else
     _fail "$f MISSING from $PLUGIN_DIR"
+  fi
+done
+
+# Verify the plugin script Python interpreter can import boto3.
+# Rocky 8: /usr/local/bin/python3 wrapper (Python 3.8 + boto3)
+# Rocky 9/10: system /usr/bin/python3 (3.9/3.12 with boto3 installed directly)
+# We check the functional requirement (boto3 importable) rather than a specific path
+# so this check works correctly on all three BurstLab generations.
+for pyfile in resume.py suspend.py change_state.py generate_conf.py; do
+  SHEBANG=$(head -1 "$PLUGIN_DIR/$pyfile" 2>/dev/null)
+  SHEBANG_PY=$(echo "$SHEBANG" | sed 's|^#!||' | awk '{print $1}')
+  if [ -z "$SHEBANG_PY" ]; then
+    _warn "$pyfile: no shebang line found"
+  elif "$SHEBANG_PY" -c "import boto3" 2>/dev/null; then
+    _pass "$pyfile: $SHEBANG_PY can import boto3"
+  else
+    _fail "$pyfile: $SHEBANG_PY cannot import boto3 — plugin will fail at runtime"
+    _fail "  Fix: ensure boto3 is installed for $SHEBANG_PY"
   fi
 done
 
@@ -120,8 +138,9 @@ else
   _fail "PartitionName or NodeGroupName contains invalid characters: $PARTITION_NAME"
 fi
 
-# Check change_state.py cron is installed for slurm user
-if crontab -l -u slurm 2>/dev/null | grep -q change_state.py; then
+# Check change_state.py cron is installed for slurm user.
+# The cron spool file is root-owned so we use sudo (rocky has passwordless sudo).
+if sudo grep -q "change_state.py" /var/spool/cron/slurm 2>/dev/null; then
   _pass "change_state.py cron is installed for slurm user"
 else
   _fail "change_state.py cron NOT found for slurm user"
@@ -147,11 +166,22 @@ for directive in "PrivateData=CLOUD" "ReturnToService=2" "DebugFlags=NO_CONF_HAS
   fi
 done
 
-# Check cloud partition is defined (generate_conf.py output was appended)
-if grep -q "PartitionName=cloud" /opt/slurm/etc/slurm.conf 2>/dev/null; then
-  _pass "Cloud partition defined in slurm.conf"
+# Detect burst partition name from partitions.json (Gen 1=aws, Gen 2/3=cloud)
+BURST_PARTITION=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('$PLUGIN_DIR/partitions.json'))
+    print(data['Partitions'][0]['PartitionName'])
+except Exception as e:
+    print('unknown', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null)
+
+# Check burst partition is defined in slurm.conf (generate_conf.py output was appended)
+if [ -n "$BURST_PARTITION" ] && grep -q "PartitionName=${BURST_PARTITION}" /opt/slurm/etc/slurm.conf 2>/dev/null; then
+  _pass "Burst partition '${BURST_PARTITION}' defined in slurm.conf"
 else
-  _fail "Cloud partition NOT in slurm.conf — did generate_conf.py run?"
+  _fail "Burst partition NOT in slurm.conf — did generate_conf.py run? (expected PartitionName=${BURST_PARTITION:-unknown})"
 fi
 
 # -----------------------------------------------------------------------------
@@ -169,14 +199,14 @@ else
   _warn "local partition state: ${LOCAL_STATE:-unknown}"
 fi
 
-# Check cloud partition exists
-CLOUD_STATE=$(/opt/slurm/bin/sinfo -p cloud -h -o "%a" 2>/dev/null)
+# Check burst partition exists in sinfo
+CLOUD_STATE=$(/opt/slurm/bin/sinfo -p "${BURST_PARTITION:-aws}" -h -o "%a" 2>/dev/null)
 if [ "$CLOUD_STATE" = "up" ]; then
-  _pass "cloud partition is UP"
+  _pass "burst partition '${BURST_PARTITION}' is UP"
 elif [ -z "$CLOUD_STATE" ]; then
-  _fail "cloud partition NOT found in sinfo"
+  _fail "burst partition '${BURST_PARTITION:-aws}' NOT found in sinfo"
 else
-  _warn "cloud partition state: $CLOUD_STATE"
+  _warn "burst partition '${BURST_PARTITION}' state: $CLOUD_STATE"
 fi
 
 # Check compute nodes are IDLE (not DOWN)
@@ -188,9 +218,9 @@ else
   _warn "  Run: scontrol show nodes | grep -A5 Reason"
 fi
 
-# Check cloud nodes are in CLOUD* state (powered off, ready to burst)
-CLOUD_NODES=$(/opt/slurm/bin/sinfo -p cloud -h -o "%T %N" 2>/dev/null)
-echo "Cloud nodes state:"
+# Check burst nodes are in CLOUD* state (powered off, ready to burst)
+CLOUD_NODES=$(/opt/slurm/bin/sinfo -p "${BURST_PARTITION:-aws}" -h -o "%T %N" 2>/dev/null)
+echo "Burst nodes state:"
 echo "$CLOUD_NODES" | sed 's/^/  /'
 
 # -----------------------------------------------------------------------------
@@ -203,6 +233,14 @@ if [ -n "$CLUSTER" ]; then
   _pass "Cluster '$CLUSTER' registered in accounting"
 else
   _fail "No cluster registered in sacctmgr — jobs will fail accounting checks"
+fi
+
+# Check alice is a registered user (required for job submission with AccountingStorageEnforce)
+if /opt/slurm/bin/sacctmgr -n show user alice 2>/dev/null | grep -q "alice"; then
+  _pass "alice is registered in Slurm accounting"
+else
+  _fail "alice is NOT in Slurm accounting — sbatch will fail"
+  _fail "  Fix: sacctmgr -i add user alice account=default"
 fi
 
 # -----------------------------------------------------------------------------

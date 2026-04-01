@@ -2,105 +2,95 @@
 # =============================================================================
 # teardown.sh — BurstLab clean shutdown
 #
-# Gracefully drains the cluster and terminates any burst nodes before
-# running terraform destroy. This prevents orphaned EC2 instances and
-# avoids Slurm error states on next deploy.
+# Gracefully drains the cluster, terminates burst nodes, then runs
+# terraform destroy. Prevents orphaned EC2 instances (Plugin v2-launched
+# burst nodes are NOT in Terraform state and must be cleaned up first).
 #
-# Run from the TERRAFORM DIRECTORY (not on the head node):
+# Usage (from the Terraform generation directory):
 #   cd terraform/generations/gen1-slurm2205-rocky8/
-#   bash ../../../scripts/teardown.sh
+#   AWS_PROFILE=aws HEAD_NODE_IP=x.x.x.x bash ../../../scripts/teardown.sh
 #
-# Or pass the head node IP to drain first:
-#   HEAD_NODE_IP=x.x.x.x bash scripts/teardown.sh
+# HEAD_NODE_IP is optional but strongly recommended — enables graceful Slurm
+# drain before destroy. Without it, burst instances are still terminated via
+# EC2 tag scan, but running jobs will be killed without notice.
+#
+# To skip terraform destroy (cleanup only):
+#   SKIP_DESTROY=true AWS_PROFILE=aws bash scripts/teardown.sh
 # =============================================================================
 
 set -uo pipefail
 
 HEAD_NODE_IP="${HEAD_NODE_IP:-}"
-SBIN=/opt/slurm/bin
+CLUSTER="${CLUSTER:-burstlab-gen1}"
+REGION="${AWS_DEFAULT_REGION:-us-west-2}"
+SKIP_DESTROY="${SKIP_DESTROY:-false}"
+KEY="${KEY:-~/.ssh/burstlab-key.pem}"
+
+# Require AWS_PROFILE
+[ -n "${AWS_PROFILE:-}" ] || { echo "ERROR: AWS_PROFILE is not set. Use: AWS_PROFILE=aws bash $0"; exit 1; }
 
 _info() { echo ">>> $1"; }
 _warn() { echo "[WARN] $1"; }
 
-# If we have SSH access to the head node, drain gracefully first
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# -----------------------------------------------------------------------------
+# Step 1: Graceful Slurm drain (if we can reach the head node)
+# -----------------------------------------------------------------------------
 if [ -n "$HEAD_NODE_IP" ]; then
   _info "Draining cluster on $HEAD_NODE_IP before destroy..."
-  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "rocky@$HEAD_NODE_IP" "
-    set -e
+  ssh -i "$KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=15 "rocky@$HEAD_NODE_IP" "
+    export SLURM_CONF=/opt/slurm/etc/slurm.conf
     SBIN=/opt/slurm/bin
 
-    # Cancel all running/pending jobs
-    echo 'Cancelling all jobs...'
-    \$SBIN/scancel --state=RUNNING --partition=cloud 2>/dev/null || true
+    echo 'Cancelling all running and pending jobs...'
+    \$SBIN/scancel --state=RUNNING 2>/dev/null || true
     \$SBIN/scancel --state=PENDING 2>/dev/null || true
+    sleep 2
 
-    # Force-suspend any remaining cloud nodes to terminate EC2 instances
-    echo 'Suspending cloud nodes...'
-    CLOUD_NODES=\$(\$SBIN/sinfo -p cloud -h -o '%N' 2>/dev/null)
-    if [ -n \"\$CLOUD_NODES\" ]; then
-      \$SBIN/scontrol update NodeName=\"\$CLOUD_NODES\" State=POWER_DOWN 2>/dev/null || true
+    echo 'Triggering power-down on all burst nodes...'
+    # Get all burst partitions (everything except 'local')
+    BURST_PARTITIONS=\$(\$SBIN/sinfo -h -o '%R' 2>/dev/null | grep -v '^local$' | sort -u | tr '\n' ',')
+    BURST_PARTITIONS=\${BURST_PARTITIONS%,}
+    if [ -n \"\$BURST_PARTITIONS\" ]; then
+      BURST_NODES=\$(\$SBIN/sinfo -p \"\$BURST_PARTITIONS\" -h -o '%N' 2>/dev/null | tr '\n' ',' | sed 's/,\$//')
+      if [ -n \"\$BURST_NODES\" ]; then
+        echo \"  Burst partitions: \$BURST_PARTITIONS\"
+        echo \"  Burst nodes:      \$BURST_NODES\"
+        sudo SLURM_CONF=\$SLURM_CONF \$SBIN/scontrol update NodeName=\"\$BURST_NODES\" State=POWER_DOWN 2>/dev/null || true
+      fi
     fi
+    sleep 5
 
-    # Wait briefly for instances to start terminating
-    sleep 10
-
-    # Run suspend.py directly for any remaining cloud nodes (belt and suspenders)
-    IDLE_CLOUD=\$(\$SBIN/sinfo -p cloud -h -o '%T %N' 2>/dev/null | grep -v CLOUD | awk '{print \$2}' | paste -sd,)
-    if [ -n \"\$IDLE_CLOUD\" ]; then
-      echo 'Running suspend.py for remaining cloud nodes...'
-      /opt/slurm/etc/aws/suspend.py \"\$IDLE_CLOUD\" 2>/dev/null || true
-    fi
-
-    # Drain the controller
     echo 'Stopping Slurm services...'
-    systemctl stop slurmctld 2>/dev/null || true
-    systemctl stop slurmdbd 2>/dev/null || true
-    systemctl stop munge 2>/dev/null || true
+    sudo systemctl stop slurmctld 2>/dev/null || true
+    sudo systemctl stop slurmdbd  2>/dev/null || true
+    sudo systemctl stop munge     2>/dev/null || true
 
     echo 'Head node drained.'
-  " && _info "Cluster drained successfully." || _warn "SSH drain failed — proceeding with terraform destroy anyway."
+  " && _info "Cluster drained." || _warn "SSH drain failed — will force-terminate via EC2 API."
 fi
 
-# Check for any orphaned burst instances before destroying
-_info "Checking for running burst instances..."
-# This requires AWS CLI and assumes the profile is set
-if command -v aws >/dev/null 2>&1; then
-  BURST_INSTANCES=$(aws ec2 describe-instances \
-    --filters "Name=tag:Project,Values=burstlab" "Name=instance-state-name,Values=running,pending" \
-    --query "Reservations[].Instances[].InstanceId" \
-    --output text \
-    --profile "${AWS_PROFILE:-aws}" \
-    --region "${AWS_DEFAULT_REGION:-us-west-2}" 2>/dev/null || echo "")
+# -----------------------------------------------------------------------------
+# Step 2: Terminate any burst EC2 instances (includes zombies from prior runs)
+# -----------------------------------------------------------------------------
+_info "Cleaning up burst EC2 instances..."
+AWS_PROFILE=$AWS_PROFILE CLUSTER=$CLUSTER AWS_DEFAULT_REGION=$REGION \
+  bash "$SCRIPT_DIR/cleanup-burst-nodes.sh" --cluster "$CLUSTER" --region "$REGION"
 
-  if [ -n "$BURST_INSTANCES" ]; then
-    _warn "Found running burst instances: $BURST_INSTANCES"
-    echo "Terminating them before destroy..."
-    aws ec2 terminate-instances \
-      --instance-ids $BURST_INSTANCES \
-      --profile "${AWS_PROFILE:-aws}" \
-      --region "${AWS_DEFAULT_REGION:-us-west-2}" >/dev/null
-    echo "Waiting for termination..."
-    aws ec2 wait instance-terminated \
-      --instance-ids $BURST_INSTANCES \
-      --profile "${AWS_PROFILE:-aws}" \
-      --region "${AWS_DEFAULT_REGION:-us-west-2}"
-    echo "Burst instances terminated."
-  else
-    _info "No running burst instances found."
-  fi
+# -----------------------------------------------------------------------------
+# Step 3: Terraform destroy
+# -----------------------------------------------------------------------------
+if [ "$SKIP_DESTROY" = true ]; then
+  _info "SKIP_DESTROY=true — skipping terraform destroy."
+  exit 0
 fi
 
-# Run terraform destroy
 if [ -f "terraform.tfvars" ] || [ -f "main.tf" ]; then
   _info "Running terraform destroy..."
-  terraform destroy -auto-approve
+  AWS_PROFILE=$AWS_PROFILE terraform destroy -auto-approve
   _info "Terraform destroy complete."
 else
-  echo
-  echo "This script must be run from a Terraform generation directory, or"
-  echo "set HEAD_NODE_IP and run it manually. Terraform destroy not run."
-  echo
-  echo "To destroy manually:"
-  echo "  cd terraform/generations/gen1-slurm2205-rocky8/"
-  echo "  terraform destroy"
+  _warn "Not in a Terraform directory — skipping terraform destroy."
+  echo "  Run manually: cd terraform/generations/gen1-slurm2205-rocky8/ && AWS_PROFILE=aws terraform destroy"
 fi

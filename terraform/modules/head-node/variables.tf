@@ -9,9 +9,9 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for the head node. m7a.large provides 2 vCPU / 8 GB RAM — sufficient for slurmctld + slurmdbd + the aws-plugin-for-slurm on a small lab cluster."
+  description = "EC2 instance type for the head node. m7a.2xlarge (8 vCPU / 32 GB) runs slurmctld + slurmdbd + the aws-plugin-for-slurm comfortably with headroom for concurrent demos."
   type        = string
-  default     = "m7a.large"
+  default     = "m7a.2xlarge"
 }
 
 variable "key_name" {
@@ -57,19 +57,10 @@ variable "slurmdbd_db_password" {
 }
 
 variable "efs_dns_name" {
-  description = "EFS filesystem DNS name. Used in the UserData script to mount /home and /opt/slurm via NFS."
+  description = "EFS filesystem DNS name. Used in the UserData script to mount /u and /opt/slurm via NFS."
   type        = string
 }
 
-variable "efs_home_access_point_id" {
-  description = "EFS access point ID for the /home export."
-  type        = string
-}
-
-variable "efs_slurm_access_point_id" {
-  description = "EFS access point ID for the /opt/slurm export."
-  type        = string
-}
 
 variable "compute_node_count" {
   description = "Number of on-prem compute nodes (compute01..N). Used in slurm.conf NodeName definitions."
@@ -129,3 +120,14 @@ variable "static_private_ip" {
   type        = string
   default     = "10.0.0.10"
 }
+
+variable "validate_script" {
+  description = "Plain-text contents of validate-cluster.sh. Injected into head node UserData via a quoted heredoc and written to /opt/slurm/etc/validate-cluster.sh on EFS so the script is available on any cluster node."
+  type        = string
+}
+
+variable "demo_script" {
+  description = "Plain-text contents of demo-burst.sh. Injected into head node UserData via a quoted heredoc and written to /opt/slurm/etc/demo-burst.sh on EFS."
+  type        = string
+}
+

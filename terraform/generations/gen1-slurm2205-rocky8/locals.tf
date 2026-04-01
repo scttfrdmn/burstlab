@@ -93,6 +93,26 @@ locals {
   cgroup_conf = file("${local.config_dir}/cgroup.conf")
 
   # ---------------------------------------------------------------------------
+  # Helper scripts (plain text)
+  # ---------------------------------------------------------------------------
+  # validate-cluster.sh and demo-burst.sh are read as plain text and injected
+  # into the head node UserData via quoted heredocs. The init script writes them
+  # to /opt/slurm/etc/ on EFS so they are accessible from any node.
+  #
+  # WHY plain text instead of base64encode()?
+  # base64-encoded scripts have near-zero compressibility (high entropy). After
+  # base64gzip(), they consumed ~10 KB of the 16 KB UserData budget — leaving
+  # only ~6 KB for the init script itself. Plain text compresses 60-70% better,
+  # leaving ample budget. Terraform does NOT re-process substituted values for
+  # ${...} patterns, so bash variables in the scripts are embedded as literals.
+  # The quoted heredoc delimiter in the init script (<<'MARKER') then prevents
+  # the shell from expanding them during the write step.
+  scripts_dir = "${path.module}/../../../scripts"
+
+  validate_script = file("${local.scripts_dir}/validate-cluster.sh")
+  demo_script     = file("${local.scripts_dir}/demo-burst.sh")
+
+  # ---------------------------------------------------------------------------
   # plugin_config.json (aws-plugin-for-slurm)
   # ---------------------------------------------------------------------------
   # Configuration for the aws-plugin-for-slurm Python plugin. Contains:

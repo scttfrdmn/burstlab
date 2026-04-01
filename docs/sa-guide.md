@@ -128,7 +128,7 @@ squeue
 Expected output:
 ```
 JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-    1     local     wrap   centos  R       0:03      1 compute01
+    1     local     wrap    alice  R       0:03      1 compute01
 ```
 
 **Talking point:** "A local job runs immediately — the compute nodes are always idle and ready. This is your guaranteed on-prem allocation. The job ran on `compute01`, one of the four simulated on-prem nodes."
@@ -304,16 +304,16 @@ Check `slurmdbd` status first. Plugin v2 requires accounting. Then check that `g
 **"What does this cost to run?"**
 
 For a BurstLab Gen 1 cluster at idle (no burst jobs running):
-- Head node (m7a.large): ~$0.09/hr = ~$2.16/day
-- 4 compute nodes (m7a.large × 4): ~$0.36/hr = ~$8.64/day
+- Head node (m7a.2xlarge): ~$0.36/hr = ~$8.64/day
+- 4 compute nodes (m7a.2xlarge × 4): ~$1.44/hr = ~$34.56/day
 - EFS storage (~1 GB): negligible
 - Data transfer: negligible for a lab
 
-Total idle cost: **~$0.45/hr or ~$10.80/day**
+Total idle cost: **~$1.80/hr or ~$43/day**
 
-When bursting (10 × m7a.xlarge running for 1 hour): ~$1.84 additional
+When bursting (10 × m7a.2xlarge running for 1 hour): ~$3.60 additional
 
-For a full-day demo with 2-3 burst cycles: **~$15-20 total**
+For a full-day demo with 2-3 burst cycles: **~$50-60 total**
 
 Remind customers to run `terraform destroy` when done. BurstLab is ephemeral by design.
 
