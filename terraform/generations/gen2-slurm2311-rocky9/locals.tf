@@ -47,6 +47,4 @@ locals {
     cluster_name        = var.cluster_name
   })
 
-  validate_script = file("${local.scripts_dir}/validate-cluster.sh")
-  demo_script     = file("${local.scripts_dir}/demo-burst.sh")
 }

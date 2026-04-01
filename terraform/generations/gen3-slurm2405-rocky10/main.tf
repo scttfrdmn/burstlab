@@ -81,6 +81,55 @@ module "iam" {
 }
 
 # =============================================================================
+# S3 BUCKET — cluster scripts
+# =============================================================================
+resource "aws_s3_bucket" "scripts" {
+  bucket_prefix = "${var.cluster_name}-scripts-"
+  force_destroy = true
+
+  tags = {
+    Name       = "${var.cluster_name}-scripts"
+    Project    = "burstlab"
+    Generation = "gen3"
+    ManagedBy  = "terraform"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "scripts" {
+  bucket                  = aws_s3_bucket.scripts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_object" "validate_script" {
+  bucket  = aws_s3_bucket.scripts.id
+  key     = "validate-cluster.sh"
+  content = file("${local.scripts_dir}/validate-cluster.sh")
+}
+
+resource "aws_s3_object" "demo_script" {
+  bucket  = aws_s3_bucket.scripts.id
+  key     = "demo-burst.sh"
+  content = file("${local.scripts_dir}/demo-burst.sh")
+}
+
+resource "aws_iam_role_policy" "head_node_scripts_s3" {
+  name = "${var.cluster_name}-head-node-scripts-s3"
+  role = module.iam.head_node_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject"]
+      Resource = "${aws_s3_bucket.scripts.arn}/*"
+    }]
+  })
+}
+
+# =============================================================================
 # MODULE: SHARED STORAGE (EFS)
 # =============================================================================
 module "shared_storage" {
@@ -134,8 +183,7 @@ module "head_node" {
   compute_node_count = var.compute_node_count
   aws_region         = var.aws_region
 
-  validate_script = local.validate_script
-  demo_script     = local.demo_script
+  scripts_bucket_name = aws_s3_bucket.scripts.id
 
   depends_on = [time_sleep.efs_dns]
 }
