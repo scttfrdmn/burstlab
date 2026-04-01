@@ -34,6 +34,10 @@ terraform {
       source  = "hashicorp/time"
       version = "~> 0.9"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 
   # State is stored locally for BurstLab Gen 1.
@@ -329,4 +333,52 @@ module "compute_nodes" {
   onprem_cidr = module.vpc.onprem_subnet_cidr
 
   depends_on = [time_sleep.efs_dns]
+}
+
+# =============================================================================
+# BURST NODE CLEANUP — destroy-time teardown
+# =============================================================================
+# Burst nodes are launched by the Slurm Plugin v2 (resume.py) and are NOT in
+# Terraform state. On `terraform destroy`, Terraform has no knowledge of them
+# and leaves them running indefinitely. This null_resource runs a local-exec
+# destroy provisioner that finds and terminates all instances launched from the
+# burst launch template before the rest of the infrastructure is torn down.
+#
+# WHY triggers? Destroy provisioners can only access self.triggers.* — all other
+# resource references are gone by the time the provisioner runs. Capturing the
+# IDs and names in triggers at create time makes them available at destroy time.
+resource "null_resource" "burst_node_cleanup" {
+  triggers = {
+    launch_template_id = module.burst_config.launch_template_id
+    aws_region         = var.aws_region
+    aws_profile        = var.aws_profile
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      echo "=== BurstLab Gen 1: terminating burst nodes before destroy ==="
+      INSTANCE_IDS=$(AWS_PROFILE="${self.triggers.aws_profile}" aws ec2 describe-instances \
+        --region "${self.triggers.aws_region}" \
+        --filters \
+          "Name=tag:aws:ec2launchtemplate:id,Values=${self.triggers.launch_template_id}" \
+          "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+        --query "Reservations[].Instances[].InstanceId" \
+        --output text 2>/dev/null || echo "")
+      if [ -n "$INSTANCE_IDS" ]; then
+        echo "Terminating burst node(s): $INSTANCE_IDS"
+        AWS_PROFILE="${self.triggers.aws_profile}" aws ec2 terminate-instances \
+          --region "${self.triggers.aws_region}" \
+          --instance-ids $INSTANCE_IDS
+        AWS_PROFILE="${self.triggers.aws_profile}" aws ec2 wait instance-terminated \
+          --region "${self.triggers.aws_region}" \
+          --instance-ids $INSTANCE_IDS
+        echo "Burst node(s) terminated."
+      else
+        echo "No running burst nodes found — nothing to clean up."
+      fi
+    EOT
+  }
+
+  depends_on = [module.burst_config]
 }
