@@ -121,13 +121,8 @@ variable "static_private_ip" {
   default     = "10.0.0.10"
 }
 
-variable "validate_script" {
-  description = "Plain-text contents of validate-cluster.sh. Injected into head node UserData via a quoted heredoc and written to /opt/slurm/etc/validate-cluster.sh on EFS so the script is available on any cluster node."
-  type        = string
-}
-
-variable "demo_script" {
-  description = "Plain-text contents of demo-burst.sh. Injected into head node UserData via a quoted heredoc and written to /opt/slurm/etc/demo-burst.sh on EFS."
+variable "scripts_bucket_name" {
+  description = "Name of the S3 bucket containing validate-cluster.sh and demo-burst.sh. Downloaded at boot time to /opt/slurm/etc/ on EFS. Using S3 avoids embedding large scripts in UserData (which would exceed the 16 KB EC2 limit even after gzip compression)."
   type        = string
 }
 

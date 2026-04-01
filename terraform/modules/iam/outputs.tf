@@ -31,3 +31,8 @@ output "head_node_role_arn" {
   description = "ARN of the head node IAM role. Exposed for debugging and audit purposes."
   value       = aws_iam_role.head_node.arn
 }
+
+output "head_node_role_name" {
+  description = "Name of the head node IAM role. Used to attach inline policies (e.g., S3 read for cluster scripts)."
+  value       = aws_iam_role.head_node.name
+}

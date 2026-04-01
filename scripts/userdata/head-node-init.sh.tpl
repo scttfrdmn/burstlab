@@ -48,7 +48,7 @@ dnf makecache --refresh || true
 # is consistent across all nodes regardless of whether it's in the AMI.
 # -----------------------------------------------------------------------------
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
-getent passwd alice >/dev/null 2>&1 || useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
 
 # -----------------------------------------------------------------------------
 # 2. Set hostname
@@ -457,20 +457,13 @@ echo "--- Installing change_state.py cron ---"
 # -----------------------------------------------------------------------------
 # 13. Deploy helper scripts to EFS
 # -----------------------------------------------------------------------------
-echo "--- Deploying helper scripts ---"
-# validate-cluster.sh and demo-burst.sh are injected as plain text via quoted
-# heredocs. The quoted delimiter (<<'MARKER') prevents bash from expanding
-# dollar-brace variables during the write step — scripts are written verbatim.
-# correctly when executed later.
-cat > /opt/slurm/etc/validate-cluster.sh << 'VALIDATESCRIPT'
-${validate_script}
-VALIDATESCRIPT
-chmod 755 /opt/slurm/etc/validate-cluster.sh
-
-cat > /opt/slurm/etc/demo-burst.sh << 'DEMOSCRIPT'
-${demo_script}
-DEMOSCRIPT
-chmod 755 /opt/slurm/etc/demo-burst.sh
+echo "--- Deploying helper scripts from S3 ---"
+# validate-cluster.sh and demo-burst.sh are stored in S3 (not embedded in
+# UserData) to stay well under the 16 KB EC2 UserData limit. The head node
+# IAM role has s3:GetObject on this bucket.
+aws s3 cp "s3://${scripts_bucket_name}/validate-cluster.sh" /opt/slurm/etc/validate-cluster.sh
+aws s3 cp "s3://${scripts_bucket_name}/demo-burst.sh" /opt/slurm/etc/demo-burst.sh
+chmod 755 /opt/slurm/etc/validate-cluster.sh /opt/slurm/etc/demo-burst.sh
 
 echo "Helper scripts deployed to /opt/slurm/etc/"
 echo "(manage-partitions.sh is deployed separately — see scripts/deploy-admin-tools.sh)"

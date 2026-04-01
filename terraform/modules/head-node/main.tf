@@ -82,8 +82,7 @@ resource "aws_instance" "head_node" {
     slurmdbd_db_password      = var.slurmdbd_db_password
     aws_region                = var.aws_region
     compute_node_count        = var.compute_node_count
-    validate_script           = var.validate_script
-    demo_script               = var.demo_script
+    scripts_bucket_name       = var.scripts_bucket_name
   }))
 
   # Ensure instance replacement recreates the UserData (not just reboots).
