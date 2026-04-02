@@ -1,6 +1,6 @@
 # Slurm: A Five-Minute Introduction
 
-Slurm is the job scheduler running on most university HPC clusters. You submit work to it, it decides when and where to run it, and it handles the bookkeeping. This document covers the concepts and commands you need to understand BurstLab.
+Slurm is the job scheduler running on most HPC clusters. You submit work to it, it decides when and where to run it, and it handles the bookkeeping. This document covers the concepts and commands you need to understand BurstLab.
 
 For a quick command reference, bookmark the official cheat sheet: https://slurm.schedmd.com/pdfs/summary.pdf
 

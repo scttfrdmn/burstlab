@@ -2,7 +2,7 @@
 
 This guide walks you through building and deploying a complete **Gen 1** BurstLab cluster
 (Rocky Linux 8 + Slurm 22.05) from scratch. Gen 1 is the recommended starting point —
-it matches the environment most university HPC teams are actually running today.
+it matches the environment most HPC teams are actually running today.
 
 Gen 2 (Rocky 9 + Slurm 23.11) and Gen 3 (Rocky 10 + Slurm 24.05) follow the **identical
 workflow** with different AMIs and `terraform/generations/` paths. See

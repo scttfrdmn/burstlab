@@ -1,6 +1,6 @@
 # BurstLab
 
-BurstLab provisions disposable "mock on-prem" HPC clusters on AWS that replicate what universities actually run, with the AWS Plugin for Slurm v2 pre-configured for cloud bursting. It is a **learning platform** — every config, every design decision, and every AWS resource is documented so an SA or customer can understand exactly what was done and why.
+BurstLab provisions disposable "mock on-prem" HPC clusters on AWS that replicate what real HPC environments actually run, with the AWS Plugin for Slurm v2 pre-configured for cloud bursting. It is a **learning platform** — every config, every design decision, and every AWS resource is documented so an SA or customer can understand exactly what was done and why.
 
 This is not a canned demo. It is a transferable architecture. An SA can stand up a BurstLab cluster that matches a customer's Slurm version and OS, walk through the bursting configuration live, and hand over the IaC when the meeting ends.
 
@@ -21,7 +21,7 @@ Burst nodes (m7a.2xlarge):    launched by Plugin v2 via EC2 CreateFleet, same NA
 EFS:  /u (user homes) and /opt/slurm (Slurm binaries + config) shared across all nodes
 ```
 
-The head node is the cluster's NAT gateway — on-prem compute and burst nodes route all outbound traffic through it. This mirrors real university HPC environments where compute nodes live on isolated private networks with no direct internet access.
+The head node is the cluster's NAT gateway — on-prem compute and burst nodes route all outbound traffic through it. This mirrors real on-prem HPC environments where compute nodes live on isolated private networks with no direct internet access.
 
 ---
 
@@ -130,8 +130,8 @@ cluster matching a specific customer environment.
 | **Gen 2** | Rocky Linux 9 | 23.11.x | Python 3.9 native; cgroup v2; `idle_on_node_suspend` | Customers on RHEL/Rocky 9, Slurm 23.x |
 | **Gen 3** | Rocky Linux 10 | 24.05.x | `cloud_reg_addrs` — burst nodes self-register with actual EC2 IP | Customers on RHEL/Rocky 10, Slurm 24.x; greenfield deployments |
 
-**Start with Gen 1** unless you know the customer's OS and Slurm version. Most university
-HPC teams actively struggling with cloud bursting today are on Rocky 8 with Slurm 22.05.
+**Start with Gen 1** unless you know the customer's OS and Slurm version. Most HPC teams
+actively struggling with cloud bursting today are on Rocky 8 with Slurm 22.05.
 
 See [docs/generations.md](docs/generations.md) for the full narrative: why three generations
 exist, what each one solves, and a decision table for matching a customer to the right generation.
@@ -140,7 +140,7 @@ exist, what each one solves, and a decision table for matching a customer to the
 
 ## Why BurstLab Exists
 
-University HPC environments share a common set of problems when attempting cloud bursting for the first time:
+On-prem HPC environments share a common set of problems when attempting cloud bursting for the first time:
 
 - **Config drift**: slurm.conf has diverged between the head node and login nodes
 - **Missing plugins**: the `serializer/json` plugin is absent in some Slurm 22.05 builds, preventing slurmctld from starting
@@ -154,7 +154,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 
 ## Design Principles
 
-1. **Correctness over cleverness.** Every config file should be something a university sysadmin can read and understand. No magic.
+1. **Correctness over cleverness.** Every config file should be something an HPC sysadmin can read and understand. No magic.
 2. **Ephemeral by default.** `terraform destroy` cleans up everything. No orphaned resources.
 3. **Match reality.** Rocky Linux 8 with the same repo and package constraints customers face — not some idealized image.
 4. **Configs are the product.** The IaC is scaffolding. The real value is the known-good `slurm.conf`, `partitions.json`, IAM policies, and security groups for each generation.

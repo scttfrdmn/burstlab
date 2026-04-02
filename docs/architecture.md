@@ -36,7 +36,7 @@ The four-subnet design is not minimal — it is deliberately structured to mirro
 
 **Management subnet** is the boundary between the simulated campus network and the outside world. The head node sits here with an Elastic IP for SSH access. In a real environment this maps to the site's DMZ or bastion subnet.
 
-**On-prem subnet** simulates a private campus compute network. Nodes here have no public IPs and cannot initiate connections to the internet directly — they must route through the head node. This matches how compute nodes behave on virtually every real university cluster we have encountered.
+**On-prem subnet** simulates a private campus compute network. Nodes here have no public IPs and cannot initiate connections to the internet directly — they must route through the head node. This matches how compute nodes behave on virtually every real HPC cluster.
 
 **Cloud subnet A and B** are where burst nodes land. Two subnets in two AZs serve two purposes: capacity availability (EC2 spot and on-demand pools are independent per AZ) and failure isolation (if us-west-2a has a capacity shortage, the EC2 Fleet request can fill from us-west-2b). In Plugin v2, both subnet IDs are listed in `partitions.json` and the Fleet request spans them automatically.
 
@@ -44,7 +44,7 @@ The four-subnet design is not minimal — it is deliberately structured to mirro
 
 A standard AWS NAT Gateway would be simpler to operate, but using the head node as a NAT router is a deliberate choice:
 
-1. **It mirrors real on-prem behavior.** University clusters almost universally route compute node internet traffic through the head or management node. An SA demonstrating this setup should be using the same topology the customer has.
+1. **It mirrors real on-prem behavior.** HPC clusters almost universally route compute node internet traffic through the head or management node. An SA demonstrating this setup should be using the same topology the customer has.
 
 2. **It is cheaper for a lab.** A NAT Gateway costs $0.045/hour plus $0.045/GB data processed, independent of usage. For a cluster that may sit idle for days between demos, this adds up. The head node instance is already running; NAT is a nearly-zero marginal cost.
 

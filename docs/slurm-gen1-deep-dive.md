@@ -292,7 +292,7 @@ TreeWidth=60000
 
 For a cloud-burst cluster where `slurmctld` needs to send a "start slurmd" message directly to burst nodes that just came online, the tree-based forwarding can introduce delays — you want direct fan-out. `TreeWidth=60000` is larger than any realistic BurstLab cluster, so slurmctld communicates directly with all nodes simultaneously.
 
-In very large clusters (> 50,000 nodes), you would tune this down. For any BurstLab cluster or realistic university HPC environment, `60000` is correct.
+In very large clusters (> 50,000 nodes), you would tune this down. For any BurstLab cluster or realistic HPC environment, `60000` is correct.
 
 ### ReturnToService
 
@@ -322,7 +322,7 @@ This is the most important directive for cloud bursting with a shared EFS config
 
 **The TCU problem (hpclogin vs hpccw01):**
 
-TCU ran two nodes that both participated in the Slurm cluster: `hpccw01` (the controller, running `slurmctld`) and `hpclogin` (a login node, running `slurmd`). Over time, their `slurm.conf` files had diverged — directives were added or changed on one node but not the other. This is the most common Slurm configuration failure mode at universities.
+TCU ran two nodes that both participated in the Slurm cluster: `hpccw01` (the controller, running `slurmctld`) and `hpclogin` (a login node, running `slurmd`). Over time, their `slurm.conf` files had diverged — directives were added or changed on one node but not the other. This is the most common Slurm configuration failure mode at HPC sites.
 
 When slurmctld starts, it computes a hash of its running `slurm.conf`. When any `slurmd` connects, it sends its own hash of its local `slurm.conf`. If the hashes differ, `slurm` refuses the connection:
 
@@ -382,7 +382,7 @@ PartitionName=aws Nodes=aws-burst-[0-7] Default=NO MaxTime=4:00:00 State=UP
 
 **MaxTime=4:00:00** caps job runtime on burst nodes at 4 hours. This is a cost control measure — a job that runs indefinitely on an `m7a.2xlarge` would accumulate unexpected charges. 4 hours is long enough for most demo and research computing jobs, short enough to prevent runaway costs.
 
-**PartitionName=aws ... Default=NO** makes the aws partition non-default. Users must explicitly request `--partition=aws` to burst. This matches typical university policy: bursting is an opt-in resource, not the default allocation.
+**PartitionName=aws ... Default=NO** makes the aws partition non-default. Users must explicitly request `--partition=aws` to burst. This matches typical HPC policy: bursting is an opt-in resource, not the default allocation.
 
 **Node naming convention:** `aws-burst-[0-7]` follows Plugin v2's naming scheme: `{PartitionName}-{NodeGroupName}-{index}`. With `PartitionName=aws` and `NodeGroupName=burst` in `partitions.json`, the names are `aws-burst-0` through `aws-burst-N`. This naming is not optional — the names must match exactly between `slurm.conf` (node definitions), `partitions.json` (plugin config), and the EC2 `Name` tag set by `resume.py`.
 
