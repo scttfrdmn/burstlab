@@ -78,7 +78,7 @@ demonstrates the exact fix a customer's sysadmin needed to apply when migrating.
 - Running CentOS 8 or Rocky 8
 - Slurm 22.x (any point release)
 - Have never successfully burst to cloud, or bursting broke after a config change
-- The TCU use case: `serializer/json` missing, `SelectType` mismatch, broken slurmdbd
+- Common blockers: `serializer/json` missing, `SelectType` mismatch, broken slurmdbd
 
 **Files:**
 - AMI: `ami/rocky8-slurm2205.pkr.hcl`

@@ -480,7 +480,7 @@ slurmctld: fatal: plugin serializer/json not found
 
 This affects some Slurm 22.05 builds where the JSON serializer was not compiled in. The BurstLab Packer AMI compiles Slurm with the JSON plugin included. If you see this error on a customer cluster (not BurstLab), the fix is to rebuild Slurm with `--with-json` or provide the `serializer_json.so` library separately.
 
-This was the specific failure at TCU that prevented their cluster from starting.
+This is a specific failure that can prevent a cluster from starting.
 
 **Common cause 3: slurm.conf not found or SLURM_CONF wrong**
 

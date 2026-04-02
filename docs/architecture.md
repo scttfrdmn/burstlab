@@ -12,7 +12,7 @@ Every one of these problems can be reproduced and solved using EC2 instances. Si
 
 **Reproducibility.** A known-good cluster can be deployed in any AWS account in under 20 minutes. There is no dependency on a customer's physical hardware, VPN access, or firewall rules.
 
-**Safety.** We can experiment with breaking and fixing things without affecting a customer's production cluster. We can introduce the exact failures that TCU experienced — diverged `slurm.conf`, missing `serializer/json`, mismatched `SelectType` — and demonstrate the fixes.
+**Safety.** We can experiment with breaking and fixing things without affecting a customer's production cluster. We can introduce common failures — diverged `slurm.conf`, missing `serializer/json`, mismatched `SelectType` — and demonstrate the fixes.
 
 **Portability.** An SA in Seattle can deploy the same cluster as an SA in Boston. The IaC is the complete specification of the environment.
 
