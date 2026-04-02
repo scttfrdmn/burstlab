@@ -41,7 +41,7 @@ All three generations are fully built and tested. Match the customer's environme
 | Not sure / first contact | **Gen 1** | Covers the largest installed base; most relatable config problems |
 | CentOS 7 or older RHEL | **Gen 1** as reference | Note the OS differences; the Slurm and Plugin v2 config is identical |
 
-For TCU specifically: Gen 1 is exactly right — CentOS 8, Slurm 22.05, Plugin v2.
+For customers on CentOS 8 or Rocky 8 with Slurm 22.05: Gen 1 is exactly right.
 
 See [generations.md](generations.md) for the full narrative on each generation.
 
@@ -281,9 +281,9 @@ At the end of the engagement, the customer may want the IaC for their own use. W
 
 ---
 
-## The TCU Talking Points
+## Common Customer Talking Points
 
-For customers in situations similar to TCU, these are the specific problems BurstLab documents and solves. Reference them directly when the context matches:
+These are the specific problems BurstLab documents and solves. Reference them directly when the context matches:
 
 **"Our slurmctld won't start"**
 Common cause in 22.05: the `serializer/json` plugin is missing. Check `journalctl -u slurmctld | grep serial`. BurstLab's Packer build compiles Slurm with the JSON plugin included. If the customer built from RPMs, they may need to install the `slurm-serializer` package or rebuild.
@@ -372,7 +372,7 @@ For BurstLab demos, local users (UIDs match across all nodes because all nodes u
 4. Deregister the Packer AMI if you do not have a near-term follow-up meeting
 5. File a brief note in the engagement tracker: which Gen, which customer pain points were addressed, what questions came up
 
-For TCU specifically: the `DebugFlags=NO_CONF_HASH`, `ReturnToService=2`, and the correct `slurmdbd` configuration are the three directives that unlock bursting for them. If you hand over only one document, hand over `slurm-gen1-deep-dive.md`.
+For customers blocked on Gen 1 bursting: `DebugFlags=NO_CONF_HASH`, `ReturnToService=2`, and the correct `slurmdbd` configuration are the three directives that unlock bursting. If you hand over only one document, hand over `slurm-gen1-deep-dive.md`.
 
 ---
 

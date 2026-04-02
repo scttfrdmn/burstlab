@@ -17,7 +17,7 @@ SlurmctldHost=headnode(10.0.0.10)
 
 **SlurmctldHost** tells every node in the cluster where to find the Slurm controller daemon. The format `hostname(IP)` includes both the hostname and its private IP address. The IP address is the critical part for burst nodes — when a burst node boots in the cloud subnet, it needs to connect back to slurmctld before DNS has settled. Specifying the IP directly ensures the connection works immediately.
 
-The TCU equivalent was `SlurmctldHost=hpccw01`. Their hpclogin node had a different `SlurmctldHost` value (possibly with a different hostname or missing the IP), which caused slurmd on the login node to connect to the wrong controller. Always use the format `hostname(IP)` and confirm it is identical on every node.
+A common real-world misconfiguration: the controller has `SlurmctldHost=hpccontrol` (no IP), and the login node has a different or missing `SlurmctldHost` value, causing slurmd on the login node to connect to the wrong controller. Always use the format `hostname(IP)` and confirm it is identical on every node.
 
 ---
 
@@ -50,7 +50,7 @@ slurmctld: error: _slurm_rpc_node_registration: Invalid authentication credentia
 
 **How munge key distribution works in BurstLab:** The head node generates a fresh munge key on first boot and copies it to `/opt/slurm/etc/munge/munge.key` on EFS. Compute nodes and burst nodes copy this file to `/etc/munge/munge.key` during their own cloud-init. Because all nodes read from the same EFS source, the key is guaranteed to be identical.
 
-In real on-prem clusters, the munge key is typically distributed via Puppet, Ansible, or a shared NFS mount. The TCU problem was not a munge key issue — but munge key mismatch is the first thing to check when nodes refuse to register.
+In real on-prem clusters, the munge key is typically distributed via Puppet, Ansible, or a shared NFS mount. Config drift is not a munge key issue — but munge key mismatch is the first thing to check when nodes refuse to register.
 
 **CryptoType=crypto/munge** specifies the cryptographic plugin used for job credential signing. This is distinct from AuthType (which controls daemon authentication). Both use munge in this configuration.
 
@@ -98,7 +98,7 @@ The alternative, `select/linear`, allocates entire nodes at a time. Linear was c
 
 **Why it matters for cloud billing:** A mismatched `SelectType` or wrong `SelectTypeParameters` can cause jobs to over-allocate burst nodes. If `SelectTypeParameters=CR_Core` (no memory tracking), a job requesting 4 CPUs and 8GB on a 4-CPU burst node could still run even if another job already consumed 7GB of that node's memory — you end up with OOM kills on expensive burst instances.
 
-**The TCU problem:** TCU's `SelectType` was set differently between their head node and login node configs. This is a silent divergence — slurm.conf accepts `SelectType` mismatches across node types without logging an obvious error, but the scheduler's behavior becomes undefined. `cons_tres` with `CR_Core_Memory` must be identical on every node.
+**Config drift on SelectType:** A common misconfiguration is `SelectType` set differently between the head node and login node configs. This is a silent divergence — slurm.conf accepts `SelectType` mismatches across node types without logging an obvious error, but the scheduler's behavior becomes undefined. `cons_tres` with `CR_Core_Memory` must be identical on every node.
 
 ---
 
@@ -318,11 +318,11 @@ Without `ReturnToService=2`, any transient failure (network hiccup during regist
 DebugFlags=NO_CONF_HASH
 ```
 
-This is the most important directive for cloud bursting with a shared EFS config. Understanding it requires understanding the TCU problem.
+This is the most important directive for cloud bursting with a shared EFS config. Understanding it requires understanding the config-drift problem.
 
-**The TCU problem (hpclogin vs hpccw01):**
+**The config-drift problem (controller vs login node):**
 
-TCU ran two nodes that both participated in the Slurm cluster: `hpccw01` (the controller, running `slurmctld`) and `hpclogin` (a login node, running `slurmd`). Over time, their `slurm.conf` files had diverged — directives were added or changed on one node but not the other. This is the most common Slurm configuration failure mode at HPC sites.
+A cluster running two nodes that both participate in Slurm — `hpccontrol` (the controller, running `slurmctld`) and `loginnode` (a login node, running `slurmd`) — is vulnerable to config drift. Over time, `slurm.conf` files diverge as directives are added or changed on one node but not the other. This is the most common Slurm configuration failure mode at HPC sites.
 
 When slurmctld starts, it computes a hash of its running `slurm.conf`. When any `slurmd` connects, it sends its own hash of its local `slurm.conf`. If the hashes differ, `slurm` refuses the connection:
 
@@ -333,7 +333,7 @@ slurmd: error: Connection with slurmctld failed: Invalid configuration
 Or the controller rejects the node:
 
 ```
-slurmctld: error: validate_slurm_user: Slurm config hash mismatch with node hpclogin
+slurmctld: error: validate_slurm_user: Slurm config hash mismatch with node loginnode
 ```
 
 **The BurstLab EFS solution — and why NO_CONF_HASH is still needed:**
@@ -417,7 +417,7 @@ Munge key mismatch. Run `munge -n | ssh computeX unmunge` from the head node to 
 The `SlurmdTimeout` (300 seconds by default) may have been reached before compute nodes finished their cloud-init. Run `scontrol update nodename=compute[01-04] state=resume` to bring them back. Also check that `slurmd` is running on the compute nodes: `systemctl status slurmd`.
 
 **"serializer/json plugin not found" in slurmctld log**
-This is a known issue in some Slurm 22.05 patch levels. The JSON serializer plugin (`serializer_json.so`) is required for accounting and may be absent if the build was configured without JSON support. The BurstLab Packer build compiles Slurm with all plugins enabled, so this should not occur with BurstLab AMIs. If you see it on a customer cluster, the fix is to rebuild Slurm with `--with-json` or install the `slurm-serializer` package. This is exactly the problem that blocked `slurmctld` from starting at TCU.
+This is a known issue in some Slurm 22.05 patch levels. The JSON serializer plugin (`serializer_json.so`) is required for accounting and may be absent if the build was configured without JSON support. The BurstLab Packer build compiles Slurm with all plugins enabled, so this should not occur with BurstLab AMIs. If you see it on a customer cluster, the fix is to rebuild Slurm with `--with-json` or install the `slurm-serializer` package.
 
 ---
 
