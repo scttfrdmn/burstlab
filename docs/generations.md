@@ -7,7 +7,7 @@ document explains why, what each one is for, and how to choose the right one.
 
 ## Why Three Generations?
 
-University HPC environments are not uniform. An SA engaging with five different research
+HPC environments are not uniform. An SA engaging with five different research
 computing teams in a single week might encounter:
 
 - A team still on CentOS 8 (EOL December 2021) that migrated to Rocky 8 — running Slurm
@@ -50,7 +50,7 @@ Before covering what differs, it is worth being explicit about what is the same:
 
 ## Generation 1 — Rocky Linux 8 + Slurm 22.05
 
-**The target customer**: a university HPC team that is struggling with cloud bursting
+**The target customer**: an HPC team that is struggling with cloud bursting
 right now. Most of these teams are on RHEL/Rocky 8 with Slurm 22.05. The CentOS 8 EOL
 in December 2021 drove a wave of migrations to Rocky 8. Many of these clusters are
 running Slurm compiled from source three to four years ago and have not been upgraded.
@@ -89,7 +89,7 @@ demonstrates the exact fix a customer's sysadmin needed to apply when migrating.
 
 ## Generation 2 — Rocky Linux 9 + Slurm 23.11
 
-**The target customer**: a university HPC team that has already migrated to Rocky 9
+**The target customer**: an HPC team that has already migrated to Rocky 9
 (RHEL 9) or is planning to. These teams are typically on Slurm 23.x, which they either
 upgraded to when moving OSes or adopted as the first version with official RHEL 9 support.
 
@@ -195,7 +195,7 @@ RSA-2048; ED25519 key pairs are not affected and do not require this workaround.
 | Rocky 10, RHEL 10, Slurm 24.05+ | **Gen 3** | Exact match |
 | Not sure / first contact | **Gen 1** | Covers the largest installed base. You can always show Gen 3 diffs once you know their environment. |
 
-When in doubt, deploy Gen 1. It is the most representative of what universities are
+When in doubt, deploy Gen 1. It is the most representative of what HPC teams are
 actually struggling with today, and the Plugin v2 setup complexity is most visible on
 Gen 1 (the Python shim, the cgroup v1 config, the pre-enumerated nodes). Showing a
 customer a working Gen 1 cluster is more persuasive than showing a Gen 3 cluster that
