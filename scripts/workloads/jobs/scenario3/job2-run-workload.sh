@@ -42,6 +42,7 @@ if [ ! -f "${STATE_FILE}" ]; then
   exit 1
 fi
 
+# shellcheck source=/dev/null
 source "${STATE_FILE}"
 echo "  EFS ID:         ${EFS_ID}"
 echo "  EFS DNS:        ${EFS_DNS}"

@@ -45,6 +45,7 @@ echo "  State file:     ${STATE_FILE}"
 
 # Check idempotency — don't create a second FSx if state file already exists
 if [ -f "${STATE_FILE}" ]; then
+  # shellcheck source=/dev/null
   source "${STATE_FILE}"
   echo "State file exists (FSX_ID=${FSX_ID:-unknown}) — checking if still valid..."
   EXISTING_STATE=$(aws fsx describe-file-systems \

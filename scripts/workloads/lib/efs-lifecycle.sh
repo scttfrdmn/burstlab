@@ -33,7 +33,8 @@ EFS_STATE_DIR="${EFS_STATE_DIR:-/u/home/alice/.efs-state}"
 # -----------------------------------------------------------------------------
 efs_create() {
   local job_id="$1"
-  local token="burstlab-ephemeral-${job_id}-$(date +%s)"
+  local token
+  token="burstlab-ephemeral-${job_id}-$(date +%s)"
 
   AWS_PROFILE="${AWS_PROFILE:-}" \
   aws efs create-file-system \

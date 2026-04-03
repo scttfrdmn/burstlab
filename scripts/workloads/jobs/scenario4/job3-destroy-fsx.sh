@@ -42,6 +42,7 @@ if [ ! -f "${STATE_FILE}" ]; then
   exit 0
 fi
 
+# shellcheck source=/dev/null
 source "${STATE_FILE}"
 echo "  FSx ID:      ${FSX_ID}"
 echo "  S3 bucket:   ${S3_DATA_BUCKET}"

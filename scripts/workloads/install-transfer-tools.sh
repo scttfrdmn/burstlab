@@ -18,7 +18,7 @@ set -euo pipefail
 exec > >(tee /var/log/burstlab-transfer-tools.log) 2>&1
 echo "=== BurstLab: installing transfer tools: $(date) ==="
 
-AWS_REGION="${1:-us-west-2}"
+export AWS_REGION="${1:-us-west-2}"
 ARCH=$(uname -m)   # x86_64 or aarch64
 SENTINEL="/opt/slurm/.burstlab-transfer-tools-ready"
 
