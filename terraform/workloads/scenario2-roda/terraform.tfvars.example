@@ -1,0 +1,11 @@
+gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
+aws_profile    = "aws"
+aws_region     = "us-west-2"
+cluster_name   = "burstlab-gen1"
+
+# RODA dataset bucket. Common options:
+#   noaa-goes16       — NOAA GOES-16 weather satellite (us-east-1, requester-pays: false)
+#   usgs-landsat      — USGS Landsat imagery
+#   1000genomes       — 1000 Genomes Project
+#   noaa-isd          — NOAA Integrated Surface Database
+roda_bucket = "noaa-goes16"
