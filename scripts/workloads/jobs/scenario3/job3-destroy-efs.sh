@@ -41,6 +41,7 @@ if [ ! -f "${STATE_FILE}" ]; then
   exit 0
 fi
 
+# shellcheck source=/dev/null
 source "${STATE_FILE}"
 echo "  EFS ID:      ${EFS_ID}"
 echo "  Created by:  Job ${CREATED_BY_JOB:-unknown}"

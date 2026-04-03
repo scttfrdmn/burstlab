@@ -43,6 +43,7 @@ if [ ! -f "${STATE_FILE}" ]; then
   exit 1
 fi
 
+# shellcheck source=/dev/null
 source "${STATE_FILE}"
 echo "  FSx ID:         ${FSX_ID}"
 echo "  FSx DNS:        ${FSX_DNS}"
