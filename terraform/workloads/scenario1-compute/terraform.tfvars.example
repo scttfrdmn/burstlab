@@ -1,0 +1,5 @@
+gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
+key_path       = "~/.ssh/burstlab-key.pem"
+aws_profile    = "aws"
+aws_region     = "us-west-2"
+cluster_name   = "burstlab-gen1"

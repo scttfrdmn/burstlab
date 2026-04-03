@@ -40,7 +40,13 @@ burstlab/
 │   ├── slurm-gen2-deep-dive.md      # Gen 2 config changes from Gen 1
 │   ├── slurm-gen3-deep-dive.md      # Gen 3 config changes, cloud_reg_addrs
 │   ├── plugin-v2-setup.md           # Plugin v2 setup: configs, debugging, IAM
-│   └── sa-guide.md                  # How to use BurstLab with customers
+│   ├── sa-guide.md                  # How to use BurstLab with customers
+│   └── workloads/                   # Workloads overlay: data staging demos
+│       ├── overview.md              # Scenario selection guide, storage tier matrix
+│       ├── scenario1-compute.md     # GROMACS + Spack on burst nodes
+│       ├── scenario2-roda.md        # RODA public datasets via s5cmd/rclone/Mountpoint
+│       ├── scenario3-ephemeral-efs.md  # Job-scoped EFS: create → compute → destroy
+│       └── scenario4-ephemeral-fsx.md  # Job-scoped FSx Lustre linked to S3
 │
 ├── terraform/
 │   ├── modules/
@@ -50,10 +56,16 @@ burstlab/
 │   │   ├── shared-storage/          # EFS filesystem and mount targets
 │   │   ├── iam/                     # Head node and burst node IAM roles
 │   │   └── burst-config/            # Plugin v2 config files and launch template
-│   └── generations/
-│       ├── gen1-slurm2205-rocky8/   # Complete Gen 1 root module (Rocky 8 + Slurm 22.05)
-│       ├── gen2-slurm2311-rocky9/   # Complete Gen 2 root module (Rocky 9 + Slurm 23.11)
-│       └── gen3-slurm2405-rocky10/  # Complete Gen 3 root module (Rocky 10 + Slurm 24.05)
+│   ├── generations/
+│   │   ├── gen1-slurm2205-rocky8/   # Complete Gen 1 root module (Rocky 8 + Slurm 22.05)
+│   │   ├── gen2-slurm2311-rocky9/   # Complete Gen 2 root module (Rocky 9 + Slurm 23.11)
+│   │   └── gen3-slurm2405-rocky10/  # Complete Gen 3 root module (Rocky 10 + Slurm 24.05)
+│   └── workloads/                   # Overlay: attaches to existing generation clusters
+│       ├── base/                    # S3 bucket, transfer tools, script deploy
+│       ├── scenario1-compute/       # Spack + GROMACS install
+│       ├── scenario2-roda/          # S3 read policy + results bucket
+│       ├── scenario3-ephemeral-efs/ # EFS lifecycle IAM policies
+│       └── scenario4-ephemeral-fsx/ # FSx + S3 policies, service-linked role
 │
 ├── configs/
 │   ├── gen1-slurm2205-rocky8/       # Gen 1 Slurm config templates
@@ -70,10 +82,22 @@ burstlab/
 │   ├── validate-cluster.sh          # Post-deploy health check (40 checks)
 │   ├── demo-burst.sh                # Interactive burst demo (run as alice via SSH)
 │   ├── teardown.sh                  # Graceful cluster shutdown + terraform destroy
-│   └── userdata/                    # Cloud-init scripts for each node type
-│       ├── head-node-init.sh.tpl
-│       ├── compute-node-init.sh.tpl
-│       └── burst-node-init.sh.tpl
+│   ├── userdata/                    # Cloud-init scripts for each node type
+│   │   ├── head-node-init.sh.tpl
+│   │   ├── compute-node-init.sh.tpl
+│   │   └── burst-node-init.sh.tpl
+│   └── workloads/                   # Workloads overlay scripts (deployed to EFS)
+│       ├── install-transfer-tools.sh  # rclone, s5cmd, Mountpoint
+│       ├── install-spack.sh           # Spack + Lmod via AWS binary cache
+│       ├── install-gromacs.sh         # GROMACS via Spack
+│       ├── lib/
+│       │   ├── efs-lifecycle.sh       # EFS create/wait/destroy helpers
+│       │   └── fsx-lifecycle.sh       # FSx Lustre create/wait/flush/destroy helpers
+│       └── jobs/
+│           ├── scenario1/             # GROMACS job scripts
+│           ├── scenario2/             # RODA data access job scripts
+│           ├── scenario3/             # Ephemeral EFS job chain
+│           └── scenario4/             # Ephemeral FSx Lustre job chain
 │
 └── ami/
     ├── rocky8-slurm2205.pkr.hcl     # Packer: Rocky Linux 8 + Slurm 22.05 (Gen 1)
@@ -138,6 +162,36 @@ exist, what each one solves, and a decision table for matching a customer to the
 
 ---
 
+## Workloads Track
+
+The workloads overlay demonstrates how HPC applications consume and produce data
+in a cloud bursting environment. It builds on top of any deployed generation cluster
+without modifying the core infrastructure.
+
+| Scenario | Story | Storage |
+|----------|-------|---------|
+| **1 — Compute** | GROMACS + Spack, no data staging | EFS only |
+| **2 — RODA** | Read public AWS datasets (NOAA GOES-16) | S3 read-only |
+| **3 — Ephemeral EFS** | Job creates EFS, computes, EFS destroyed | EFS ephemeral |
+| **4 — Ephemeral FSx** | Job creates FSx Lustre, lazy S3 hydration, flush + destroy | FSx + S3 |
+
+```bash
+# Deploy the base overlay (once per cluster)
+cd terraform/workloads/base/
+terraform init && terraform apply
+
+# Deploy a scenario and run it
+cd terraform/workloads/scenario3-ephemeral-efs/
+terraform init && terraform apply
+ssh alice@<head_node_ip>
+bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
+```
+
+See [docs/workloads/overview.md](docs/workloads/overview.md) for scenario selection,
+storage tier decision matrix, and granularity modes (per-job, per-array, per-campaign).
+
+---
+
 ## Why BurstLab Exists
 
 On-prem HPC environments share a common set of problems when attempting cloud bursting for the first time:
@@ -176,6 +230,11 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [slurm-gen3-deep-dive.md](docs/slurm-gen3-deep-dive.md) | SAs, HPC admins | Gen 3 config changes, `cloud_reg_addrs` |
 | [plugin-v2-setup.md](docs/plugin-v2-setup.md) | SAs, HPC admins | Plugin v2 setup, configs, debugging |
 | [sa-guide.md](docs/sa-guide.md) | SAs | How to run a customer demo |
+| [workloads/overview.md](docs/workloads/overview.md) | SAs | Workloads overlay: scenario guide, storage tiers |
+| [workloads/scenario1-compute.md](docs/workloads/scenario1-compute.md) | SAs | GROMACS + Spack demo |
+| [workloads/scenario2-roda.md](docs/workloads/scenario2-roda.md) | SAs | RODA public datasets, s5cmd/rclone/Mountpoint |
+| [workloads/scenario3-ephemeral-efs.md](docs/workloads/scenario3-ephemeral-efs.md) | SAs | Ephemeral EFS job chain |
+| [workloads/scenario4-ephemeral-fsx.md](docs/workloads/scenario4-ephemeral-fsx.md) | SAs | Ephemeral FSx Lustre + S3 |
 
 ---
 

@@ -1,0 +1,27 @@
+# =============================================================================
+# BASE WORKLOADS LAYER — terraform.tfvars example
+# =============================================================================
+# Copy this to terraform.tfvars and fill in the required values.
+#
+# Required (no defaults):
+#   gen_state_path  — path to the generation cluster's terraform.tfstate
+#   key_path        — path to your SSH private key
+#
+# Optional (defaults provided in variables.tf):
+#   aws_region, aws_profile, cluster_name
+
+# Path to the deployed generation cluster's state file.
+# Relative to this directory (terraform/workloads/base/).
+gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
+
+# Path to the SSH private key used to connect to the head node.
+key_path = "~/.ssh/burstlab-key.pem"
+
+# AWS CLI profile. Replace 'aws' with your actual profile name.
+aws_profile = "aws"
+
+# AWS region where the cluster is deployed.
+aws_region = "us-west-2"
+
+# Must match the cluster_name used when deploying the generation cluster.
+cluster_name = "burstlab-gen1"
