@@ -62,13 +62,14 @@ echo "Creating EFS filesystem..."
 EFS_ID=$(efs_create "${JOB_REF}")
 echo "  Created: ${EFS_ID}"
 
+# Wait for filesystem to be available before adding mount target
+# (CreateMountTarget fails if EFS is still in 'creating' state)
+efs_wait_available "${EFS_ID}"
+
 # Add mount target in the cloud subnet
 echo "Adding mount target in ${CLOUD_SUBNET_A_ID}..."
 MT_ID=$(efs_add_mount_target "${EFS_ID}" "${CLOUD_SUBNET_A_ID}" "${EFS_SG_ID}")
 echo "  Mount target: ${MT_ID}"
-
-# Wait for filesystem to be available
-efs_wait_available "${EFS_ID}"
 
 # Wait for mount target to be available
 efs_wait_mount_target "${EFS_ID}"

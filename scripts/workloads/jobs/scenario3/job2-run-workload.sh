@@ -32,8 +32,8 @@ echo "  Job ID:         ${SLURM_JOB_ID}"
 echo "  Array Task ID:  ${SLURM_ARRAY_TASK_ID:-none}"
 echo "  Granularity:    ${GRANULARITY}"
 
-# Read EFS ID from state file written by Job 1
-STATE_FILE=$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")
+# Read EFS ID from state file written by submit-chain.sh (passed explicitly) or derived
+STATE_FILE="${EFS_STATE_FILE:-$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")}"
 echo "  State file:     ${STATE_FILE}"
 
 if [ ! -f "${STATE_FILE}" ]; then
@@ -47,13 +47,13 @@ source "${STATE_FILE}"
 echo "  EFS ID:         ${EFS_ID}"
 echo "  EFS DNS:        ${EFS_DNS}"
 
-# Mount the ephemeral EFS
+# Mount the ephemeral EFS (uses sudo for NFS mount privilege)
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-MOUNT_POINT="/mnt/scratch/efs-${EFS_ID}-${SLURM_JOB_ID}-${TASK_ID}"
+MOUNT_POINT="/tmp/efs-${EFS_ID}-${SLURM_JOB_ID}-${TASK_ID}"
 mkdir -p "${MOUNT_POINT}"
 
 echo "Mounting ${EFS_DNS}:/ at ${MOUNT_POINT}..."
-mount -t nfs4 \
+sudo mount -t nfs4 \
   -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
   "${EFS_DNS}:/" \
   "${MOUNT_POINT}"
@@ -120,7 +120,7 @@ echo "  Results copied to permanent EFS: ${RESULTS_DIR}"
 # Unmount before Job 3 destroys the filesystem
 echo ""
 echo "Unmounting ${MOUNT_POINT}..."
-umount "${MOUNT_POINT}"
+sudo umount "${MOUNT_POINT}"
 rmdir "${MOUNT_POINT}"
 echo "  Unmounted."
 

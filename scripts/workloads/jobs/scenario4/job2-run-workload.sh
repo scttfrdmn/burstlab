@@ -33,8 +33,8 @@ echo "  Job ID:         ${SLURM_JOB_ID}"
 echo "  Array Task ID:  ${SLURM_ARRAY_TASK_ID:-none}"
 echo "  Granularity:    ${GRANULARITY}"
 
-# Read FSx state from file written by Job 1
-STATE_FILE=$(resolve_fsx_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")
+# Read FSx state from file (passed explicitly by submit-chain.sh, or derived)
+STATE_FILE="${FSX_STATE_FILE:-$(resolve_fsx_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")}"
 echo "  State file:     ${STATE_FILE}"
 
 if [ ! -f "${STATE_FILE}" ]; then
