@@ -36,6 +36,11 @@ fi
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
 getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
 
+# Allow alice to mount/umount for workloads overlay (ephemeral EFS/FSx scenarios)
+echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/mount.nfs4' \
+  > /etc/sudoers.d/alice-mount
+chmod 440 /etc/sudoers.d/alice-mount
+
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
 # that blocks munge (873), slurmctld (6817), and NFS (2049).
 systemctl stop iptables 2>/dev/null || true

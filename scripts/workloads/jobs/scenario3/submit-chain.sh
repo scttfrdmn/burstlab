@@ -78,13 +78,18 @@ echo ""
 echo "Step 0: Creating EFS filesystem (running on head node)..."
 source "${SCRIPT_DIR}/job1-create-efs.sh"
 
-# Read the state file that job1 wrote so we can show the EFS ID
+# Read the state file that job1 wrote so we can show the EFS ID and pass its
+# exact path to Slurm jobs (avoids key mismatch between inline create and batch job IDs).
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
-STATE_FILE=$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME}")
-source "${STATE_FILE}"
+EFS_STATE_FILE=$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME}")
+# shellcheck source=/dev/null
+source "${EFS_STATE_FILE}"
 echo ""
 echo "  EFS ready: ${EFS_ID} (${EFS_DNS})"
 echo ""
+
+# Pass the state file path explicitly so batch jobs don't need to re-derive it
+EXPORT_VARS="${EXPORT_VARS},EFS_STATE_FILE=${EFS_STATE_FILE}"
 
 # -----------------------------------------------------------------------------
 # Job 1: Run workload on ephemeral EFS (burst node)

@@ -227,17 +227,20 @@ resolve_fsx_state_file() {
 
   case "$granularity" in
     per-job)
-      echo "${FSX_STATE_DIR}/job-${SLURM_JOB_ID:-unknown}.env"
+      local job_key="${SLURM_JOB_ID:-${JOB_REF:-$(date +%s)}}"
+      echo "${FSX_STATE_DIR}/job-${job_key}.env"
       ;;
     per-array)
-      echo "${FSX_STATE_DIR}/array-${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-unknown}}.env"
+      local array_key="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-${JOB_REF:-$(date +%s)}}}"
+      echo "${FSX_STATE_DIR}/array-${array_key}.env"
       ;;
     per-campaign)
       echo "${FSX_STATE_DIR}/campaign-${campaign}.env"
       ;;
     *)
       echo "WARNING: unknown granularity '${granularity}', defaulting to per-job" >&2
-      echo "${FSX_STATE_DIR}/job-${SLURM_JOB_ID:-unknown}.env"
+      local job_key="${SLURM_JOB_ID:-${JOB_REF:-$(date +%s)}}"
+      echo "${FSX_STATE_DIR}/job-${job_key}.env"
       ;;
   esac
 }

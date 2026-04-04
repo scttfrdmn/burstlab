@@ -36,7 +36,6 @@ efs_create() {
   local token
   token="burstlab-ephemeral-${job_id}-$(date +%s)"
 
-  AWS_PROFILE="${AWS_PROFILE:-}" \
   aws efs create-file-system \
     --creation-token "$token" \
     --performance-mode generalPurpose \
@@ -192,11 +191,14 @@ resolve_state_file() {
 
   case "$granularity" in
     per-job)
-      echo "${EFS_STATE_DIR}/job-${SLURM_JOB_ID:-unknown}.env"
+      # JOB_REF is set by job1 when running inline (not under Slurm)
+      local job_key="${SLURM_JOB_ID:-${JOB_REF:-$(date +%s)}}"
+      echo "${EFS_STATE_DIR}/job-${job_key}.env"
       ;;
     per-array)
       # Use the array job ID so all tasks share the same state file
-      echo "${EFS_STATE_DIR}/array-${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-unknown}}.env"
+      local array_key="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-${JOB_REF:-$(date +%s)}}}"
+      echo "${EFS_STATE_DIR}/array-${array_key}.env"
       ;;
     per-campaign)
       echo "${EFS_STATE_DIR}/campaign-${campaign}.env"

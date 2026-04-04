@@ -82,14 +82,17 @@ echo ""
 echo "Step 0: Creating FSx Lustre filesystem (running on head node)..."
 source "${SCRIPT_DIR}/job1-create-fsx.sh"
 
-# Read the state file that job1 wrote
+# Read the state file that job1 wrote; pass the path explicitly to avoid
+# Slurm job ID key mismatch with the inline (head node) create.
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
-STATE_FILE=$(resolve_fsx_state_file "${GRANULARITY}" "${CAMPAIGN_NAME}")
+FSX_STATE_FILE=$(resolve_fsx_state_file "${GRANULARITY}" "${CAMPAIGN_NAME}")
 # shellcheck source=/dev/null
-source "${STATE_FILE}"
+source "${FSX_STATE_FILE}"
 echo ""
 echo "  FSx ready: ${FSX_ID} (${FSX_DNS})"
 echo ""
+
+EXPORT_VARS="${EXPORT_VARS},FSX_STATE_FILE=${FSX_STATE_FILE}"
 
 # -----------------------------------------------------------------------------
 # Job 1: Run workload on ephemeral FSx Lustre (burst node)

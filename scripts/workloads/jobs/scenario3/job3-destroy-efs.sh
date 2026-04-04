@@ -31,8 +31,8 @@ echo "=== EFS Destroy: started on $(hostname): $(date) ==="
 echo "  Job ID:      ${SLURM_JOB_ID}"
 echo "  Granularity: ${GRANULARITY}"
 
-# Locate the state file written by Job 1
-STATE_FILE=$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")
+# Locate the state file (passed explicitly by submit-chain.sh, or derived)
+STATE_FILE="${EFS_STATE_FILE:-$(resolve_state_file "${GRANULARITY}" "${CAMPAIGN_NAME:-default}")}"
 echo "  State file:  ${STATE_FILE}"
 
 if [ ! -f "${STATE_FILE}" ]; then
