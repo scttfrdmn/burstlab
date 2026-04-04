@@ -68,7 +68,7 @@ if ! command -v s5cmd &>/dev/null; then
   fi
   curl -fsSL "$S5CMD_URL" | tar xz -C /usr/local/bin s5cmd
   chmod 755 /usr/local/bin/s5cmd
-  echo "s5cmd: $(s5cmd version)"
+  echo "s5cmd: $(/usr/local/bin/s5cmd version)"
 else
   echo "s5cmd already installed: $(s5cmd version)"
 fi
@@ -117,5 +117,5 @@ echo ""
 echo "=== Transfer tools installed: $(date) ==="
 echo "  rsync:      $(rsync --version | head -1)"
 echo "  rclone:     $(rclone version | head -1)"
-echo "  s5cmd:      $(s5cmd version)"
+echo "  s5cmd:      $(/usr/local/bin/s5cmd version 2>/dev/null || echo 'not installed')"
 echo "  mount-s3:   $(mount-s3 --version 2>/dev/null || echo 'present')"

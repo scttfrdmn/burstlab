@@ -2,30 +2,30 @@
 # =============================================================================
 # scenario3/job1-create-efs.sh — Create ephemeral EFS filesystem
 #
-# Submitted by submit-chain.sh. Creates an EFS filesystem and mount target
-# in the cloud subnet, then writes the filesystem ID to a state file on the
-# permanent cluster EFS so Job 2 can find it.
+# Sourced by submit-chain.sh, which runs it inline on the head node.
+# Creates an EFS filesystem and mount target in the cloud subnet, then writes
+# the filesystem ID to a state file on permanent cluster EFS.
 #
-# SA talking point: "Job 1 calls the AWS EFS API directly from the burst node
-# to create a filesystem. Takes about 60 seconds to become available. The
-# filesystem ID is written to the cluster's permanent EFS so the next job
-# can pick it up — the state file is the handoff between jobs."
+# SA talking point: "EFS creation is just an API call — we run it right here
+# on the head node. Takes about 60 seconds. The filesystem ID is written to
+# the cluster's permanent EFS as the handoff to the Slurm jobs."
 # =============================================================================
 
-#SBATCH --job-name=efs-create
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --time=00:10:00
-#SBATCH --output=/u/home/alice/logs/efs-create-%j.out
-#SBATCH --error=/u/home/alice/logs/efs-create-%j.err
+# Guard: only set -euo if running as a standalone script, not when sourced
+# (submit-chain.sh already has set -euo pipefail)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  set -euo pipefail
+fi
 
-set -euo pipefail
 mkdir -p /u/home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
 
+# Use a timestamp-based ID when not running under Slurm
+JOB_REF="${SLURM_JOB_ID:-$(date +%s)}"
+
 echo "=== EFS Create: started on $(hostname): $(date) ==="
-echo "  Job ID:     ${SLURM_JOB_ID}"
+echo "  Ref ID:     ${JOB_REF}"
 echo "  Granularity:${GRANULARITY}"
 echo "  Subnet:     ${CLOUD_SUBNET_A_ID}"
 echo "  SG:         ${EFS_SG_ID}"
@@ -49,7 +49,7 @@ if [ -f "${STATE_FILE}" ]; then
   if [ "$EXISTING_STATE" = "available" ]; then
     echo "Existing EFS ${EFS_ID} is still available — skipping creation."
     echo "To force recreate: rm ${STATE_FILE}"
-    exit 0
+    return 0 2>/dev/null || exit 0
   else
     echo "Existing EFS not found or not available — creating new one."
     rm -f "${STATE_FILE}"
@@ -59,7 +59,7 @@ fi
 # Create the EFS filesystem
 echo ""
 echo "Creating EFS filesystem..."
-EFS_ID=$(efs_create "${SLURM_JOB_ID}")
+EFS_ID=$(efs_create "${JOB_REF}")
 echo "  Created: ${EFS_ID}"
 
 # Add mount target in the cloud subnet
@@ -73,14 +73,14 @@ efs_wait_available "${EFS_ID}"
 # Wait for mount target to be available
 efs_wait_mount_target "${EFS_ID}"
 
-# Write state file to permanent cluster EFS — Job 2 reads this
+# Write state file to permanent cluster EFS
 cat > "${STATE_FILE}" << EOF
 # BurstLab ephemeral EFS state
-# Created by Job ${SLURM_JOB_ID} at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Created at $(date -u +%Y-%m-%dT%H:%M:%SZ) by ref ${JOB_REF}
 EFS_ID=${EFS_ID}
 EFS_MT_ID=${MT_ID}
 EFS_DNS=${EFS_ID}.efs.${AWS_REGION}.amazonaws.com
-CREATED_BY_JOB=${SLURM_JOB_ID}
+CREATED_BY_JOB=${JOB_REF}
 GRANULARITY=${GRANULARITY}
 CAMPAIGN_NAME=${CAMPAIGN_NAME:-default}
 EOF
