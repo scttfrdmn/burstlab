@@ -12,26 +12,24 @@
 #   - AutoImportPolicy=NEW_CHANGED: S3 objects visible without manual HSM recall
 #   - Lazy hydration: data streams from S3 on first read
 #
-# SA talking point: "Job 1 calls the FSx API to create a Lustre filesystem
-# linked to S3. Takes 5-10 minutes to provision. While it's provisioning,
-# no data is copied — the filesystem just knows where its data repository is.
-# The FSx ID is written to the cluster's permanent EFS as the handoff to Job 2."
+# SA talking point: "FSx creation is just an API call — we run it on the head
+# node while you watch. Takes 5-10 minutes. No burst nodes running during this
+# time. Once FSx is AVAILABLE, the Slurm jobs are submitted."
 # =============================================================================
 
-#SBATCH --job-name=fsx-create
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --time=00:20:00
-#SBATCH --output=/u/home/alice/logs/fsx-create-%j.out
-#SBATCH --error=/u/home/alice/logs/fsx-create-%j.err
+# Guard: only set -euo if running standalone, not when sourced by submit-chain.sh
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  set -euo pipefail
+fi
 
-set -euo pipefail
 mkdir -p /u/home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
 
+JOB_REF="${SLURM_JOB_ID:-$(date +%s)}"
+
 echo "=== FSx Create: started on $(hostname): $(date) ==="
-echo "  Job ID:         ${SLURM_JOB_ID}"
+echo "  Ref ID:         ${JOB_REF}"
 echo "  Granularity:    ${GRANULARITY}"
 echo "  Subnet:         ${CLOUD_SUBNET_A_ID}"
 echo "  SG:             ${FSX_SG_ID}"
@@ -57,7 +55,7 @@ if [ -f "${STATE_FILE}" ]; then
   if [ "$EXISTING_STATE" = "AVAILABLE" ]; then
     echo "Existing FSx ${FSX_ID} is still AVAILABLE — skipping creation."
     echo "To force recreate: rm ${STATE_FILE}"
-    exit 0
+    return 0 2>/dev/null || exit 0
   else
     echo "Existing FSx not found or not available (${EXISTING_STATE}) — creating new one."
     rm -f "${STATE_FILE}"
@@ -67,7 +65,7 @@ fi
 # Stage input data into S3 before creating FSx (so it's ready for lazy hydration)
 echo ""
 echo "Staging input data to s3://${S3_DATA_BUCKET}/input/..."
-S3_PREFIX="jobs/${SLURM_JOB_ID}"
+S3_PREFIX="jobs/${JOB_REF}"
 
 if [ -d "/opt/slurm/etc/workloads/data" ]; then
   aws s3 sync /opt/slurm/etc/workloads/data/ \
@@ -95,7 +93,7 @@ echo "  Input data ready at s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/"
 echo ""
 echo "Creating FSx Lustre filesystem..."
 FSX_ID=$(fsx_create \
-  "${SLURM_JOB_ID}" \
+  "${JOB_REF}" \
   "${S3_DATA_BUCKET}" \
   "${S3_PREFIX}" \
   "${CLOUD_SUBNET_A_ID}" \
@@ -121,13 +119,13 @@ echo "  Mount name: ${FSX_MOUNT_NAME}"
 # Write state file to permanent cluster EFS — Job 2 reads this
 cat > "${STATE_FILE}" << EOF
 # BurstLab ephemeral FSx Lustre state
-# Created by Job ${SLURM_JOB_ID} at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Created at $(date -u +%Y-%m-%dT%H:%M:%SZ) by ref ${JOB_REF}
 FSX_ID=${FSX_ID}
 FSX_DNS=${FSX_DNS}
 FSX_MOUNT_NAME=${FSX_MOUNT_NAME}
 S3_DATA_BUCKET=${S3_DATA_BUCKET}
 S3_PREFIX=${S3_PREFIX}
-CREATED_BY_JOB=${SLURM_JOB_ID}
+CREATED_BY_JOB=${JOB_REF}
 GRANULARITY=${GRANULARITY}
 CAMPAIGN_NAME=${CAMPAIGN_NAME:-default}
 EOF
