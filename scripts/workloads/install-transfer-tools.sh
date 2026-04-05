@@ -51,9 +51,9 @@ acl = private
 server_side_encryption = AES256
 EOF
 # Also configure for alice (the demo user)
-mkdir -p /u/home/alice/.config/rclone
-cp /root/.config/rclone/rclone.conf /u/home/alice/.config/rclone/rclone.conf
-chown -R alice:alice /u/home/alice/.config 2>/dev/null || true
+mkdir -p /home/alice/.config/rclone
+cp /root/.config/rclone/rclone.conf /home/alice/.config/rclone/rclone.conf
+chown -R alice:alice /home/alice/.config 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
 # 2. s5cmd — fastest S3 tool for parallel multipart transfers

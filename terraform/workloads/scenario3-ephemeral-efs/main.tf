@@ -12,7 +12,7 @@
 #   2. Attaches EFS lifecycle IAM policy to burst node role (for job execution)
 #
 # After applying, submit jobs via:
-#   CLOUD_SUBNET_A_ID=$(terraform output -raw cloud_subnet_a_id) \
+#   BURST_SUBNET_ID=$(terraform output -raw burst_subnet_id) \
 #   EFS_SG_ID=$(terraform output -raw efs_sg_id) \
 #   AWS_REGION=us-west-2 \
 #     bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh --granularity per-job
@@ -38,7 +38,9 @@ locals {
   head_node_role_name  = element(split("/", data.terraform_remote_state.cluster.outputs.head_node_role_arn), 1)
   burst_node_role_name = element(split("/", data.terraform_remote_state.cluster.outputs.burst_node_role_arn), 1)
   vpc_id               = data.terraform_remote_state.cluster.outputs.vpc_id
-  cloud_subnet_a_id    = data.terraform_remote_state.cluster.outputs.cloud_subnet_a_id
+  # cloud_subnet_b_id is the burst (cloud) subnet — NOT the on-prem subnet.
+  # Ephemeral EFS mount targets are created here to match real hybrid architecture.
+  cloud_subnet_b_id    = data.terraform_remote_state.cluster.outputs.cloud_subnet_b_id
 }
 
 # Look up the EFS security group by name (created by the vpc module)

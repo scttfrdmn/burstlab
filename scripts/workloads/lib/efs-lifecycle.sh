@@ -15,7 +15,7 @@
 #
 # Required environment variables (set by submit-chain.sh):
 #   AWS_REGION          — AWS region
-#   CLOUD_SUBNET_A_ID   — Subnet for the EFS mount target
+#   BURST_SUBNET_ID     — Cloud burst subnet for the EFS mount target (NOT the on-prem subnet)
 #   EFS_SG_ID           — Security group allowing NFS (2049) from VPC CIDR
 #   GRANULARITY         — per-job | per-array | per-campaign
 #   CAMPAIGN_NAME       — only required when GRANULARITY=per-campaign
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-us-west-2}"
-EFS_STATE_DIR="${EFS_STATE_DIR:-/u/home/alice/.efs-state}"
+EFS_STATE_DIR="${EFS_STATE_DIR:-/home/alice/.efs-state}"
 
 # -----------------------------------------------------------------------------
 # efs_create <job_id>

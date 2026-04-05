@@ -1,13 +1,17 @@
 # Pass these as environment variables when submitting job chains:
 #
-#   CLOUD_SUBNET_A_ID=$(terraform output -raw cloud_subnet_a_id) \
+#   BURST_SUBNET_ID=$(terraform output -raw burst_subnet_id) \
 #   EFS_SG_ID=$(terraform output -raw efs_sg_id) \
 #   AWS_REGION=us-west-2 \
 #     bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh --granularity per-job
+#
+# burst_subnet_id is the cloud-side subnet where burst nodes run. The ephemeral
+# EFS mount target is created here — NOT in the on-prem subnet — matching what
+# would happen in a real hybrid environment.
 
-output "cloud_subnet_a_id" {
-  description = "Cloud burst subnet A — required by job1 to create the EFS mount target"
-  value       = local.cloud_subnet_a_id
+output "burst_subnet_id" {
+  description = "Cloud burst subnet B (us-west-2b) where burst nodes run. The ephemeral EFS mount target is created here, not in the on-prem subnet."
+  value       = local.cloud_subnet_b_id
 }
 
 output "efs_sg_id" {

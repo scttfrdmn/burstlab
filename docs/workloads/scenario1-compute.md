@@ -14,7 +14,7 @@ before adding the complexity of cloud storage.
 - Spack managing scientific software on shared EFS (visible to all nodes)
 - Lmod environment modules (`module load gromacs`)
 - MPI job on a single burst node (`mpirun -np N`)
-- Results written to permanent cluster EFS (`/u/home/alice/results/`)
+- Results written to permanent cluster EFS (`/home/alice/results/`)
 
 ---
 
@@ -86,7 +86,7 @@ ls ~/results/gromacs-*/
   (EFA) and network-aware Slurm plugin configuration — that's a separate
   conversation."
 
-- "Results land on the cluster's permanent EFS at `/u/home/alice/results/`.
+- "Results land on the cluster's permanent EFS at `/home/alice/results/`.
   That's the shared home directory, visible from every node and from on-prem
   if you mount the same EFS."
 

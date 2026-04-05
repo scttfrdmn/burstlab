@@ -17,7 +17,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   set -euo pipefail
 fi
 
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
 
@@ -27,7 +27,7 @@ JOB_REF="${SLURM_JOB_ID:-$(date +%s)}"
 echo "=== EFS Create: started on $(hostname): $(date) ==="
 echo "  Ref ID:     ${JOB_REF}"
 echo "  Granularity:${GRANULARITY}"
-echo "  Subnet:     ${CLOUD_SUBNET_A_ID}"
+echo "  Burst subnet:${BURST_SUBNET_ID}"
 echo "  SG:         ${EFS_SG_ID}"
 echo "  Region:     ${AWS_REGION}"
 
@@ -66,9 +66,9 @@ echo "  Created: ${EFS_ID}"
 # (CreateMountTarget fails if EFS is still in 'creating' state)
 efs_wait_available "${EFS_ID}"
 
-# Add mount target in the cloud subnet
-echo "Adding mount target in ${CLOUD_SUBNET_A_ID}..."
-MT_ID=$(efs_add_mount_target "${EFS_ID}" "${CLOUD_SUBNET_A_ID}" "${EFS_SG_ID}")
+# Add mount target in the burst (cloud) subnet — not on-prem
+echo "Adding mount target in ${BURST_SUBNET_ID}..."
+MT_ID=$(efs_add_mount_target "${EFS_ID}" "${BURST_SUBNET_ID}" "${EFS_SG_ID}")
 echo "  Mount target: ${MT_ID}"
 
 # Wait for mount target to be available

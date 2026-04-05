@@ -16,14 +16,14 @@
 #   per-campaign — named EFS volume shared across multiple job submissions
 #
 # SA talking point: "EFS is created right here on the head node — it's just
-# an API call, we don't need a burst node for that. Once the EFS is available
-# and the mount target is ready (~60 seconds), we submit two jobs: one to
-# run the workload, one to destroy the EFS when it's done. Watch squeue while
-# the burst node starts up and then the EFS disappears after the job."
+# an API call, we don't need a burst node for that. The mount target goes into
+# the cloud burst subnet, exactly like it would in a real hybrid environment.
+# Once the EFS is available (~60 seconds), we submit two jobs: one to run the
+# workload on the burst node, one to destroy the EFS when it's done."
 #
 # Usage:
 #   # Required environment variables from terraform output:
-#   CLOUD_SUBNET_A_ID=$(cd terraform/workloads/scenario3-ephemeral-efs && terraform output -raw cloud_subnet_a_id)
+#   BURST_SUBNET_ID=$(cd terraform/workloads/scenario3-ephemeral-efs && terraform output -raw burst_subnet_id)
 #   EFS_SG_ID=$(cd terraform/workloads/scenario3-ephemeral-efs && terraform output -raw efs_sg_id)
 #
 #   bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
@@ -50,24 +50,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-: "${CLOUD_SUBNET_A_ID:?CLOUD_SUBNET_A_ID must be set (from terraform output -raw cloud_subnet_a_id)}"
+# BURST_SUBNET_ID: the cloud-side subnet where burst nodes run and where the
+# ephemeral EFS mount target should be created. In a real hybrid setup this
+# would be a subnet in your cloud VPC — NOT on the on-prem network.
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
 : "${EFS_SG_ID:?EFS_SG_ID must be set (from terraform output -raw efs_sg_id)}"
 : "${AWS_REGION:?AWS_REGION must be set}"
 
-export GRANULARITY CAMPAIGN_NAME AWS_REGION CLOUD_SUBNET_A_ID EFS_SG_ID
+export GRANULARITY CAMPAIGN_NAME AWS_REGION BURST_SUBNET_ID EFS_SG_ID
 
 EXPORT_VARS="ALL,GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME}"
-EXPORT_VARS="${EXPORT_VARS},CLOUD_SUBNET_A_ID=${CLOUD_SUBNET_A_ID}"
+EXPORT_VARS="${EXPORT_VARS},BURST_SUBNET_ID=${BURST_SUBNET_ID}"
 EXPORT_VARS="${EXPORT_VARS},EFS_SG_ID=${EFS_SG_ID}"
 EXPORT_VARS="${EXPORT_VARS},AWS_REGION=${AWS_REGION}"
 
 # Ensure log directory exists before jobs try to write to it
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 echo "=== Submitting ephemeral EFS job chain ==="
 echo "  Granularity:  ${GRANULARITY}"
 echo "  Campaign:     ${CAMPAIGN_NAME}"
-echo "  Subnet:       ${CLOUD_SUBNET_A_ID}"
+echo "  Burst subnet: ${BURST_SUBNET_ID}  (cloud-side, NOT on-prem)"
 echo "  EFS SG:       ${EFS_SG_ID}"
 echo "  Region:       ${AWS_REGION}"
 echo ""
@@ -128,9 +131,10 @@ if [ "$GRANULARITY" = "per-campaign" ]; then
   echo "  sbatch --dependency=afterok:${JOB1} --export='${EXPORT_VARS}' \\"
   echo "    ${SCRIPT_DIR}/job3-destroy-efs.sh"
 else
+  # Destroy job: just AWS API calls — runs on head node (no burst EC2 needed)
   JOB2=$(sbatch --parsable \
     --job-name=efs-destroy \
-    --partition="${PARTITION}" \
+    --partition=local \
     --nodes=1 --ntasks=1 \
     --time=00:10:00 \
     --dependency=afterok:"${JOB1}" \

@@ -1,0 +1,142 @@
+#!/bin/bash
+# =============================================================================
+# efs-sbatch — Transparent EFS lifecycle wrapper for sbatch
+#
+# Install to /opt/slurm/bin/efs-sbatch.
+# Real sbatch is at /opt/slurm-baked/bin/sbatch.
+#
+# Usage (identical to sbatch):
+#   efs-sbatch myjob.sh
+#
+# The job script signals that it wants ephemeral EFS storage via:
+#   #SBATCH --comment=efs
+#
+# What this wrapper does:
+#   1. Parses the job script for #SBATCH --comment=efs
+#   2. Creates an ephemeral EFS filesystem (~60 seconds, inline here)
+#   3. Submits the real job with EFS_STATE_FILE injected into --export
+#   4. Submits a destroy job (--partition=local, afterok:<workload_job_id>)
+#   5. Returns the workload job ID (destroy is invisible to the user)
+#
+# SA talking point: "EFS is created right here — it's just an API call.
+# The mount target goes into the cloud burst subnet. Once available (~60s),
+# the job is submitted with the filesystem ID in its environment. The user
+# typed one command and got one job ID back."
+#
+# Required env vars:
+#   BURST_SUBNET_ID  — cloud burst subnet for EFS mount target
+#   EFS_SG_ID        — security group (allows NFS from VPC)
+#   AWS_REGION       — AWS region
+# =============================================================================
+
+set -euo pipefail
+
+REAL_SBATCH=/opt/slurm-baked/bin/sbatch
+LIB=/opt/slurm/etc/workloads/lib/efs-lifecycle.sh
+DESTROY_SCRIPT=/opt/slurm/etc/workloads/jobs/scenario3/job3-destroy-efs.sh
+
+# Find the job script (last non-option argument)
+JOB_SCRIPT=""
+for arg in "$@"; do
+  if [[ "$arg" != -* ]] && [[ -f "$arg" ]]; then
+    JOB_SCRIPT="$arg"
+  fi
+done
+
+if [ -z "$JOB_SCRIPT" ]; then
+  echo "efs-sbatch: no job script found in arguments — falling through to sbatch" >&2
+  exec "$REAL_SBATCH" "$@"
+fi
+
+# ---------------------------------------------------------------------------
+# Check for #SBATCH --comment=efs in the job script
+# ---------------------------------------------------------------------------
+if ! grep -q '^#SBATCH[[:space:]]\+--comment=efs' "$JOB_SCRIPT" 2>/dev/null; then
+  exec "$REAL_SBATCH" "$@"
+fi
+
+# ---------------------------------------------------------------------------
+# Validate required env vars
+# ---------------------------------------------------------------------------
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
+: "${EFS_SG_ID:?EFS_SG_ID must be set (from terraform output -raw efs_sg_id)}"
+: "${AWS_REGION:?AWS_REGION must be set}"
+
+export AWS_REGION BURST_SUBNET_ID EFS_SG_ID
+
+# ---------------------------------------------------------------------------
+# Create EFS filesystem (inline — ~60 seconds)
+# ---------------------------------------------------------------------------
+echo "efs-sbatch: creating ephemeral EFS filesystem..." >&2
+
+source "$LIB"
+
+GRANULARITY="${GRANULARITY:-per-job}"
+CAMPAIGN_NAME="${CAMPAIGN_NAME:-default}"
+JOB_REF="wrap-$(date +%s)"
+export GRANULARITY CAMPAIGN_NAME JOB_REF
+
+EFS_ID=$(efs_create "${JOB_REF}")
+efs_add_mount_target "${EFS_ID}" "${BURST_SUBNET_ID}" "${EFS_SG_ID}"
+efs_wait_available "${EFS_ID}"
+efs_wait_mount_target "${EFS_ID}"
+EFS_DNS="${EFS_ID}.efs.${AWS_REGION}.amazonaws.com"
+
+# Write state file
+STATE_DIR="${HOME}/.efs-state"
+mkdir -p "${STATE_DIR}"
+STATE_FILE="${STATE_DIR}/job-${JOB_REF}.env"
+cat > "${STATE_FILE}" << EOF
+EFS_ID=${EFS_ID}
+EFS_DNS=${EFS_DNS}
+AWS_REGION=${AWS_REGION}
+BURST_SUBNET_ID=${BURST_SUBNET_ID}
+EFS_SG_ID=${EFS_SG_ID}
+CREATED_BY_JOB=${JOB_REF}
+GRANULARITY=${GRANULARITY}
+CAMPAIGN_NAME=${CAMPAIGN_NAME}
+EOF
+
+echo "efs-sbatch: EFS ${EFS_ID} is available — submitting job..." >&2
+
+# ---------------------------------------------------------------------------
+# Build --export string
+# ---------------------------------------------------------------------------
+EXISTING_EXPORT=""
+PASSTHROUGH_ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" =~ ^--export=(.+)$ ]]; then
+    EXISTING_EXPORT="${BASH_REMATCH[1]}"
+  else
+    PASSTHROUGH_ARGS+=("$arg")
+  fi
+done
+
+EFS_ENV="EFS_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION}"
+if [ -n "$EXISTING_EXPORT" ]; then
+  EXPORT_ARG="--export=${EXISTING_EXPORT},${EFS_ENV}"
+else
+  EXPORT_ARG="--export=ALL,${EFS_ENV}"
+fi
+
+# ---------------------------------------------------------------------------
+# Submit workload job
+# ---------------------------------------------------------------------------
+WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "${PASSTHROUGH_ARGS[@]}" "$EXPORT_ARG")
+echo "efs-sbatch: workload job submitted: ${WORKLOAD_JOB_ID}" >&2
+
+# ---------------------------------------------------------------------------
+# Submit destroy job (local partition, invisible to user)
+# ---------------------------------------------------------------------------
+DESTROY_EXPORT="ALL,EFS_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION}"
+DESTROY_JOB_ID=$("$REAL_SBATCH" --parsable \
+  --job-name=efs-destroy \
+  --partition=local \
+  --nodes=1 --ntasks=1 \
+  --time=00:10:00 \
+  --dependency=afterok:"${WORKLOAD_JOB_ID}" \
+  --export="${DESTROY_EXPORT}" \
+  "$DESTROY_SCRIPT")
+echo "efs-sbatch: destroy job queued: ${DESTROY_JOB_ID} (afterok:${WORKLOAD_JOB_ID})" >&2
+
+echo "${WORKLOAD_JOB_ID}"

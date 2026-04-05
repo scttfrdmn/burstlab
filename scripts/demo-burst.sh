@@ -93,8 +93,8 @@ _info "This job will run on a static compute node that is already running."
 LOCAL_JOB_ID=$($SBIN/sbatch \
   --partition=local \
   --job-name=demo-local \
-  --chdir=/u/home/alice \
-  --output=/u/home/alice/demo-local-%j.out \
+  --chdir=/home/alice \
+  --output=/home/alice/demo-local-%j.out \
   --wrap="echo 'Job running on:' && hostname && echo 'CPUs:' && nproc && sleep 15" \
   | awk '{print $NF}')
 
@@ -108,7 +108,7 @@ for i in $(seq 1 6); do
 done
 
 _step "Job output:"
-cat /u/home/alice/demo-local-${LOCAL_JOB_ID}.out 2>/dev/null || echo "(job may still be running)"
+cat /home/alice/demo-local-${LOCAL_JOB_ID}.out 2>/dev/null || echo "(job may still be running)"
 
 _wait
 
@@ -131,8 +131,8 @@ _info "This triggers Plugin v2 resume.py → EC2 CreateFleet → m7a.xlarge laun
 BURST_JOB_ID=$($SBIN/sbatch \
   --partition="${BURST_PARTITION}" \
   --job-name=demo-burst \
-  --chdir=/u/home/alice \
-  --output=/u/home/alice/demo-burst-%j.out \
+  --chdir=/home/alice \
+  --output=/home/alice/demo-burst-%j.out \
   --wrap="hostname && nproc && echo 'Burst job complete.'" \
   | awk '{print $NF}')
 
@@ -175,7 +175,7 @@ done
 _step "Burst job output:"
 # Brief pause to allow EFS write propagation from burst node before reading.
 sleep 5
-cat /u/home/alice/demo-burst-${BURST_JOB_ID}.out 2>/dev/null || echo "(output not yet available)"
+cat /home/alice/demo-burst-${BURST_JOB_ID}.out 2>/dev/null || echo "(output not yet available)"
 
 # Show AWS Plugin log
 _step "Plugin v2 log (last 20 lines):"
@@ -198,7 +198,7 @@ echo "     - Instance: m7a.xlarge in cloud subnets A or B"
 echo "     - Set the EC2 Name tag to ${NODE_PREFIX}-N"
 echo "  4. EC2 instance launched, ran burst-node-init.sh:"
 echo "     - Read its name from IMDS tag (InstanceMetadataTags=enabled)"
-echo "     - Mounted EFS (/u and /opt/slurm)"
+echo "     - Mounted EFS (/home and /opt/slurm)"
 echo "     - Decoded munge key from Terraform-injected base64"
 echo "     - Started slurmd -N ${NODE_PREFIX}-N"
 echo "  5. slurmd registered with slurmctld as '${NODE_PREFIX}-N'"

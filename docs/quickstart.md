@@ -300,7 +300,7 @@ Verify your environment:
 
 ```bash
 whoami      # alice
-echo $HOME  # /u/home/alice
+echo $HOME  # /home/alice
 sinfo       # shows the cluster partitions
 ```
 
@@ -409,7 +409,7 @@ echo "AMI and snapshot deleted."
 | Compute nodes stuck in DOWN after 10 minutes | `scontrol show node compute01` — read the `Reason` field. Check `/var/log/burstlab-init.log` on that node via head node: `ssh compute01 sudo cat /var/log/burstlab-init.log` |
 | Burst node stuck in `alloc~` for more than 5 minutes | IAM issue or instance launch failure. `scontrol show node aws-burst-0` then check EC2 console for failed launches. |
 | Job stuck in PD (pending) with no node assigned | `scontrol show job <jobid>` — read the `Reason` field. |
-| `squeue` shows job running but no output file | Check the job was submitted with an output path under `/u/home/alice/` so it writes to shared storage. |
+| `squeue` shows job running but no output file | Check the job was submitted with an output path under `/home/alice/` so it writes to shared storage. |
 
 If the init log shows `FATAL`:
 ```bash

@@ -43,7 +43,7 @@ Before covering what differs, it is worth being explicit about what is the same:
   The steps are identical; only the AMI name and tfvars directory change.
 - **Network architecture**: same four-subnet VPC, same EFS layout, same NAT setup,
   same security groups. An architecture diagram drawn for Gen 1 describes Gen 3 faithfully.
-- **Alice**: the demo HPC user with UID/GID 2000 and home directory at `/u/home/alice`
+- **Alice**: the demo HPC user with UID/GID 2000 and home directory at `/home/alice`
   exists on all three generations.
 
 ---

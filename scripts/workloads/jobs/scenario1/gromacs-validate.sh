@@ -18,11 +18,11 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --time=00:15:00
-#SBATCH --output=/u/home/alice/logs/gromacs-validate-%j.out
-#SBATCH --error=/u/home/alice/logs/gromacs-validate-%j.err
+#SBATCH --output=/home/alice/logs/gromacs-validate-%j.out
+#SBATCH --error=/home/alice/logs/gromacs-validate-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 echo "=== GROMACS Validate: started on $(hostname): $(date) ==="
 echo "Job ID: ${SLURM_JOB_ID}"
@@ -48,7 +48,7 @@ echo "GROMACS binary: ${GMX}"
 ${GMX} --version | head -5
 
 # Create working directory
-WORKDIR="/u/home/alice/gromacs-validate-${SLURM_JOB_ID}"
+WORKDIR="/home/alice/gromacs-validate-${SLURM_JOB_ID}"
 mkdir -p "${WORKDIR}"
 cd "${WORKDIR}"
 
@@ -101,5 +101,5 @@ echo "  Cores used: ${SLURM_NTASKS}"
 echo "  Completed: $(date)"
 
 # Cleanup working directory
-cd /u/home/alice
+cd /home/alice
 rm -rf "${WORKDIR}"

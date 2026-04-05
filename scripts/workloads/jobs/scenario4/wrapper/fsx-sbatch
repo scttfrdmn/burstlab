@@ -1,0 +1,185 @@
+#!/bin/bash
+# =============================================================================
+# fsx-sbatch — Transparent FSx Lustre lifecycle wrapper for sbatch
+#
+# Install to /opt/slurm/bin/fsx-sbatch (ahead of the system sbatch in PATH).
+# Real sbatch is at /opt/slurm-baked/bin/sbatch.
+#
+# Usage (identical to sbatch):
+#   fsx-sbatch [sbatch-options] myjob.sh
+#   fsx-sbatch --fsx-storage=2400 myjob.sh    ← override storage size
+#
+# The job script signals that it wants FSx storage via:
+#   #SBATCH --comment=fsx:1200
+# or the wrapper arg --fsx-storage=N overrides the comment value.
+#
+# What this wrapper does:
+#   1. Parses the job script for #SBATCH --comment=fsx:<GB>
+#   2. Creates an ephemeral FSx SCRATCH_2 filesystem (5-10 minutes, inline here)
+#   3. Submits the real job with FSX_STATE_FILE injected into --export
+#   4. Submits a destroy job (--partition=local, afterok:<workload_job_id>)
+#   5. Returns the workload job ID (destroy is invisible to the user)
+#
+# SA talking point: "The user sees one command and one job ID. The storage
+# lifecycle — create, inject, flush, destroy — is completely hidden. If the
+# cluster already has a wrapper like this, migration cost is zero."
+#
+# Required env vars (set by Terraform or sourced before calling):
+#   BURST_SUBNET_ID  — cloud burst subnet for FSx placement
+#   FSX_SG_ID        — security group (allows Lustre from VPC)
+#   S3_DATA_BUCKET   — S3 bucket for data repository
+#   AWS_REGION       — AWS region
+# =============================================================================
+
+set -euo pipefail
+
+REAL_SBATCH=/opt/slurm-baked/bin/sbatch
+LIB=/opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
+DESTROY_SCRIPT=/opt/slurm/etc/workloads/jobs/scenario4/job3-destroy-fsx.sh
+
+# ---------------------------------------------------------------------------
+# Parse our own --fsx-storage=N arg (strip it before passing to real sbatch)
+# ---------------------------------------------------------------------------
+FSX_OVERRIDE_GB=""
+PASSTHROUGH_ARGS=()
+
+for arg in "$@"; do
+  if [[ "$arg" =~ ^--fsx-storage=([0-9]+)$ ]]; then
+    FSX_OVERRIDE_GB="${BASH_REMATCH[1]}"
+  else
+    PASSTHROUGH_ARGS+=("$arg")
+  fi
+done
+
+# Find the job script (last non-option argument)
+JOB_SCRIPT=""
+for arg in "${PASSTHROUGH_ARGS[@]}"; do
+  if [[ "$arg" != -* ]] && [[ -f "$arg" ]]; then
+    JOB_SCRIPT="$arg"
+  fi
+done
+
+if [ -z "$JOB_SCRIPT" ]; then
+  echo "fsx-sbatch: no job script found in arguments — falling through to sbatch" >&2
+  exec "$REAL_SBATCH" "${PASSTHROUGH_ARGS[@]}"
+fi
+
+# ---------------------------------------------------------------------------
+# Check for #SBATCH --comment=fsx:<GB> in the job script
+# ---------------------------------------------------------------------------
+FSX_STORAGE_GB=$(grep -oP '(?<=--comment=fsx:)\d+' "$JOB_SCRIPT" 2>/dev/null | head -1 || true)
+
+# --fsx-storage= arg overrides comment value
+if [ -n "$FSX_OVERRIDE_GB" ]; then
+  FSX_STORAGE_GB="$FSX_OVERRIDE_GB"
+fi
+
+# No FSx trigger found — fall through to real sbatch unchanged
+if [ -z "$FSX_STORAGE_GB" ]; then
+  exec "$REAL_SBATCH" "${PASSTHROUGH_ARGS[@]}"
+fi
+
+# ---------------------------------------------------------------------------
+# Validate required env vars
+# ---------------------------------------------------------------------------
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
+: "${FSX_SG_ID:?FSX_SG_ID must be set (from terraform output -raw fsx_sg_id)}"
+: "${S3_DATA_BUCKET:?S3_DATA_BUCKET must be set (from terraform output -raw s3_data_bucket)}"
+: "${AWS_REGION:?AWS_REGION must be set}"
+
+export FSX_STORAGE_GB AWS_REGION BURST_SUBNET_ID FSX_SG_ID S3_DATA_BUCKET
+
+# ---------------------------------------------------------------------------
+# Create FSx Lustre filesystem (inline — visible progress in terminal)
+# ---------------------------------------------------------------------------
+echo "fsx-sbatch: creating FSx SCRATCH_2 (${FSX_STORAGE_GB} GB) — this takes 5-10 minutes..." >&2
+
+source "$LIB"
+
+GRANULARITY="${GRANULARITY:-per-job}"
+CAMPAIGN_NAME="${CAMPAIGN_NAME:-default}"
+# Use a timestamp-based ref since we're outside Slurm at this point
+JOB_REF="wrap-$(date +%s)"
+export GRANULARITY CAMPAIGN_NAME JOB_REF
+
+# Stage input data in S3
+S3_PREFIX="jobs/${JOB_REF}"
+export S3_PREFIX
+if [ -d "/opt/slurm/etc/workloads/data" ]; then
+  aws s3 sync /opt/slurm/etc/workloads/data/ \
+    "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/" \
+    --region "${AWS_REGION}" --quiet 2>/dev/null || true
+fi
+
+# Create FSx and wait for AVAILABLE
+FSX_ID=$(fsx_create "${JOB_REF}" "${S3_DATA_BUCKET}" "${S3_PREFIX}" \
+  "${BURST_SUBNET_ID}" "${FSX_SG_ID}" "${FSX_STORAGE_GB}")
+fsx_wait_available "${FSX_ID}"
+FSX_DNS=$(fsx_get_dns "${FSX_ID}")
+FSX_MOUNT_NAME=$(aws fsx describe-file-systems \
+  --file-system-ids "${FSX_ID}" \
+  --region "${AWS_REGION}" \
+  --query 'FileSystems[0].LustreConfiguration.MountName' \
+  --output text)
+
+# Write state file
+STATE_DIR="${HOME}/.fsx-state"
+mkdir -p "${STATE_DIR}"
+STATE_FILE="${STATE_DIR}/job-${JOB_REF}.env"
+cat > "${STATE_FILE}" << EOF
+FSX_ID=${FSX_ID}
+FSX_DNS=${FSX_DNS}
+FSX_MOUNT_NAME=${FSX_MOUNT_NAME}
+S3_DATA_BUCKET=${S3_DATA_BUCKET}
+S3_PREFIX=${S3_PREFIX}
+AWS_REGION=${AWS_REGION}
+CREATED_BY_JOB=${JOB_REF}
+GRANULARITY=${GRANULARITY}
+CAMPAIGN_NAME=${CAMPAIGN_NAME}
+EOF
+
+echo "fsx-sbatch: FSx ${FSX_ID} is AVAILABLE — submitting job..." >&2
+
+# ---------------------------------------------------------------------------
+# Build --export string, injecting FSX_STATE_FILE into the job's environment
+# ---------------------------------------------------------------------------
+# Find any existing --export in passthrough args and append to it
+EXISTING_EXPORT=""
+NEW_ARGS=()
+for arg in "${PASSTHROUGH_ARGS[@]}"; do
+  if [[ "$arg" =~ ^--export=(.+)$ ]]; then
+    EXISTING_EXPORT="${BASH_REMATCH[1]}"
+  else
+    NEW_ARGS+=("$arg")
+  fi
+done
+
+FSX_ENV="FSX_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION},S3_DATA_BUCKET=${S3_DATA_BUCKET}"
+if [ -n "$EXISTING_EXPORT" ]; then
+  EXPORT_ARG="--export=${EXISTING_EXPORT},${FSX_ENV}"
+else
+  EXPORT_ARG="--export=ALL,${FSX_ENV}"
+fi
+
+# ---------------------------------------------------------------------------
+# Submit workload job
+# ---------------------------------------------------------------------------
+WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "${NEW_ARGS[@]}" "$EXPORT_ARG")
+echo "fsx-sbatch: workload job submitted: ${WORKLOAD_JOB_ID}" >&2
+
+# ---------------------------------------------------------------------------
+# Submit destroy job (local partition, invisible to user)
+# ---------------------------------------------------------------------------
+DESTROY_EXPORT="ALL,FSX_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION},S3_DATA_BUCKET=${S3_DATA_BUCKET}"
+DESTROY_JOB_ID=$("$REAL_SBATCH" --parsable \
+  --job-name=fsx-destroy \
+  --partition=local \
+  --nodes=1 --ntasks=1 \
+  --time=00:20:00 \
+  --dependency=afterok:"${WORKLOAD_JOB_ID}" \
+  --export="${DESTROY_EXPORT}" \
+  "$DESTROY_SCRIPT")
+echo "fsx-sbatch: destroy job queued: ${DESTROY_JOB_ID} (afterok:${WORKLOAD_JOB_ID})" >&2
+
+# Return the workload job ID (standard sbatch output)
+echo "${WORKLOAD_JOB_ID}"

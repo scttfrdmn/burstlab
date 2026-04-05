@@ -19,11 +19,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
 #SBATCH --time=01:00:00
-#SBATCH --output=/u/home/alice/logs/efs-workload-%j.out
-#SBATCH --error=/u/home/alice/logs/efs-workload-%j.err
+#SBATCH --output=/home/alice/logs/efs-workload-%j.out
+#SBATCH --error=/home/alice/logs/efs-workload-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
 
@@ -59,6 +59,15 @@ sudo mount -t nfs4 \
   "${MOUNT_POINT}"
 
 echo "  Mounted successfully."
+
+# Make the EFS root writable (new EFS root is root:root 755 — alice can't write)
+sudo chmod 777 "${MOUNT_POINT}"
+
+# Expose the scratch filesystem at the standard ~/scratch path.
+# Applications can use ~/scratch or $SCRATCH without knowing the internal path.
+export SCRATCH="${MOUNT_POINT}"
+ln -sfn "${MOUNT_POINT}" "${HOME}/scratch"
+echo "  Scratch: ${HOME}/scratch -> ${MOUNT_POINT}"
 
 # Set up per-task directories
 INPUT_DIR="${MOUNT_POINT}/input/${TASK_ID}"
@@ -112,12 +121,13 @@ echo "  Workload completed in ${ELAPSED}s"
 echo "  Output: $(ls ${OUTPUT_DIR}/ | wc -l) files in ${OUTPUT_DIR}"
 
 # Copy results back to permanent EFS before unmounting
-RESULTS_DIR="/u/home/alice/results/efs-job-${SLURM_JOB_ID}-task-${TASK_ID}"
+RESULTS_DIR="/home/alice/results/efs-job-${SLURM_JOB_ID}-task-${TASK_ID}"
 mkdir -p "${RESULTS_DIR}"
 cp -r "${OUTPUT_DIR}"/. "${RESULTS_DIR}/"
 echo "  Results copied to permanent EFS: ${RESULTS_DIR}"
 
 # Unmount before Job 3 destroys the filesystem
+rm -f "${HOME}/scratch"
 echo ""
 echo "Unmounting ${MOUNT_POINT}..."
 sudo umount "${MOUNT_POINT}"

@@ -85,9 +85,22 @@ resource "aws_instance" "head_node" {
     scripts_bucket_name       = var.scripts_bucket_name
   }))
 
-  # Ensure instance replacement recreates the UserData (not just reboots).
-  # Without this, changing UserData on an already-created instance has no effect.
-  user_data_replace_on_change = true
+  # user_data_replace_on_change is intentionally NOT set (defaults to false).
+  # The head node UserData includes partitions.json which contains the burst
+  # launch template ID. If user_data_replace_on_change = true, updating the
+  # launch template (e.g., to install Lustre client) would destroy and recreate
+  # the head node, wiping all in-progress cluster state. Config updates
+  # (partitions.json, slurm.conf) are instead applied via the null_resource
+  # SSH deploy that uploads to EFS — no head node recreation needed.
+
+  lifecycle {
+    ignore_changes = [
+      # Prevent head node recreation when launch template or other config files
+      # embedded in user_data change. The null_resource SSH deploy handles config
+      # updates without requiring a new instance.
+      user_data_base64,
+    ]
+  }
 
   tags = {
     Name       = "${var.cluster_name}-head-node"

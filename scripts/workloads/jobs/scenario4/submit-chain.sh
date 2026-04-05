@@ -18,7 +18,7 @@
 # S3. Job 2 flushes results back to S3 and destroys the filesystem."
 #
 # Usage:
-#   CLOUD_SUBNET_A_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw cloud_subnet_a_id)
+#   BURST_SUBNET_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw burst_subnet_id)
 #   FSX_SG_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw fsx_sg_id)
 #   S3_DATA_BUCKET=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw s3_data_bucket)
 #
@@ -48,26 +48,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-: "${CLOUD_SUBNET_A_ID:?CLOUD_SUBNET_A_ID must be set (from terraform output -raw cloud_subnet_a_id)}"
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
 : "${FSX_SG_ID:?FSX_SG_ID must be set (from terraform output -raw fsx_sg_id)}"
 : "${S3_DATA_BUCKET:?S3_DATA_BUCKET must be set (from terraform output -raw s3_data_bucket)}"
 : "${AWS_REGION:?AWS_REGION must be set}"
 
-export GRANULARITY CAMPAIGN_NAME AWS_REGION CLOUD_SUBNET_A_ID FSX_SG_ID S3_DATA_BUCKET FSX_STORAGE_GB
+export GRANULARITY CAMPAIGN_NAME AWS_REGION BURST_SUBNET_ID FSX_SG_ID S3_DATA_BUCKET FSX_STORAGE_GB
 
 EXPORT_VARS="ALL,GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME}"
-EXPORT_VARS="${EXPORT_VARS},CLOUD_SUBNET_A_ID=${CLOUD_SUBNET_A_ID}"
+EXPORT_VARS="${EXPORT_VARS},BURST_SUBNET_ID=${BURST_SUBNET_ID}"
 EXPORT_VARS="${EXPORT_VARS},FSX_SG_ID=${FSX_SG_ID}"
 EXPORT_VARS="${EXPORT_VARS},S3_DATA_BUCKET=${S3_DATA_BUCKET}"
 EXPORT_VARS="${EXPORT_VARS},FSX_STORAGE_GB=${FSX_STORAGE_GB}"
 EXPORT_VARS="${EXPORT_VARS},AWS_REGION=${AWS_REGION}"
 
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 echo "=== Submitting ephemeral FSx Lustre job chain ==="
 echo "  Granularity:    ${GRANULARITY}"
 echo "  Campaign:       ${CAMPAIGN_NAME}"
-echo "  Subnet:         ${CLOUD_SUBNET_A_ID}"
+echo "  Burst subnet:   ${BURST_SUBNET_ID}  (cloud-side, NOT on-prem)"
 echo "  FSx SG:         ${FSX_SG_ID}"
 echo "  S3 data bucket: ${S3_DATA_BUCKET}"
 echo "  FSx storage:    ${FSX_STORAGE_GB} GB"
@@ -131,9 +131,10 @@ if [ "$GRANULARITY" = "per-campaign" ]; then
   echo "  sbatch --dependency=afterok:${JOB1} --export='${EXPORT_VARS}' \\"
   echo "    ${SCRIPT_DIR}/job3-destroy-fsx.sh"
 else
+  # Destroy job: just AWS API calls — runs on head node (no burst EC2 needed)
   JOB2=$(sbatch --parsable \
     --job-name=fsx-destroy \
-    --partition="${PARTITION}" \
+    --partition=local \
     --nodes=1 --ntasks=1 \
     --time=00:20:00 \
     --dependency=afterok:"${JOB1}" \

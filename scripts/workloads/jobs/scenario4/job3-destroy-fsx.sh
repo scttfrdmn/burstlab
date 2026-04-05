@@ -20,11 +20,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=00:20:00
-#SBATCH --output=/u/home/alice/logs/fsx-destroy-%j.out
-#SBATCH --error=/u/home/alice/logs/fsx-destroy-%j.err
+#SBATCH --output=/home/alice/logs/fsx-destroy-%j.out
+#SBATCH --error=/home/alice/logs/fsx-destroy-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
 
@@ -81,7 +81,7 @@ if [ -n "${TASK_ID}" ]; then
   echo "  S3 path: s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/"
 else
   echo "WARNING: Could not create export task — proceeding with destruction anyway."
-  echo "Results on permanent EFS (/u/home/alice/results/) are still intact."
+  echo "Results on permanent EFS (/home/alice/results/) are still intact."
 fi
 
 # Destroy the FSx filesystem

@@ -22,7 +22,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   set -euo pipefail
 fi
 
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
 
@@ -31,7 +31,7 @@ JOB_REF="${SLURM_JOB_ID:-$(date +%s)}"
 echo "=== FSx Create: started on $(hostname): $(date) ==="
 echo "  Ref ID:         ${JOB_REF}"
 echo "  Granularity:    ${GRANULARITY}"
-echo "  Subnet:         ${CLOUD_SUBNET_A_ID}"
+echo "  Subnet:         ${BURST_SUBNET_ID}"
 echo "  SG:             ${FSX_SG_ID}"
 echo "  S3 bucket:      ${S3_DATA_BUCKET}"
 echo "  Storage:        ${FSX_STORAGE_GB:-1200} GB"
@@ -75,8 +75,14 @@ if [ -d "/opt/slurm/etc/workloads/data" ]; then
 fi
 
 # Create synthetic input if no data was available
-OBJECT_COUNT=$(aws s3 ls "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/" \
-  --region "${AWS_REGION}" 2>/dev/null | wc -l || echo 0)
+_LISTING=$(aws s3 ls "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/" \
+  --region "${AWS_REGION}" 2>/dev/null) || _LISTING=""
+if [ -n "${_LISTING}" ]; then
+  OBJECT_COUNT=$(echo "${_LISTING}" | wc -l | tr -d ' ')
+else
+  OBJECT_COUNT=0
+fi
+unset _LISTING
 
 if [ "${OBJECT_COUNT}" -eq 0 ]; then
   echo "Generating synthetic workload data in S3..."
@@ -96,7 +102,7 @@ FSX_ID=$(fsx_create \
   "${JOB_REF}" \
   "${S3_DATA_BUCKET}" \
   "${S3_PREFIX}" \
-  "${CLOUD_SUBNET_A_ID}" \
+  "${BURST_SUBNET_ID}" \
   "${FSX_SG_ID}" \
   "${FSX_STORAGE_GB:-1200}")
 echo "  Created: ${FSX_ID}"
@@ -125,6 +131,7 @@ FSX_DNS=${FSX_DNS}
 FSX_MOUNT_NAME=${FSX_MOUNT_NAME}
 S3_DATA_BUCKET=${S3_DATA_BUCKET}
 S3_PREFIX=${S3_PREFIX}
+AWS_REGION=${AWS_REGION}
 CREATED_BY_JOB=${JOB_REF}
 GRANULARITY=${GRANULARITY}
 CAMPAIGN_NAME=${CAMPAIGN_NAME:-default}

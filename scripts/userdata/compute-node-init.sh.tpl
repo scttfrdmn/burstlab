@@ -7,7 +7,7 @@
 #   2. Set hostname based on instance index (compute01, compute02, ...)
 #   3. Add /etc/hosts entries for all cluster nodes
 #   4. Configure default route via head node (NAT)
-#   5. Mount EFS: /u and /opt/slurm
+#   5. Mount EFS: /home and /opt/slurm
 #   6. Write munge key from Terraform-injected base64, start munge
 #   7. Start slurmd with the correct node name
 #
@@ -30,7 +30,7 @@ fi
 
 # Ensure cluster users exist with pinned UID/GID (alice = demo HPC user)
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
-getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /home/alice alice
 
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
 # that blocks munge (873), slurmctld (6817), and NFS (2049).
@@ -70,13 +70,13 @@ ip route replace default via ${head_node_ip} 2>/dev/null || true
 # 5. Mount EFS
 # Wait for head node to have populated /opt/slurm before mounting.
 # -----------------------------------------------------------------------------
-mkdir -p /u /opt/slurm
+mkdir -p /opt/slurm
 
-echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/home /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
 # Retry mounting — EFS DNS propagation and head node init may still be running
-for dir in /u /opt/slurm; do
+for dir in /home /opt/slurm; do
   for attempt in $(seq 1 30); do
     mount "$dir" && break || {
       echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."

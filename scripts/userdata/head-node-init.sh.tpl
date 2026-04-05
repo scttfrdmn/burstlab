@@ -6,7 +6,7 @@
 #   1. Fix CentOS 8 EOL repos to vault.centos.org
 #   2. Set hostname
 #   3. Configure NAT (iptables MASQUERADE, no firewall service — services have DROP defaults)
-#   4. Mount EFS: /u and /opt/slurm
+#   4. Mount EFS: /home and /opt/slurm
 #   5. Populate /opt/slurm on EFS from the AMI if first boot
 #   6. Configure munge key
 #   7. Write Slurm config files from Terraform-rendered templates
@@ -43,12 +43,12 @@ dnf makecache --refresh || true
 
 # -----------------------------------------------------------------------------
 # 1b. Ensure cluster users exist with pinned UID/GID
-# alice (UID/GID 2000) is the demo HPC user. Her home is on EFS (/u/home/alice)
+# alice (UID/GID 2000) is the demo HPC user. Her home is on EFS (/home/alice)
 # and is created in step 4. We create the user entry here so that UID/GID 2000
 # is consistent across all nodes regardless of whether it's in the AMI.
 # -----------------------------------------------------------------------------
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
-getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /home/alice alice
 
 # -----------------------------------------------------------------------------
 # 2. Set hostname
@@ -127,26 +127,34 @@ echo "NAT rules persisted to /etc/sysconfig/iptables-burstlab.rules"
 # -----------------------------------------------------------------------------
 echo "--- Mounting EFS via NFSv4.1 ---"
 # EFS is mounted using plain nfs4 (nfs-utils). No amazon-efs-utils needed on Rocky/CentOS.
-# /u  — cluster user home directories (EFS). Rocky Linux's /home stays on LOCAL disk
-#       so that SSH access for the rocky admin user never depends on EFS availability.
-# /opt/slurm — Slurm binaries, configs, and plugin (EFS).
-mkdir -p /u /opt/slurm
+# /home       — cluster user home directories (EFS /home subpath).
+# /opt/slurm  — Slurm binaries, configs, and plugin (EFS).
+mkdir -p /opt/slurm
 
-# /u — cluster user home directories. Mounted at /u, not /home, so the OS rocky user's
-# home (/home/rocky, local disk, pre-created in AMI) is never shadowed by EFS.
-# This is the standard HPC pattern (e.g. /u, /cluster/home) used at most universities.
+# /home — cluster user home directories.
+# Mounts the EFS /home subdirectory at /home. During bootstrap (below) we create
+# /home/rocky in EFS and inject rocky's SSH key there before this mount goes live,
+# so rocky's home is on EFS and SSH access works regardless of /home/rocky on local disk.
 # nofail: don't block boot if EFS is temporarily unavailable.
 # x-systemd.requires/after=network-online.target: wait for DNS before systemd tries
 # to start the mount unit, preventing the race condition where systemd picks up the
 # new fstab entry mid-boot before DNS is resolvable.
-echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/home /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
 # /opt/slurm — Slurm binaries, configs, and plugin shared across all nodes
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
-# Bootstrap: create EFS /slurm subdirectory if it doesn't exist.
-# NFSv4 subpath mounts require the directory to exist on the server first.
-# Mount EFS root temporarily, create /slurm, then unmount before fstab mounts.
+# Read the EC2 key pair's public key from IMDS before the bootstrap mount.
+# We inject it into EFS /home/rocky during bootstrap so rocky can SSH in
+# after /home is mounted from EFS (which shadows any local /home/rocky).
+_IMDS_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 300" || true)
+_EC2_PUBKEY=$(curl -sf -H "X-aws-ec2-metadata-token: $_IMDS_TOKEN" \
+  "http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key" || true)
+
+# Bootstrap: create EFS subdirectories if they don't exist.
+# NFSv4 subpath mounts require the directories to exist on the server first.
+# Mount EFS root temporarily, create /slurm and /home dirs, then unmount.
 mkdir -p /mnt/efs-bootstrap
 _EFS_BOOTSTRAP_MOUNTED=0
 for attempt in $(seq 1 30); do
@@ -158,8 +166,17 @@ for attempt in $(seq 1 30); do
 done
 if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
   mkdir -p /mnt/efs-bootstrap/slurm
+  mkdir -p /mnt/efs-bootstrap/home/alice
+  mkdir -p /mnt/efs-bootstrap/home/rocky/.ssh
+  # Inject rocky's SSH key into EFS during bootstrap so it's present before /home mounts
+  if [ -n "$_EC2_PUBKEY" ]; then
+    echo "$_EC2_PUBKEY" > /mnt/efs-bootstrap/home/rocky/.ssh/authorized_keys
+    chmod 600 /mnt/efs-bootstrap/home/rocky/.ssh/authorized_keys
+    chmod 700 /mnt/efs-bootstrap/home/rocky/.ssh
+    chown -R rocky:rocky /mnt/efs-bootstrap/home/rocky
+  fi
   umount /mnt/efs-bootstrap
-  echo "EFS /slurm directory ensured."
+  echo "EFS /slurm and /home directories ensured."
 else
   echo "FATAL: EFS bootstrap mount failed after 30 attempts (10 minutes) — cannot continue."
   exit 1
@@ -167,7 +184,7 @@ fi
 rmdir /mnt/efs-bootstrap 2>/dev/null || true
 
 # Mount EFS — retry loop because EFS mount target DNS may take several minutes to propagate
-for dir in /u /opt/slurm; do
+for dir in /home /opt/slurm; do
   for attempt in $(seq 1 30); do
     mount "$dir" && break || {
       echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."
@@ -177,39 +194,22 @@ for dir in /u /opt/slurm; do
   mountpoint -q "$dir" || { echo "FATAL: could not mount $dir after 30 attempts"; exit 1; }
 done
 
-# Inject the EC2 key pair's public key into rocky's authorized_keys on LOCAL disk.
-# rocky's home (/home/rocky) is local to the head node — no EFS dependency.
-# This means SSH always works regardless of EFS state, which is the whole point
-# of mounting cluster user homes at /u instead of /home.
-_IMDS_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
-  -H "X-aws-ec2-metadata-token-ttl-seconds: 300" || true)
-_EC2_PUBKEY=$(curl -sf -H "X-aws-ec2-metadata-token: $_IMDS_TOKEN" \
-  "http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key" || true)
-if [ -n "$_EC2_PUBKEY" ]; then
-  mkdir -p /home/rocky/.ssh
-  grep -qF "$_EC2_PUBKEY" /home/rocky/.ssh/authorized_keys 2>/dev/null || echo "$_EC2_PUBKEY" >> /home/rocky/.ssh/authorized_keys
-  chown rocky:rocky /home/rocky/.ssh/authorized_keys
-  chmod 700 /home/rocky/.ssh
-  chmod 600 /home/rocky/.ssh/authorized_keys
-  echo "SSH key injected to local /home/rocky/.ssh/authorized_keys."
-fi
-
-# Set up alice's home directory on EFS (/u/home/alice).
+# Set up alice's home directory on EFS (/home/alice).
 # alice is the cluster demo user (UID 2000, created in AMI).
 # Her home is on EFS so it's accessible from all nodes — head, compute, burst.
 # Install the same EC2 key pair so alice can SSH in directly.
-if mountpoint -q /u; then
-  mkdir -p /u/home/alice/.ssh
-  getent passwd alice >/dev/null 2>&1 && chown alice:alice /u/home/alice || true
-  chmod 700 /u/home/alice
+if mountpoint -q /home; then
+  mkdir -p /home/alice/.ssh
+  getent passwd alice >/dev/null 2>&1 && chown alice:alice /home/alice || true
+  chmod 700 /home/alice
   if [ -n "$_EC2_PUBKEY" ]; then
-    echo "$_EC2_PUBKEY" > /u/home/alice/.ssh/authorized_keys
-    chown -R alice:alice /u/home/alice/.ssh
-    chmod 700 /u/home/alice/.ssh
-    chmod 600 /u/home/alice/.ssh/authorized_keys
+    echo "$_EC2_PUBKEY" > /home/alice/.ssh/authorized_keys
+    chown -R alice:alice /home/alice/.ssh
+    chmod 700 /home/alice/.ssh
+    chmod 600 /home/alice/.ssh/authorized_keys
     echo "SSH key installed for alice."
   fi
-  echo "Created /u/home/alice home directory on EFS."
+  echo "Created /home/alice home directory on EFS."
 fi
 
 # -----------------------------------------------------------------------------
