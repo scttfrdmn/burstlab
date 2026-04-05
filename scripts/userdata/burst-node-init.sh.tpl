@@ -11,7 +11,7 @@
 #   2. Read SLURM_NODENAME from EC2 Name tag via IMDS
 #   3. Set hostname to match Slurm node name
 #   4. Add /etc/hosts entries for cluster nodes
-#   5. Mount EFS: /u and /opt/slurm
+#   5. Mount EFS: /home and /opt/slurm
 #   6. Write munge key from Terraform-injected base64, start munge
 #   7. Start slurmd -N $SLURM_NODENAME
 #
@@ -34,12 +34,27 @@ fi
 
 # Ensure cluster users exist with pinned UID/GID (alice = demo HPC user)
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
-getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /u/home/alice alice
+getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /home/alice alice
 
 # Allow alice to mount/umount for workloads overlay (ephemeral EFS/FSx scenarios)
-echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/mount.nfs4' \
+echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/mount.nfs4, /usr/bin/chmod 777 /tmp/efs-*, /usr/bin/chmod 777 /tmp/fsx-*, /usr/sbin/modprobe lustre' \
   > /etc/sudoers.d/alice-mount
 chmod 440 /etc/sudoers.d/alice-mount
+
+# Pre-install Lustre client for FSx Lustre mounts (Scenario 4 workloads).
+# Write the repo file directly (gpgcheck=0; the AWS-provided repo file lacks gpgkey=
+# and uses $basearch substitution that breaks in some contexts).
+# The kmod-lustre-client package uses kernel ABI compatibility (weak-modules) and
+# works on Rocky 8.x kernels despite being built against a specific point release.
+cat > /etc/yum.repos.d/fsx-lustre-client.repo << 'REPOEOF'
+[aws-fsx]
+name=AWS FSx Packages - x86_64
+baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/8/x86_64/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+REPOEOF
+yum install -y kmod-lustre-client lustre-client 2>/dev/null || true
 
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
 # that blocks munge (873), slurmctld (6817), and NFS (2049).
@@ -96,12 +111,12 @@ echo "${head_node_ip} headnode" >> /etc/hosts
 # Burst nodes are in the cloud subnets, which have EFS mount targets.
 # Route to head node (NAT) is handled by the VPC route table.
 # -----------------------------------------------------------------------------
-mkdir -p /u /opt/slurm
+mkdir -p /opt/slurm
 
-echo "${efs_dns_name}:/ /u nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
+echo "${efs_dns_name}:/home /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
-for dir in /u /opt/slurm; do
+for dir in /home /opt/slurm; do
   for attempt in $(seq 1 30); do
     mount "$dir" && break || {
       echo "EFS mount attempt $attempt/30 for $dir failed, retrying in 20s..."

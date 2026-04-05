@@ -97,7 +97,7 @@ bash submit-chain.sh --granularity per-array --array-tasks 0-3
 bash submit-chain.sh --granularity per-campaign --campaign-name sweep-001
 ```
 
-State files live at `/u/home/alice/.fsx-state/{key}.env` on permanent cluster EFS.
+State files live at `/home/alice/.fsx-state/{key}.env` on permanent cluster EFS.
 
 ---
 
@@ -245,6 +245,81 @@ For large files, increase `max_pages_per_rpc` to 512.
 
 ---
 
+## Transparent Lifecycle Approaches
+
+The three-job chain is the most explicit way to run this scenario. Three additional
+approaches hide the create/destroy complexity so users interact with standard `sbatch`
+or a drop-in wrapper.
+
+### Approach A — Wrapper (`fsx-sbatch`)
+
+Deploy with `terraform/workloads/scenario4-wrapper/`. Installs `fsx-sbatch` to
+`/opt/slurm/bin/` on the head node.
+
+```bash
+# Job script needs only one line change:
+#SBATCH --comment=fsx:1200
+
+# Submit identically to sbatch:
+fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
+# Or override storage size:
+fsx-sbatch --fsx-storage=2400 myjob.sh
+```
+
+The wrapper creates FSx inline (terminal shows progress, ~5-10 min), submits the
+workload with `FSX_STATE_FILE` injected, and queues the destroy job with
+`--dependency=afterok`. The user sees one job ID.
+
+**SA talking point:** "One command, one job ID. The FSx lifecycle is completely hidden.
+The FSx filesystem appears in the AWS console during the workload and disappears after."
+
+### Approach B — Prolog/Epilog
+
+Deploy with `terraform/workloads/scenario4-prolog-epilog/`. Patches `slurm.conf` with
+`SlurmctldProlog` and `SlurmctldEpilog`.
+
+```bash
+# Standard sbatch — no wrapper needed:
+sbatch --comment=fsx:1200 --partition=aws \
+  /opt/slurm/etc/workloads/jobs/scenario4/prolog-epilog/example-job.sh
+```
+
+The job sits in `CF` (configuring) state while the prolog provisions FSx (~5-10 min).
+The epilog flushes output to S3 and destroys FSx after the job ends.
+
+**SA talking point:** "The job stays in `CF` state while the prolog runs — that's the
+FSx filesystem being provisioned. The SA narrates: 'that's creating a 1.2 TB Lustre
+filesystem in AWS right now.' After the job completes, the epilog flushes to S3 and
+destroys FSx automatically."
+
+### Approach C — Burst Buffer Lua
+
+Deploy with `terraform/workloads/scenario4-burst-buffer/`. Requires `burst_buffer/lua`
+compiled into the Slurm build (Gen 1 AMI does not include it by default — the Terraform
+module checks and fails fast with rebuild instructions).
+
+```bash
+# Job script uses #BB directive — industry standard from DataWarp/Cray:
+#BB create_persistent name=myfsx capacity=1200GB access=striped type=scratch
+
+sbatch /opt/slurm/etc/workloads/jobs/scenario4/burst-buffer/example-job.sh
+```
+
+Job states during lifecycle:
+
+```
+BF (stage-in)   ← FSx provisioning (~5-10 min)
+R               ← workload running
+CG (stage-out)  ← S3 flush + FSx destroy
+```
+
+**SA talking point:** "This is the burst buffer abstraction — the same mechanism
+DataWarp uses on Cray XC systems. We're implementing the lifecycle hooks against FSx
+instead of on-prem hardware. Any job script from another HPC center that uses burst
+buffers can run here with minimal changes."
+
+---
+
 ## Teardown
 
 ```bash
@@ -252,6 +327,15 @@ cd terraform/workloads/scenario4-ephemeral-fsx/
 terraform destroy
 # Removes: IAM policies, S3 data bucket (force_destroy=true), FSx service-linked role
 # Does NOT destroy: the FSx filesystem (job3 handles that)
+```
+
+If wrapper, prolog/epilog, or burst-buffer modules were also applied, destroy them first:
+
+```bash
+cd terraform/workloads/scenario4-burst-buffer/  && terraform destroy
+cd terraform/workloads/scenario4-prolog-epilog/ && terraform destroy
+cd terraform/workloads/scenario4-wrapper/       && terraform destroy
+cd terraform/workloads/scenario4-ephemeral-fsx/ && terraform destroy
 ```
 
 If the FSx filesystem is still running (job3 didn't complete), destroy it manually:

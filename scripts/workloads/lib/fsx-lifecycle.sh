@@ -16,7 +16,7 @@
 #
 # Required environment variables:
 #   AWS_REGION          — AWS region
-#   CLOUD_SUBNET_A_ID   — Subnet for the FSx filesystem
+#   BURST_SUBNET_ID   — Subnet for the FSx filesystem
 #   FSX_SG_ID           — Security group (must allow Lustre ports from VPC)
 #   S3_DATA_BUCKET      — S3 bucket for the data repository
 #   GRANULARITY         — per-job | per-array | per-campaign
@@ -34,7 +34,7 @@
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-us-west-2}"
-FSX_STATE_DIR="${FSX_STATE_DIR:-/u/home/alice/.fsx-state}"
+FSX_STATE_DIR="${FSX_STATE_DIR:-/home/alice/.fsx-state}"
 FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
 S3_DATA_PREFIX="${S3_DATA_PREFIX:-data/}"
 
@@ -50,7 +50,7 @@ fsx_create() {
   local job_id="$1"
   local s3_bucket="${2:-${S3_DATA_BUCKET}}"
   local s3_prefix="${3:-${S3_DATA_PREFIX}}"
-  local subnet_id="${4:-${CLOUD_SUBNET_A_ID}}"
+  local subnet_id="${4:-${BURST_SUBNET_ID}}"
   local sg_id="${5:-${FSX_SG_ID}}"
   local storage_gb="${6:-${FSX_STORAGE_GB}}"
 
@@ -60,12 +60,12 @@ fsx_create() {
     storage_gb=1200
   fi
 
-  # Print cost estimate before creating
+  # Print cost estimate before creating (stderr — stdout is reserved for the filesystem ID)
   local hourly_cost
   hourly_cost=$(awk "BEGIN { printf \"%.2f\", ${storage_gb} * 0.14 / 730 }")
-  echo "Creating FSx Lustre SCRATCH_2: ${storage_gb} GB @ \$${hourly_cost}/hr"
-  echo "  S3 data repository: s3://${s3_bucket}/${s3_prefix}"
-  echo "  Subnet: ${subnet_id}"
+  echo "Creating FSx Lustre SCRATCH_2: ${storage_gb} GB @ \$${hourly_cost}/hr" >&2
+  echo "  S3 data repository: s3://${s3_bucket}/${s3_prefix}" >&2
+  echo "  Subnet: ${subnet_id}" >&2
 
   aws fsx create-file-system \
     --file-system-type LUSTRE \
@@ -91,11 +91,11 @@ fsx_create() {
 
 # -----------------------------------------------------------------------------
 # fsx_wait_available <fsx_id> [max_attempts]
-# FSx creation typically takes 5-10 minutes. Default: 60 attempts × 15s = 15 min.
+# FSx creation typically takes 5-10 minutes but can reach 20 min. Default: 80 × 15s = 20 min.
 # -----------------------------------------------------------------------------
 fsx_wait_available() {
   local fsx_id="$1"
-  local max="${2:-60}"
+  local max="${2:-80}"
 
   echo "Waiting for FSx ${fsx_id} to become AVAILABLE (typically 5-10 min)..."
   for attempt in $(seq 1 "$max"); do
@@ -151,7 +151,7 @@ fsx_flush_to_s3() {
   local fsx_id="$1"
   local path_prefix="${2:-/}"
 
-  echo "Flushing FSx ${fsx_id} path '${path_prefix}' to S3..."
+  echo "Flushing FSx ${fsx_id} path '${path_prefix}' to S3..." >&2
   aws fsx create-data-repository-task \
     --file-system-id "$fsx_id" \
     --type EXPORT_TO_REPOSITORY \

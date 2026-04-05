@@ -24,10 +24,10 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=00:30:00
-#SBATCH --output=/u/home/alice/logs/roda-rclone-%j.out
+#SBATCH --output=/home/alice/logs/roda-rclone-%j.out
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 RODA_BUCKET="${RODA_BUCKET:-noaa-goes16}"
 RESULTS_BUCKET="${RESULTS_BUCKET:?RESULTS_BUCKET must be set}"

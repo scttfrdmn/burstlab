@@ -256,6 +256,48 @@ Edit `configs/gen1-slurm2205-rocky8/partitions.json.tpl`:
 
 Remove the `"OnDemandOptions"` block. Redeploy and rerun `generate_conf.py`. This demonstrates to price-sensitive customers how to significantly reduce burst node costs.
 
+### 7. Workloads Track (Optional — Add 20-40 Minutes)
+
+After the core burst demo, the workloads overlay demonstrates cloud-native data management.
+Choose the depth based on time and audience interest.
+
+**Quick EFS story (5 minutes):**
+
+```bash
+# Still as alice — deploy was done in advance
+bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
+```
+
+**Talking point:** "Three jobs submitted with dependencies. Watch the EFS console — a
+filesystem appears when Job 1 runs and disappears when Job 3 completes. The user pays
+for EFS storage only while the job is running. For a demo workload, that's about two
+cents."
+
+**FSx Lustre story (20-40 minutes, best for Lustre/HPC storage audience):**
+
+```bash
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
+```
+
+Use the 5-10 minute FSx provisioning time to explain lazy hydration, SCRATCH_2 specs,
+and the S3/FSx cost comparison. This is the best technical depth story in BurstLab for
+an HPC storage-aware audience.
+
+**Transparent lifecycle progression (add 10 minutes to either story):**
+
+After showing the chain, demonstrate the wrapper approach:
+
+```bash
+fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
+```
+
+The contrast — three job IDs vs one — is the demo moment. "The customer's users never
+change how they submit. The create, inject, flush, destroy is all invisible."
+
+See [workloads/overview.md](workloads/overview.md) and
+[workloads/transparent-lifecycle.md](workloads/transparent-lifecycle.md) for full talking
+points per approach.
+
 ---
 
 ## Handing Over the IaC
@@ -382,3 +424,5 @@ For customers blocked on Gen 1 bursting: `DebugFlags=NO_CONF_HASH`, `ReturnToSer
 - Architecture: [architecture.md](architecture.md)
 - Plugin v2 troubleshooting: [plugin-v2-setup.md](plugin-v2-setup.md#debugging-common-failures)
 - slurm.conf directives: [slurm-gen1-deep-dive.md](slurm-gen1-deep-dive.md)
+- Workloads overview: [workloads/overview.md](workloads/overview.md)
+- Transparent lifecycle approaches: [workloads/transparent-lifecycle.md](workloads/transparent-lifecycle.md)

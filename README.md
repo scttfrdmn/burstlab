@@ -65,7 +65,12 @@ burstlab/
 │       ├── scenario1-compute/       # Spack + GROMACS install
 │       ├── scenario2-roda/          # S3 read policy + results bucket
 │       ├── scenario3-ephemeral-efs/ # EFS lifecycle IAM policies
-│       └── scenario4-ephemeral-fsx/ # FSx + S3 policies, service-linked role
+│       ├── scenario3-wrapper/       # efs-sbatch drop-in wrapper deploy
+│       ├── scenario3-prolog-epilog/ # EFS prolog/epilog + slurm.conf patch
+│       ├── scenario4-ephemeral-fsx/ # FSx + S3 policies, service-linked role
+│       ├── scenario4-wrapper/       # fsx-sbatch drop-in wrapper deploy
+│       ├── scenario4-prolog-epilog/ # FSx prolog/epilog + slurm.conf patch
+│       └── scenario4-burst-buffer/  # Lua burst buffer plugin deploy
 │
 ├── configs/
 │   ├── gen1-slurm2205-rocky8/       # Gen 1 Slurm config templates
@@ -96,8 +101,8 @@ burstlab/
 │       └── jobs/
 │           ├── scenario1/             # GROMACS job scripts
 │           ├── scenario2/             # RODA data access job scripts
-│           ├── scenario3/             # Ephemeral EFS job chain
-│           └── scenario4/             # Ephemeral FSx Lustre job chain
+│           ├── scenario3/             # Ephemeral EFS: chain, wrapper, prolog/epilog
+│           └── scenario4/             # Ephemeral FSx: chain, wrapper, prolog/epilog, BB
 │
 └── ami/
     ├── rocky8-slurm2205.pkr.hcl     # Packer: Rocky Linux 8 + Slurm 22.05 (Gen 1)
@@ -172,8 +177,17 @@ without modifying the core infrastructure.
 |----------|-------|---------|
 | **1 — Compute** | GROMACS + Spack, no data staging | EFS only |
 | **2 — RODA** | Read public AWS datasets (NOAA GOES-16) | S3 read-only |
-| **3 — Ephemeral EFS** | Job creates EFS, computes, EFS destroyed | EFS ephemeral |
-| **4 — Ephemeral FSx** | Job creates FSx Lustre, lazy S3 hydration, flush + destroy | FSx + S3 |
+| **3 — Ephemeral EFS** | Job-scoped NFS scratch with three lifecycle approaches | EFS ephemeral |
+| **4 — Ephemeral FSx** | Job-scoped Lustre scratch linked to S3 with three lifecycle approaches | FSx + S3 |
+
+Scenarios 3 and 4 each support three ways to trigger storage lifecycle — from explicit to transparent:
+
+| Approach | How to submit | User sees |
+|----------|--------------|-----------|
+| **0 — Chain** | `bash submit-chain.sh` | Three job IDs with dependencies |
+| **A — Wrapper** | `fsx-sbatch myjob.sh` | One job ID |
+| **B — Prolog/Epilog** | `sbatch --comment=fsx:1200 myjob.sh` | One job ID; storage created silently |
+| **C — Burst Buffer** | `sbatch myjob.sh` (with `#BB` directive) | BF → R → CG state transitions |
 
 ```bash
 # Deploy the base overlay (once per cluster)
@@ -181,14 +195,16 @@ cd terraform/workloads/base/
 terraform init && terraform apply
 
 # Deploy a scenario and run it
-cd terraform/workloads/scenario3-ephemeral-efs/
+cd terraform/workloads/scenario4-ephemeral-fsx/
 terraform init && terraform apply
 ssh alice@<head_node_ip>
-bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 ```
 
 See [docs/workloads/overview.md](docs/workloads/overview.md) for scenario selection,
 storage tier decision matrix, and granularity modes (per-job, per-array, per-campaign).
+See [docs/workloads/transparent-lifecycle.md](docs/workloads/transparent-lifecycle.md)
+for a full comparison of the three transparent lifecycle approaches.
 
 ---
 
@@ -233,8 +249,9 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [workloads/overview.md](docs/workloads/overview.md) | SAs | Workloads overlay: scenario guide, storage tiers |
 | [workloads/scenario1-compute.md](docs/workloads/scenario1-compute.md) | SAs | GROMACS + Spack demo |
 | [workloads/scenario2-roda.md](docs/workloads/scenario2-roda.md) | SAs | RODA public datasets, s5cmd/rclone/Mountpoint |
-| [workloads/scenario3-ephemeral-efs.md](docs/workloads/scenario3-ephemeral-efs.md) | SAs | Ephemeral EFS job chain |
-| [workloads/scenario4-ephemeral-fsx.md](docs/workloads/scenario4-ephemeral-fsx.md) | SAs | Ephemeral FSx Lustre + S3 |
+| [workloads/scenario3-ephemeral-efs.md](docs/workloads/scenario3-ephemeral-efs.md) | SAs | Ephemeral EFS: chain, wrapper, prolog/epilog |
+| [workloads/scenario4-ephemeral-fsx.md](docs/workloads/scenario4-ephemeral-fsx.md) | SAs | Ephemeral FSx Lustre + S3: chain, wrapper, prolog/epilog, burst buffer |
+| [workloads/transparent-lifecycle.md](docs/workloads/transparent-lifecycle.md) | SAs | Approach comparison: chain vs wrapper vs prolog/epilog vs burst buffer |
 
 ---
 

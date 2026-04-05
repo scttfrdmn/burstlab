@@ -4,4 +4,7 @@ aws_region     = "us-west-2"
 cluster_name   = "burstlab-gen1"
 
 # Set to false if AWSServiceRoleForAmazonFSx already exists in your AWS account
-create_fsx_service_linked_role = true
+create_fsx_service_linked_role = false
+
+# Set to false if s3.data-source.lustre.fsx.amazonaws.com SLR already exists in your account
+create_fsx_s3_service_linked_role = false

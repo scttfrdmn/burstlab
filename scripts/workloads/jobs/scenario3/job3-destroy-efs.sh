@@ -19,11 +19,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=00:10:00
-#SBATCH --output=/u/home/alice/logs/efs-destroy-%j.out
-#SBATCH --error=/u/home/alice/logs/efs-destroy-%j.err
+#SBATCH --output=/home/alice/logs/efs-destroy-%j.out
+#SBATCH --error=/home/alice/logs/efs-destroy-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
 

@@ -130,7 +130,7 @@ CAMPAIGN_NAME=protein-sweep AWS_REGION=us-west-2 EFS_SG_ID=$EFS_SG_ID \
 
 ## State File
 
-Job 1 writes a state file to `/u/home/alice/.efs-state/{key}.env` on permanent
+Job 1 writes a state file to `/home/alice/.efs-state/{key}.env` on permanent
 cluster EFS. Job 2 sources this file to get the EFS ID. Job 3 sources it, destroys
 the filesystem, and removes the file.
 
@@ -179,11 +179,67 @@ cat ~/.efs-state/<SLURM_JOB_ID>.env
 
 ---
 
+## Transparent Lifecycle Approaches
+
+The three-job chain is the most explicit way to run this scenario. Two additional
+approaches hide the create/destroy complexity so users interact with standard `sbatch`.
+
+### Approach A — Wrapper (`efs-sbatch`)
+
+Deploy with `terraform/workloads/scenario3-wrapper/`. Installs `efs-sbatch` to
+`/opt/slurm/bin/` on the head node.
+
+```bash
+# Job script needs only one line change:
+#SBATCH --comment=efs
+
+# Submit identically to sbatch:
+efs-sbatch /opt/slurm/etc/workloads/jobs/scenario3/wrapper/example-job.sh
+```
+
+The wrapper creates EFS inline (terminal shows progress), submits the workload with
+`EFS_STATE_FILE` injected into the environment, and queues the destroy job with
+`--dependency=afterok`. The user sees one job ID. The destroy job appears in `squeue`
+as `(Dependency)` but can be ignored.
+
+**SA talking point:** "One command, one job ID. The EFS lifecycle — create, inject,
+destroy — is completely hidden. If the cluster already has a similar wrapper for other
+purposes, migration cost is zero."
+
+### Approach B — Prolog/Epilog
+
+Deploy with `terraform/workloads/scenario3-prolog-epilog/`. Patches `slurm.conf` with
+`SlurmctldProlog` and `SlurmctldEpilog` pointing to a combined storage dispatcher.
+
+```bash
+# Standard sbatch — no wrapper needed:
+sbatch --comment=efs --partition=aws \
+  /opt/slurm/etc/workloads/jobs/scenario3/prolog-epilog/example-job.sh
+```
+
+The prolog detects `--comment=efs`, creates EFS, injects `EFS_STATE_FILE` via
+`scontrol update JobId=N Environment=...`. The epilog destroys EFS after the job ends.
+Jobs without `--comment=efs` pass through with no overhead.
+
+**SA talking point:** "The `--comment` field is the only job script change. Everything
+else is standard `sbatch`. The prolog and epilog run on the head node as `SlurmUser`,
+so no EC2 instances are needed for create/destroy."
+
+---
+
 ## Teardown
 
 ```bash
 cd terraform/workloads/scenario3-ephemeral-efs/
 terraform destroy   # removes IAM policies from burst + head roles
+```
+
+If wrapper or prolog/epilog modules were also applied, destroy them first:
+
+```bash
+cd terraform/workloads/scenario3-prolog-epilog/ && terraform destroy
+cd terraform/workloads/scenario3-wrapper/       && terraform destroy
+cd terraform/workloads/scenario3-ephemeral-efs/ && terraform destroy
 ```
 
 The core cluster, permanent cluster EFS, and all burst nodes are untouched.

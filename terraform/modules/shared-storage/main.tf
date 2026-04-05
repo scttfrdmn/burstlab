@@ -85,10 +85,10 @@ resource "aws_efs_mount_target" "cloud_b" {
 # keeping them isolated at the NFS level.
 
 # -----------------------------------------------------------------------------
-# /u access point (cluster home directories)
+# /home access point (cluster home directories)
 # -----------------------------------------------------------------------------
 # root_directory path = "/home" creates the /home directory on EFS.
-# When EFS root is mounted at /u, alice's home is /u/home/alice.
+# Nodes mount EFS /home at /home — alice's home is /home/alice on all nodes.
 # POSIX UID/GID 0 (root) with permissions 755 — alice's own dir is 700.
 resource "aws_efs_access_point" "home" {
   file_system_id = aws_efs_file_system.main.id

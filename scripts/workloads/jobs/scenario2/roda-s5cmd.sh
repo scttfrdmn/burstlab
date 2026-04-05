@@ -28,11 +28,11 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=/u/home/alice/logs/roda-s5cmd-%j.out
-#SBATCH --error=/u/home/alice/logs/roda-s5cmd-%j.err
+#SBATCH --output=/home/alice/logs/roda-s5cmd-%j.out
+#SBATCH --error=/home/alice/logs/roda-s5cmd-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
 
 RODA_BUCKET="${RODA_BUCKET:-noaa-goes16}"
 RESULTS_BUCKET="${RESULTS_BUCKET:?RESULTS_BUCKET must be set}"

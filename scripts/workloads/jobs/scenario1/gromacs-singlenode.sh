@@ -26,11 +26,11 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=28G
 #SBATCH --time=00:30:00
-#SBATCH --output=/u/home/alice/logs/gromacs-burst-%j.out
-#SBATCH --error=/u/home/alice/logs/gromacs-burst-%j.err
+#SBATCH --output=/home/alice/logs/gromacs-burst-%j.out
+#SBATCH --error=/home/alice/logs/gromacs-burst-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs /u/home/alice/results
+mkdir -p /home/alice/logs /home/alice/results
 
 echo "=== GROMACS Burst Demo: started: $(date) ==="
 echo "  Job ID:    ${SLURM_JOB_ID}"
@@ -46,8 +46,8 @@ echo "  GROMACS:   $(${GMX} --version | grep 'GROMACS version' | awk '{print $NF
 echo ""
 
 # Working directory on EFS
-WORKDIR="/u/home/alice/gromacs-run-${SLURM_JOB_ID}"
-RESULTS_DIR="/u/home/alice/results/gromacs-${SLURM_JOB_ID}"
+WORKDIR="/home/alice/gromacs-run-${SLURM_JOB_ID}"
+RESULTS_DIR="/home/alice/results/gromacs-${SLURM_JOB_ID}"
 mkdir -p "${WORKDIR}" "${RESULTS_DIR}"
 cd "${WORKDIR}"
 
@@ -122,5 +122,5 @@ echo "SA note: This burst node will power down after SuspendTime seconds."
 echo "  Watch: sinfo -p aws"
 
 # Cleanup working directory (keep results)
-cd /u/home/alice
+cd /home/alice
 rm -rf "${WORKDIR}"

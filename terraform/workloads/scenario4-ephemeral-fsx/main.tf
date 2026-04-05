@@ -14,7 +14,7 @@
 #
 # After applying, submit jobs via:
 #   S3_DATA_BUCKET=$(terraform output -raw s3_data_bucket) \
-#   CLOUD_SUBNET_A_ID=$(terraform output -raw cloud_subnet_a_id) \
+#   BURST_SUBNET_ID=$(terraform output -raw burst_subnet_id) \
 #   FSX_SG_ID=$(terraform output -raw fsx_sg_id) \
 #   AWS_REGION=us-west-2 FSX_STORAGE_GB=1200 \
 #     bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh \
@@ -41,7 +41,8 @@ locals {
   burst_node_role_name = element(split("/", data.terraform_remote_state.cluster.outputs.burst_node_role_arn), 1)
   head_node_role_name  = element(split("/", data.terraform_remote_state.cluster.outputs.head_node_role_arn), 1)
   vpc_id               = data.terraform_remote_state.cluster.outputs.vpc_id
-  cloud_subnet_a_id    = data.terraform_remote_state.cluster.outputs.cloud_subnet_a_id
+  # cloud_subnet_b_id is the burst (cloud) subnet — FSx must be created here, not on the on-prem subnet
+  cloud_subnet_b_id    = data.terraform_remote_state.cluster.outputs.cloud_subnet_b_id
 }
 
 # Look up the burst node security group (FSx must be in the same SG or a peered SG)
@@ -89,6 +90,13 @@ resource "aws_s3_bucket_public_access_block" "fsx_data" {
 # IAM — FSx + S3 lifecycle permissions
 # =============================================================================
 
+# Head node needs FSx + S3 permissions because FSx create runs inline on the head node
+resource "aws_iam_role_policy" "head_node_fsx_lifecycle" {
+  name   = "${var.cluster_name}-workloads-fsx-lifecycle"
+  role   = local.head_node_role_name
+  policy = aws_iam_role_policy.burst_node_fsx_lifecycle.policy
+}
+
 resource "aws_iam_role_policy" "burst_node_fsx_lifecycle" {
   name = "${var.cluster_name}-workloads-fsx-lifecycle"
   role = local.burst_node_role_name
@@ -135,6 +143,19 @@ resource "aws_iam_role_policy" "burst_node_fsx_lifecycle" {
         Effect = "Allow"
         Action = "iam:PassRole"
         Resource = "arn:aws:iam::*:role/aws-service-role/s3.data-source.lustre.fsx.amazonaws.com/*"
+      },
+      {
+        # FSx needs to create and configure the S3 data-source service-linked role per filesystem.
+        # AWS FSx docs require CreateServiceLinkedRole + AttachRolePolicy + PutRolePolicy:
+        # https://docs.aws.amazon.com/fsx/latest/LustreGuide/setting-up.html#fsx-adding-permissions-s3
+        Sid    = "CreateFSxS3SLR"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole",
+          "iam:AttachRolePolicy",
+          "iam:PutRolePolicy"
+        ]
+        Resource = "arn:aws:iam::*:role/aws-service-role/s3.data-source.lustre.fsx.amazonaws.com/*"
       }
     ]
   })
@@ -154,6 +175,20 @@ resource "aws_iam_service_linked_role" "fsx" {
   # If the role already exists, Terraform will get a conflict error.
   # Set create_fsx_slr = false in tfvars if the role already exists in your account.
   count = var.create_fsx_service_linked_role ? 1 : 0
+
+  lifecycle {
+    ignore_changes = all
+  }
+}
+
+# FSx S3 data repository service-linked role — required for FSx Lustre filesystems
+# that use an S3 data repository association (AutoImportPolicy / data repo tasks).
+# This is a DIFFERENT role from AWSServiceRoleForAmazonFSx above.
+resource "aws_iam_service_linked_role" "fsx_s3" {
+  aws_service_name = "s3.data-source.lustre.fsx.amazonaws.com"
+  description      = "Service-linked role for FSx Lustre S3 data repositories"
+
+  count = var.create_fsx_s3_service_linked_role ? 1 : 0
 
   lifecycle {
     ignore_changes = all

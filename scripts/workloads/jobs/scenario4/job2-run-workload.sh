@@ -20,11 +20,20 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
 #SBATCH --time=01:00:00
-#SBATCH --output=/u/home/alice/logs/fsx-workload-%j.out
-#SBATCH --error=/u/home/alice/logs/fsx-workload-%j.err
+#SBATCH --output=/home/alice/logs/fsx-workload-%j.out
+#SBATCH --error=/home/alice/logs/fsx-workload-%j.err
 
 set -euo pipefail
-mkdir -p /u/home/alice/logs
+mkdir -p /home/alice/logs
+
+# Ensure Lustre kernel module is loaded (pre-installed at node boot via burst-node-init.sh.tpl)
+if ! lsmod | grep -q '^lustre'; then
+  sudo modprobe lustre 2>/dev/null || {
+    echo "ERROR: Cannot load Lustre kernel module." >&2
+    echo "Ensure the cluster was deployed with the current launch template (Lustre pre-installed at boot)." >&2
+    exit 1
+  }
+fi
 
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
 
@@ -65,17 +74,26 @@ fi
 
 # Mount the FSx Lustre filesystem
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-MOUNT_POINT="/mnt/scratch/fsx-${FSX_ID}-${SLURM_JOB_ID}-${TASK_ID}"
+MOUNT_POINT="/tmp/fsx-${FSX_ID}-${SLURM_JOB_ID}-${TASK_ID}"
 mkdir -p "${MOUNT_POINT}"
 
 echo ""
 echo "Mounting FSx Lustre at ${MOUNT_POINT}..."
-mount -t lustre \
+sudo mount -t lustre \
   -o noatime,flock \
   "${FSX_DNS}@tcp:/${FSX_MOUNT_NAME}" \
   "${MOUNT_POINT}"
 
 echo "  Mounted successfully."
+
+# Make the FSx root writable (new FSx root is root:root 755 — alice can't write)
+sudo chmod 777 "${MOUNT_POINT}"
+
+# Expose the scratch filesystem at the standard ~/scratch path.
+# Applications can use ~/scratch or $SCRATCH without knowing the internal path.
+export SCRATCH="${MOUNT_POINT}"
+ln -sfn "${MOUNT_POINT}" "${HOME}/scratch"
+echo "  Scratch: ${HOME}/scratch -> ${MOUNT_POINT}"
 
 # Lustre client tuning for burst nodes (write-heavy workloads)
 lctl set_param osc.*.max_rpcs_in_flight=16 2>/dev/null || true
@@ -133,15 +151,16 @@ OUTPUT_COUNT=$(ls "${OUTPUT_DIR}/" 2>/dev/null | wc -l)
 echo "  Output: ${OUTPUT_COUNT} files in ${OUTPUT_DIR}"
 
 # Copy results to permanent EFS as well
-RESULTS_DIR="/u/home/alice/results/fsx-job-${SLURM_JOB_ID}-task-${TASK_ID}"
+RESULTS_DIR="/home/alice/results/fsx-job-${SLURM_JOB_ID}-task-${TASK_ID}"
 mkdir -p "${RESULTS_DIR}"
 cp -r "${OUTPUT_DIR}"/. "${RESULTS_DIR}/"
 echo "  Results mirrored to permanent EFS: ${RESULTS_DIR}"
 
 # Unmount before Job 3 flushes and destroys the filesystem
+rm -f "${HOME}/scratch"
 echo ""
 echo "Unmounting ${MOUNT_POINT}..."
-umount "${MOUNT_POINT}"
+sudo umount "${MOUNT_POINT}"
 rmdir "${MOUNT_POINT}"
 echo "  Unmounted."
 

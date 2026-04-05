@@ -13,17 +13,22 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit: gen_state_path, key_path
 terraform init && terraform apply   # ~10 min (installs transfer tools)
 
-# 2. Deploy the scenario you want to demo
-cd terraform/workloads/scenario3-ephemeral-efs/
+# 2. Deploy the scenario you want to demo (example: Scenario 4 chain)
+cd terraform/workloads/scenario4-ephemeral-fsx/
 cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply   # ~30 sec (IAM policies only)
+terraform init && terraform apply   # ~30 sec (IAM + S3 bucket)
 
 # 3. SSH as alice and run the demo
-ssh alice@<head_node_public_ip>
-bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
+ssh -i ~/.ssh/burstlab-key.pem alice@<head_node_public_ip>
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
-# 4. Teardown
-terraform destroy   # in scenario dir, then in base/
+# 4. Optional: deploy a transparent lifecycle approach on top
+cd terraform/workloads/scenario4-wrapper/
+terraform init && terraform apply
+# Then: fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
+
+# 5. Teardown
+terraform destroy   # in scenario dir (and transparent approach dirs if applied), then in base/
 # Core cluster is untouched
 ```
 
@@ -35,11 +40,25 @@ terraform destroy   # in scenario dir, then in base/
 |----------|-------|-----------|---------|
 | [1 — Compute](scenario1-compute.md) | HPC application with no data staging | Spack, GROMACS, Lmod | EFS only |
 | [2 — RODA](scenario2-roda.md) | Read public cloud datasets | s5cmd, rclone, Mountpoint | S3 read |
-| [3 — Ephemeral EFS](scenario3-ephemeral-efs.md) | Job-scoped NFS scratch, created and destroyed per job | AWS EFS API | EFS ephemeral |
-| [4 — Ephemeral FSx](scenario4-ephemeral-fsx.md) | Job-scoped Lustre scratch linked to S3 | AWS FSx API | FSx + S3 |
+| [3 — Ephemeral EFS](scenario3-ephemeral-efs.md) | Job-scoped NFS scratch with three lifecycle approaches | AWS EFS API | EFS ephemeral |
+| [4 — Ephemeral FSx](scenario4-ephemeral-fsx.md) | Job-scoped Lustre scratch linked to S3 with three lifecycle approaches | AWS FSx API | FSx + S3 |
 
 Start with **Scenario 1** if the audience is new to cloud HPC. Go to **Scenario 3 or 4**
 if they already understand burst mechanics and want to see cloud-native data management.
+
+### Lifecycle Approaches (Scenarios 3 and 4)
+
+Both ephemeral storage scenarios support four ways to trigger the storage lifecycle,
+from most explicit to most transparent:
+
+| Approach | Deployment | How to submit | Best for |
+|----------|-----------|--------------|----------|
+| **0 — Chain** | Built-in | `bash submit-chain.sh` | Teaching the mechanics step by step |
+| **A — Wrapper** | `scenario{3,4}-wrapper/` | `fsx-sbatch myjob.sh` | Fastest to adopt; zero job script changes beyond installing the wrapper |
+| **B — Prolog/Epilog** | `scenario{3,4}-prolog-epilog/` | `sbatch --comment=fsx:1200 myjob.sh` | Clusters that already use prolog/epilog for other things |
+| **C — Burst Buffer** | `scenario4-burst-buffer/` | `sbatch myjob.sh` (with `#BB` directive) | FSx only; HPC centers familiar with DataWarp/Cray burst buffers |
+
+See [transparent-lifecycle.md](transparent-lifecycle.md) for a full comparison with SA talking points.
 
 ---
 
@@ -100,7 +119,12 @@ terraform/workloads/
 ├── scenario1-compute/       # Spack + GROMACS install
 ├── scenario2-roda/          # S3 read policy on burst role
 ├── scenario3-ephemeral-efs/ # EFS lifecycle policy on burst + head roles
-└── scenario4-ephemeral-fsx/ # FSx + S3 policy, FSx service-linked role
+├── scenario3-wrapper/       # efs-sbatch deploy (Approach A)
+├── scenario3-prolog-epilog/ # EFS prolog/epilog + slurm.conf patch (Approach B)
+├── scenario4-ephemeral-fsx/ # FSx + S3 policy, FSx service-linked role
+├── scenario4-wrapper/       # fsx-sbatch deploy (Approach A)
+├── scenario4-prolog-epilog/ # FSx prolog/epilog + slurm.conf patch (Approach B)
+└── scenario4-burst-buffer/  # Lua burst buffer plugin + burstbuffer.conf (Approach C)
 ```
 
 Each scenario's Terraform layer is independent and can be applied/destroyed

@@ -1,10 +1,10 @@
 # Terraform state and local config — never commit these
-terraform/generations/*/terraform.tfvars
-terraform/generations/*/.terraform/
-terraform/generations/*/.terraform.lock.hcl
-terraform/generations/*/terraform.tfstate
-terraform/generations/*/terraform.tfstate.backup
-terraform/generations/*/.terraform.tfstate.lock.info
+terraform/**/terraform.tfvars
+terraform/**/.terraform/
+terraform/**/.terraform.lock.hcl
+terraform/**/terraform.tfstate
+terraform/**/terraform.tfstate.backup
+terraform/**/.terraform.tfstate.lock.info
 
 # SSH private keys
 *.pem
