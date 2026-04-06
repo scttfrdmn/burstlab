@@ -1,0 +1,83 @@
+#!/bin/bash
+# =============================================================================
+# fsx-purge — Delete S3 data from a completed FSx scratch run
+#
+# Installed to /opt/slurm/bin/fsx-purge (in PATH for all users).
+#
+# Removes all S3 data (data bucket + results bucket) for a given run and
+# deletes the run record. Results on permanent EFS (~/.results/) are NOT
+# touched — only S3 data is deleted.
+#
+# Usage:
+#   fsx-purge <RUN_ID>
+#   fsx-purge <RUN_ID> --yes     # skip confirmation
+# =============================================================================
+
+set -euo pipefail
+
+HISTORY_DIR="${HOME}/.fsx-history"
+RUN_ID=""
+SKIP_CONFIRM=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --yes) SKIP_CONFIRM=true; shift ;;
+    -*)    echo "Unknown option: $1"; exit 1 ;;
+    *)     RUN_ID="$1"; shift ;;
+  esac
+done
+
+if [ -z "${RUN_ID}" ]; then
+  echo "Usage: fsx-purge <RUN_ID>"
+  echo ""
+  echo "Use 'fsx-list' to see available runs."
+  exit 1
+fi
+
+RUN_FILE="${HISTORY_DIR}/${RUN_ID}.run"
+if [ ! -f "${RUN_FILE}" ]; then
+  echo "Run '${RUN_ID}' not found."
+  echo "Use 'fsx-list' to see available runs."
+  exit 1
+fi
+
+# Read run record
+S3_DATA_BUCKET="" S3_PREFIX="" RESULTS_BUCKET="" AWS_REGION="" LABEL=""
+# shellcheck source=/dev/null
+source "${RUN_FILE}"
+
+echo "Purge run ${RUN_ID}${LABEL:+ ($LABEL)}"
+echo ""
+echo "  S3 data:   s3://${S3_DATA_BUCKET}/${S3_PREFIX}/"
+if [ "${RESULTS_BUCKET}" != "none" ] && [ -n "${RESULTS_BUCKET}" ]; then
+  echo "  Durable:   s3://${RESULTS_BUCKET}/runs/${RUN_ID}/"
+fi
+echo "  EFS results (~/results/) will NOT be deleted."
+echo ""
+
+if ! $SKIP_CONFIRM; then
+  read -rp "Delete S3 data for this run? [y/N] " REPLY
+  if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+    echo "Cancelled."
+    exit 0
+  fi
+fi
+
+# Delete from data bucket
+echo "Deleting s3://${S3_DATA_BUCKET}/${S3_PREFIX}/..."
+aws s3 rm "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/" \
+  --recursive --region "${AWS_REGION}" 2>/dev/null || \
+  echo "  (data bucket may already be empty or deleted)"
+
+# Delete from results bucket
+if [ "${RESULTS_BUCKET}" != "none" ] && [ -n "${RESULTS_BUCKET}" ]; then
+  echo "Deleting s3://${RESULTS_BUCKET}/runs/${RUN_ID}/..."
+  aws s3 rm "s3://${RESULTS_BUCKET}/runs/${RUN_ID}/" \
+    --recursive --region "${AWS_REGION}" 2>/dev/null || \
+    echo "  (results bucket may already be empty)"
+fi
+
+# Remove run record
+rm -f "${RUN_FILE}"
+echo ""
+echo "Run ${RUN_ID} purged."

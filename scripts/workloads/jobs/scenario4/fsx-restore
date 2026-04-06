@@ -1,0 +1,55 @@
+#!/bin/bash
+# =============================================================================
+# fsx-restore — Re-create FSx scratch from a previous run's S3 data
+#
+# Installed to /opt/slurm/bin/fsx-restore (in PATH for all users).
+#
+# Creates a new FSx Lustre filesystem linked to the same S3 prefix that a
+# previous run wrote to. Files appear immediately as stubs and hydrate from
+# S3 on first read. Runs a verification job to confirm data integrity, then
+# destroys the FSx filesystem.
+#
+# Usage:
+#   fsx-restore <RUN_ID>
+#   fsx-restore <RUN_ID> --keep     # don't auto-destroy after verify
+#
+# SA talking point: "We destroyed the FSx filesystem earlier. Now we're
+# spinning up brand new Lustre storage pointing at the same S3 prefix.
+# The files appear immediately — Lustre hydrates them from S3 on demand.
+# The checksums match. S3 is the ground truth."
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# If installed to /opt/slurm/bin/, the actual scripts are in the workloads dir
+WORKLOAD_DIR="/opt/slurm/etc/workloads/jobs/scenario4"
+if [ ! -d "${WORKLOAD_DIR}" ]; then
+  WORKLOAD_DIR="${SCRIPT_DIR}"
+fi
+
+HISTORY_DIR="${HOME}/.fsx-history"
+RUN_ID=""
+AUTO_DESTROY=true
+PARTITION="${PARTITION:-aws}"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --keep)      AUTO_DESTROY=false; shift ;;
+    --partition) PARTITION="$2";     shift 2 ;;
+    -*)          echo "Unknown option: $1"; exit 1 ;;
+    *)           RUN_ID="$1";        shift ;;
+  esac
+done
+
+if [ -z "${RUN_ID}" ]; then
+  echo "Usage: fsx-restore <RUN_ID>"
+  echo ""
+  echo "Re-creates FSx scratch from a previous run's S3 data."
+  echo "Use 'fsx-list' to see available runs."
+  exit 1
+fi
+
+# Delegate to the restore chain script
+RESTORE_ARGS=("--run" "${RUN_ID}" "--partition" "${PARTITION}")
+exec bash "${WORKLOAD_DIR}/submit-chain-restore.sh" "${RESTORE_ARGS[@]}"
