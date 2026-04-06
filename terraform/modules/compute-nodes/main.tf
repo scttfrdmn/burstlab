@@ -36,9 +36,10 @@ resource "aws_instance" "compute" {
 
   vpc_security_group_ids = [var.sg_id]
 
-  # Compute nodes don't need IAM permissions — they don't call AWS APIs.
-  # They authenticate with Slurm via Munge (shared secret), not AWS IAM.
-  # No instance profile attached.
+  # Compute nodes need IAM permissions when the workloads overlay is deployed —
+  # destroy/cleanup jobs run on the local partition (compute nodes) and need
+  # AWS API access for FSx, EFS, and S3 operations. Uses the head node profile.
+  iam_instance_profile = var.iam_instance_profile != "" ? var.iam_instance_profile : null
 
   # No public IP — these nodes only communicate within the VPC.
   # Internet access (for yum updates etc.) routes through the head node NAT.

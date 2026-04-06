@@ -332,6 +332,10 @@ module "compute_nodes" {
   # entries for all nodes (using cidrhost()) so they resolve each other.
   onprem_cidr = module.vpc.onprem_subnet_cidr
 
+  # Compute nodes need IAM permissions when the workloads overlay is deployed —
+  # destroy/cleanup jobs run on the local partition and call AWS APIs (FSx, EFS, S3).
+  iam_instance_profile = module.iam.head_node_instance_profile_name
+
   depends_on = [time_sleep.efs_dns]
 }
 
