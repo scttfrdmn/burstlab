@@ -249,6 +249,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [workloads/overview.md](docs/workloads/overview.md) | SAs | Workloads overlay: scenario guide, storage tiers |
 | [workloads/scenario1-compute.md](docs/workloads/scenario1-compute.md) | SAs | GROMACS + Spack demo |
 | [workloads/scenario2-roda.md](docs/workloads/scenario2-roda.md) | SAs | RODA public datasets, s5cmd/rclone/Mountpoint |
+| [workloads/user-guide.md](docs/workloads/user-guide.md) | Cluster users | How to use fsx-sbatch, efs-sbatch, fsx-list/restore/purge |
 | [workloads/scenario3-ephemeral-efs.md](docs/workloads/scenario3-ephemeral-efs.md) | SAs | Ephemeral EFS: chain, wrapper, prolog/epilog |
 | [workloads/scenario4-ephemeral-fsx.md](docs/workloads/scenario4-ephemeral-fsx.md) | SAs | Ephemeral FSx Lustre + S3: chain, wrapper, prolog/epilog, burst buffer |
 | [workloads/transparent-lifecycle.md](docs/workloads/transparent-lifecycle.md) | SAs | Approach comparison: chain vs wrapper vs prolog/epilog vs burst buffer |
