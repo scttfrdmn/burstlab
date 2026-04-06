@@ -52,6 +52,12 @@ variable "head_node_private_ip" {
   type        = string
 }
 
+variable "iam_instance_profile" {
+  description = "IAM instance profile name for compute nodes. Required by the workloads overlay — destroy/cleanup jobs run on the local partition and need AWS API access (FSx, EFS, S3). Uses the same profile as the head node."
+  type        = string
+  default     = ""
+}
+
 variable "onprem_cidr" {
   description = "CIDR block of the on-prem compute subnet (e.g. 10.0.1.0/24). Used in the compute node init script to populate /etc/hosts entries for all compute nodes using cidrhost() so they can resolve each other by short name."
   type        = string
