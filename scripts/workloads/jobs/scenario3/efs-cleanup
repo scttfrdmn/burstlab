@@ -1,0 +1,161 @@
+#!/bin/bash
+# =============================================================================
+# efs-cleanup — Find and delete orphaned ephemeral EFS filesystems
+#
+# Installed to /opt/slurm/bin/efs-cleanup (in PATH for all users).
+#
+# Scans for EFS filesystems tagged BurstLabEphemeral=true that are still
+# running. These are leftovers from job chains that didn't complete cleanly
+# (job3-destroy-efs.sh failed or was never submitted).
+#
+# Usage:
+#   efs-cleanup              # list orphaned filesystems
+#   efs-cleanup --delete     # delete them (with confirmation)
+#   efs-cleanup --delete --yes  # delete without confirmation
+#
+# Also cleans up stale state files in ~/.efs-state/ that reference
+# filesystems that no longer exist.
+# =============================================================================
+
+set -euo pipefail
+
+STATE_DIR="${HOME}/.efs-state"
+AWS_REGION="${AWS_REGION:-us-west-2}"
+DELETE=false
+SKIP_CONFIRM=false
+
+# Source sysconfig for region
+if [ -f /etc/sysconfig/burstlab-workloads ]; then
+  # shellcheck source=/dev/null
+  source /etc/sysconfig/burstlab-workloads
+fi
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --delete) DELETE=true;       shift ;;
+    --yes)    SKIP_CONFIRM=true; shift ;;
+    --region) AWS_REGION="$2";   shift 2 ;;
+    *)        echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
+
+# -------------------------------------------------------------------------
+# Find orphaned EFS filesystems via AWS API
+# -------------------------------------------------------------------------
+echo "Scanning for orphaned BurstLab EFS filesystems..."
+echo ""
+
+ORPHANED_IDS=()
+ORPHANED_INFO=()
+
+# Query all EFS filesystems tagged as BurstLab ephemeral
+EFS_LIST=$(aws efs describe-file-systems \
+  --region "${AWS_REGION}" \
+  --query 'FileSystems[?Tags[?Key==`BurstLabEphemeral` && Value==`true`]].[FileSystemId,LifeCycleState,SizeInBytes.Value,Tags[?Key==`Name`].Value|[0],CreationToken]' \
+  --output text 2>/dev/null || true)
+
+if [ -z "${EFS_LIST}" ]; then
+  echo "No orphaned EFS filesystems found."
+else
+  printf "  %-24s %-12s %-10s %-40s\n" "EFS ID" "STATE" "SIZE" "NAME"
+  printf "  %-24s %-12s %-10s %-40s\n" "------" "-----" "----" "----"
+
+  while IFS=$'\t' read -r FS_ID STATE SIZE_BYTES NAME TOKEN; do
+    [ -n "$FS_ID" ] || continue
+
+    # Convert bytes to human-readable
+    if [ "${SIZE_BYTES}" -gt 1073741824 ]; then
+      SIZE_HR="$(awk "BEGIN { printf \"%.1f GB\", ${SIZE_BYTES}/1073741824 }")"
+    elif [ "${SIZE_BYTES}" -gt 1048576 ]; then
+      SIZE_HR="$(awk "BEGIN { printf \"%.1f MB\", ${SIZE_BYTES}/1048576 }")"
+    else
+      SIZE_HR="${SIZE_BYTES} B"
+    fi
+
+    printf "  %-24s %-12s %-10s %-40s\n" "${FS_ID}" "${STATE}" "${SIZE_HR}" "${NAME:-unnamed}"
+    ORPHANED_IDS+=("${FS_ID}")
+    ORPHANED_INFO+=("${FS_ID} (${NAME:-unnamed}, ${STATE})")
+  done <<< "${EFS_LIST}"
+
+  echo ""
+  echo "  Found ${#ORPHANED_IDS[@]} ephemeral EFS filesystem(s)."
+fi
+
+# -------------------------------------------------------------------------
+# Check for stale state files
+# -------------------------------------------------------------------------
+STALE_FILES=()
+if [ -d "${STATE_DIR}" ]; then
+  for state_file in "${STATE_DIR}"/*.env 2>/dev/null; do
+    [ -f "$state_file" ] || continue
+
+    EFS_ID=""
+    # shellcheck source=/dev/null
+    source "$state_file"
+
+    if [ -n "${EFS_ID}" ]; then
+      # Check if this EFS still exists
+      FS_STATE=$(aws efs describe-file-systems \
+        --file-system-id "${EFS_ID}" \
+        --region "${AWS_REGION}" \
+        --query 'FileSystems[0].LifeCycleState' \
+        --output text 2>/dev/null || echo "not-found")
+
+      if [ "${FS_STATE}" = "not-found" ] || [ "${FS_STATE}" = "None" ]; then
+        STALE_FILES+=("$state_file")
+      fi
+    fi
+  done
+
+  if [ ${#STALE_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo "  Stale state files (EFS no longer exists):"
+    for sf in "${STALE_FILES[@]}"; do
+      echo "    $(basename "$sf")"
+    done
+  fi
+fi
+
+# -------------------------------------------------------------------------
+# Delete if requested
+# -------------------------------------------------------------------------
+if ! $DELETE; then
+  if [ ${#ORPHANED_IDS[@]} -gt 0 ]; then
+    echo ""
+    echo "To delete these filesystems:"
+    echo "  efs-cleanup --delete"
+  fi
+  exit 0
+fi
+
+TOTAL=$((${#ORPHANED_IDS[@]} + ${#STALE_FILES[@]}))
+if [ "${TOTAL}" -eq 0 ]; then
+  echo "Nothing to clean up."
+  exit 0
+fi
+
+if ! $SKIP_CONFIRM; then
+  echo ""
+  read -rp "Delete ${#ORPHANED_IDS[@]} EFS filesystem(s) and ${#STALE_FILES[@]} stale state file(s)? [y/N] " REPLY
+  if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+    echo "Cancelled."
+    exit 0
+  fi
+fi
+
+# Source lifecycle lib for efs_destroy (handles mount target removal)
+source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
+
+for FS_ID in "${ORPHANED_IDS[@]}"; do
+  echo ""
+  echo "Destroying ${FS_ID}..."
+  efs_destroy "${FS_ID}" || echo "  WARNING: Failed to destroy ${FS_ID}"
+done
+
+for sf in "${STALE_FILES[@]}"; do
+  rm -f "$sf"
+  echo "Removed stale state file: $(basename "$sf")"
+done
+
+echo ""
+echo "Cleanup complete."

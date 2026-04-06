@@ -67,14 +67,15 @@ ENDSSH
   }
 }
 
-# Deploy efs-sbatch wrapper
-resource "null_resource" "deploy_efs_sbatch" {
+# Deploy efs-sbatch + efs-cleanup to /opt/slurm/bin/
+resource "null_resource" "deploy_efs_commands" {
   depends_on = [null_resource.write_sysconfig]
 
   triggers = {
-    head_node_ip = local.head_node_ip
-    wrapper_hash = filemd5("${local.scripts_dir}/jobs/scenario3/wrapper/efs-sbatch")
-    example_hash = filemd5("${local.scripts_dir}/jobs/scenario3/wrapper/example-job.sh")
+    head_node_ip  = local.head_node_ip
+    wrapper_hash  = filemd5("${local.scripts_dir}/jobs/scenario3/wrapper/efs-sbatch")
+    cleanup_hash  = filemd5("${local.scripts_dir}/jobs/scenario3/efs-cleanup")
+    example_hash  = filemd5("${local.scripts_dir}/jobs/scenario3/wrapper/example-job.sh")
   }
 
   provisioner "local-exec" {
@@ -82,15 +83,17 @@ resource "null_resource" "deploy_efs_sbatch" {
       SSH="ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
       SCP="scp -i ${var.key_path} -o StrictHostKeyChecking=no"
 
-      $SCP ${local.scripts_dir}/jobs/scenario3/wrapper/efs-sbatch \
-        rocky@${local.head_node_ip}:/tmp/efs-sbatch
-      $SCP ${local.scripts_dir}/jobs/scenario3/wrapper/example-job.sh \
-        rocky@${local.head_node_ip}:/tmp/efs-wrapper-example-job.sh
+      $SCP \
+        ${local.scripts_dir}/jobs/scenario3/wrapper/efs-sbatch \
+        ${local.scripts_dir}/jobs/scenario3/efs-cleanup \
+        ${local.scripts_dir}/jobs/scenario3/wrapper/example-job.sh \
+        rocky@${local.head_node_ip}:/tmp/
 
       $SSH rocky@${local.head_node_ip} "
-        sudo install -o root -g root -m 0755 /tmp/efs-sbatch /opt/slurm/bin/efs-sbatch
+        sudo install -o root -g root -m 0755 /tmp/efs-sbatch  /opt/slurm/bin/efs-sbatch
+        sudo install -o root -g root -m 0755 /tmp/efs-cleanup /opt/slurm/bin/efs-cleanup
         sudo mkdir -p /opt/slurm/etc/workloads/jobs/scenario3/wrapper
-        sudo install -o root -g root -m 0755 /tmp/efs-wrapper-example-job.sh \
+        sudo install -o root -g root -m 0755 /tmp/example-job.sh \
           /opt/slurm/etc/workloads/jobs/scenario3/wrapper/example-job.sh
       "
     EOT
