@@ -18,11 +18,12 @@
 # S3. Job 2 flushes results back to S3 and destroys the filesystem."
 #
 # Usage:
-#   BURST_SUBNET_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw burst_subnet_id)
-#   FSX_SG_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw fsx_sg_id)
-#   S3_DATA_BUCKET=$(cd terraform/workloads/scenario4-ephemeral-fsx && terraform output -raw s3_data_bucket)
+#   # Source env from sysconfig (set by Terraform) or pass directly:
+#   source /etc/sysconfig/burstlab-workloads
 #
 #   bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
+#   bash submit-chain.sh --input-dir ~/my-dataset/
+#   bash submit-chain.sh --campaign-name protein-run-1 --input-dir ~/proteins/
 # =============================================================================
 
 set -euo pipefail
@@ -35,6 +36,13 @@ CAMPAIGN_NAME="${CAMPAIGN_NAME:-default}"
 ARRAY_TASKS="${ARRAY_TASKS:-}"
 PARTITION="${PARTITION:-aws}"
 FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
+INPUT_DIR=""
+
+# Source sysconfig if available (provides BURST_SUBNET_ID, FSX_SG_ID, etc.)
+if [ -f /etc/sysconfig/burstlab-workloads ]; then
+  # shellcheck source=/dev/null
+  source /etc/sysconfig/burstlab-workloads
+fi
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -44,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --array-tasks)    ARRAY_TASKS="$2";    shift 2 ;;
     --partition)      PARTITION="$2";      shift 2 ;;
     --fsx-storage-gb) FSX_STORAGE_GB="$2"; shift 2 ;;
+    --input-dir)      INPUT_DIR="$2";      shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -54,7 +63,7 @@ done
 : "${AWS_REGION:?AWS_REGION must be set}"
 RESULTS_BUCKET="${RESULTS_BUCKET:-}"
 
-export GRANULARITY CAMPAIGN_NAME AWS_REGION BURST_SUBNET_ID FSX_SG_ID S3_DATA_BUCKET FSX_STORAGE_GB RESULTS_BUCKET
+export GRANULARITY CAMPAIGN_NAME AWS_REGION BURST_SUBNET_ID FSX_SG_ID S3_DATA_BUCKET FSX_STORAGE_GB RESULTS_BUCKET INPUT_DIR
 
 EXPORT_VARS="ALL,GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME}"
 EXPORT_VARS="${EXPORT_VARS},BURST_SUBNET_ID=${BURST_SUBNET_ID}"
@@ -69,9 +78,13 @@ mkdir -p /home/alice/logs
 echo "=== Submitting ephemeral FSx Lustre job chain ==="
 echo "  Granularity:    ${GRANULARITY}"
 echo "  Campaign:       ${CAMPAIGN_NAME}"
+echo "  Input dir:      ${INPUT_DIR:-<synthetic data>}"
 echo "  Burst subnet:   ${BURST_SUBNET_ID}  (cloud-side, NOT on-prem)"
 echo "  FSx SG:         ${FSX_SG_ID}"
 echo "  S3 data bucket: ${S3_DATA_BUCKET}"
+if [ -n "${RESULTS_BUCKET}" ]; then
+  echo "  Results bucket: ${RESULTS_BUCKET}"
+fi
 echo "  FSx storage:    ${FSX_STORAGE_GB} GB"
 echo "  Region:         ${AWS_REGION}"
 echo ""

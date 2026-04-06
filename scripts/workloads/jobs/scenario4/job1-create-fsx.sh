@@ -64,10 +64,18 @@ fi
 
 # Stage input data into S3 before creating FSx (so it's ready for lazy hydration)
 echo ""
-echo "Staging input data to s3://${S3_DATA_BUCKET}/input/..."
 S3_PREFIX="jobs/${JOB_REF}"
 
-if [ -d "/opt/slurm/etc/workloads/data" ]; then
+# Priority: --input-dir flag > /opt/slurm/etc/workloads/data/ > synthetic data
+INPUT_DIR="${INPUT_DIR:-}"
+if [ -n "${INPUT_DIR}" ] && [ -d "${INPUT_DIR}" ]; then
+  echo "Staging input data from ${INPUT_DIR} to s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/..."
+  aws s3 sync "${INPUT_DIR}" \
+    "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/" \
+    --region "${AWS_REGION}" \
+    --quiet || true
+elif [ -d "/opt/slurm/etc/workloads/data" ]; then
+  echo "Staging input data from /opt/slurm/etc/workloads/data/ to s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/..."
   aws s3 sync /opt/slurm/etc/workloads/data/ \
     "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/input/" \
     --region "${AWS_REGION}" \
