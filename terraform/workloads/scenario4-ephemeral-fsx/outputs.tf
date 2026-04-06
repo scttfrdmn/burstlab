@@ -11,8 +11,13 @@
 # created here, not in the on-prem subnet, to match real hybrid architecture.
 
 output "s3_data_bucket" {
-  description = "S3 bucket for FSx data repository (input data and results)"
+  description = "S3 bucket for FSx data repository (ephemeral — input staging + FSx scratch)"
   value       = aws_s3_bucket.fsx_data.bucket
+}
+
+output "s3_results_bucket" {
+  description = "S3 bucket for durable results (persists across terraform destroy)"
+  value       = aws_s3_bucket.fsx_results.bucket
 }
 
 output "burst_subnet_id" {

@@ -84,10 +84,44 @@ else
   echo "Results on permanent EFS (/home/alice/results/) are still intact."
 fi
 
+# Copy results to the durable results bucket (if configured)
+RESULTS_BUCKET="${RESULTS_BUCKET:-}"
+CAMPAIGN_REF_NAME="${CAMPAIGN_NAME:-job-${CREATED_BY_JOB:-${SLURM_JOB_ID}}}"
+if [ -n "${RESULTS_BUCKET}" ]; then
+  echo ""
+  echo "Copying results to durable bucket: s3://${RESULTS_BUCKET}/campaigns/${CAMPAIGN_REF_NAME}/"
+  aws s3 sync \
+    "s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/" \
+    "s3://${RESULTS_BUCKET}/campaigns/${CAMPAIGN_REF_NAME}/" \
+    --region "${AWS_REGION}" --quiet || \
+    echo "WARNING: Copy to results bucket failed — results still in data bucket." >&2
+fi
+
 # Destroy the FSx filesystem
 echo ""
 echo "Destroying FSx filesystem ${FSX_ID}..."
 fsx_destroy "${FSX_ID}"
+
+# Write campaign completion record (persists on permanent EFS for restore chain)
+CAMPAIGN_DIR="/home/alice/.fsx-campaigns"
+mkdir -p "${CAMPAIGN_DIR}"
+CAMPAIGN_FILE="${CAMPAIGN_DIR}/${CAMPAIGN_REF_NAME}.ref"
+cat > "${CAMPAIGN_FILE}" << EOF
+# BurstLab FSx campaign record
+# Written at $(date -u +%Y-%m-%dT%H:%M:%SZ) by job ${SLURM_JOB_ID}
+CAMPAIGN_NAME=${CAMPAIGN_REF_NAME}
+S3_DATA_BUCKET=${S3_DATA_BUCKET}
+S3_PREFIX=${S3_PREFIX}
+S3_OUTPUT_URI=s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/
+RESULTS_BUCKET=${RESULTS_BUCKET:-none}
+RESULTS_URI=${RESULTS_BUCKET:+s3://${RESULTS_BUCKET}/campaigns/${CAMPAIGN_REF_NAME}/}
+BURST_SUBNET_ID=${BURST_SUBNET_ID:-}
+FSX_SG_ID=${FSX_SG_ID:-}
+AWS_REGION=${AWS_REGION}
+FSX_STORAGE_GB=${FSX_STORAGE_GB:-1200}
+COMPLETED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+echo "Campaign record saved: ${CAMPAIGN_FILE}"
 
 # Remove the state file
 echo "Removing state file: ${STATE_FILE}"
@@ -97,5 +131,10 @@ echo ""
 echo "=== FSx Destroy: COMPLETE ==="
 echo "  FSx ${FSX_ID} deleted."
 echo "  Results persisted at: s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/"
+if [ -n "${RESULTS_BUCKET}" ]; then
+  echo "  Durable copy at:     s3://${RESULTS_BUCKET}/campaigns/${CAMPAIGN_REF_NAME}/"
+fi
+echo "  Campaign record:     ${CAMPAIGN_FILE}"
+echo "  Restore with:        bash submit-chain-restore.sh --campaign-name ${CAMPAIGN_REF_NAME}"
 echo "  S3 cost:   ~\$0.023/GB-month (vs \$0.14/GB-month on FSx)"
 echo "  Completed: $(date)"

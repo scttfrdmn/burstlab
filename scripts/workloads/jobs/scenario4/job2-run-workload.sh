@@ -133,6 +133,15 @@ for f in "${INPUT_DIR}"/*; do
   echo "  ${FNAME}: checksum=${CKSUM}, hsm=${HSM_STATE}, read=${FILE_ELAPSED}s"
 done
 
+# Write SHA256 manifest for restore verification
+echo "Writing SHA256 manifest for restore verification..."
+MANIFEST="${OUTPUT_DIR}/manifest.sha256"
+for f in "${INPUT_DIR}"/*; do
+  [ -f "$f" ] || continue
+  sha256sum "$f"
+done > "${MANIFEST}"
+echo "  Manifest: ${MANIFEST} ($(wc -l < "${MANIFEST}") files)"
+
 # Write job metadata
 cat > "${OUTPUT_DIR}/job-metadata.txt" << EOF
 Job ID:       ${SLURM_JOB_ID}
