@@ -80,11 +80,16 @@ if [ -z "$FSX_STORAGE_GB" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Validate required env vars
+# Source cluster config (set by Terraform — provides infrastructure vars)
 # ---------------------------------------------------------------------------
-: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
-: "${FSX_SG_ID:?FSX_SG_ID must be set (from terraform output -raw fsx_sg_id)}"
-: "${S3_DATA_BUCKET:?S3_DATA_BUCKET must be set (from terraform output -raw s3_data_bucket)}"
+if [ -f /etc/sysconfig/burstlab-workloads ]; then
+  # shellcheck source=/dev/null
+  source /etc/sysconfig/burstlab-workloads
+fi
+
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set — is the workloads overlay deployed?}"
+: "${FSX_SG_ID:?FSX_SG_ID must be set — is the workloads overlay deployed?}"
+: "${S3_DATA_BUCKET:?S3_DATA_BUCKET must be set — is the workloads overlay deployed?}"
 : "${AWS_REGION:?AWS_REGION must be set}"
 
 export FSX_STORAGE_GB AWS_REGION BURST_SUBNET_ID FSX_SG_ID S3_DATA_BUCKET
@@ -165,12 +170,13 @@ fi
 # Submit workload job
 # ---------------------------------------------------------------------------
 WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "${NEW_ARGS[@]}" "$EXPORT_ARG")
-echo "fsx-sbatch: workload job submitted: ${WORKLOAD_JOB_ID}" >&2
+echo "fsx-sbatch: job ${WORKLOAD_JOB_ID} submitted" >&2
 
 # ---------------------------------------------------------------------------
 # Submit destroy job (local partition, invisible to user)
 # ---------------------------------------------------------------------------
-DESTROY_EXPORT="ALL,FSX_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION},S3_DATA_BUCKET=${S3_DATA_BUCKET}"
+RESULTS_BUCKET="${RESULTS_BUCKET:-}"
+DESTROY_EXPORT="ALL,FSX_STATE_FILE=${STATE_FILE},GRANULARITY=${GRANULARITY},CAMPAIGN_NAME=${CAMPAIGN_NAME},AWS_REGION=${AWS_REGION},S3_DATA_BUCKET=${S3_DATA_BUCKET},RESULTS_BUCKET=${RESULTS_BUCKET}"
 DESTROY_JOB_ID=$("$REAL_SBATCH" --parsable \
   --job-name=fsx-destroy \
   --partition=local \
@@ -179,7 +185,9 @@ DESTROY_JOB_ID=$("$REAL_SBATCH" --parsable \
   --dependency=afterok:"${WORKLOAD_JOB_ID}" \
   --export="${DESTROY_EXPORT}" \
   "$DESTROY_SCRIPT")
-echo "fsx-sbatch: destroy job queued: ${DESTROY_JOB_ID} (afterok:${WORKLOAD_JOB_ID})" >&2
+
+echo "fsx-sbatch: results will be at ~/results/fsx-job-${WORKLOAD_JOB_ID}-task-0/" >&2
+echo "fsx-sbatch: S3 data persists after FSx is destroyed — use 'fsx-list' to manage" >&2
 
 # Return the workload job ID (standard sbatch output)
 echo "${WORKLOAD_JOB_ID}"

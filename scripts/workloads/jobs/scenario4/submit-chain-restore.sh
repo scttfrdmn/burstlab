@@ -13,9 +13,12 @@
 #   Job 2:  Destroy FSx (afterok:Job1)
 #
 # Usage:
-#   bash submit-chain-restore.sh --campaign-name <NAME>
+#   bash submit-chain-restore.sh <RUN_ID>
+#   bash submit-chain-restore.sh --run <RUN_ID>
 #   bash submit-chain-restore.sh \
 #     --s3-data-bucket <BUCKET> --s3-prefix <PREFIX>
+#
+# The user-facing wrapper is: fsx-restore <RUN_ID>
 #
 # SA talking point: "We destroyed the FSx filesystem 10 minutes ago. The data is
 # in S3 at $0.023/GB-month. Now we're creating a brand new Lustre filesystem
@@ -27,10 +30,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CAMPAIGN_DIR="${HOME}/.fsx-campaigns"
+HISTORY_DIR="${HOME}/.fsx-history"
 
 # Defaults
-CAMPAIGN_NAME=""
+RUN_ID=""
 S3_DATA_BUCKET="${S3_DATA_BUCKET:-}"
 S3_PREFIX="${S3_PREFIX:-}"
 PARTITION="${PARTITION:-aws}"
@@ -38,26 +41,27 @@ FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --campaign-name)  CAMPAIGN_NAME="$2";  shift 2 ;;
+    --run)            RUN_ID="$2";         shift 2 ;;
     --s3-data-bucket) S3_DATA_BUCKET="$2"; shift 2 ;;
     --s3-prefix)      S3_PREFIX="$2";      shift 2 ;;
     --partition)      PARTITION="$2";      shift 2 ;;
     --fsx-storage-gb) FSX_STORAGE_GB="$2"; shift 2 ;;
-    *) echo "Unknown argument: $1"; exit 1 ;;
+    -*)               echo "Unknown option: $1"; exit 1 ;;
+    *)                RUN_ID="$1";         shift   ;;  # positional arg = run ID
   esac
 done
 
-# Load from campaign record if --campaign-name was given
-if [ -n "${CAMPAIGN_NAME}" ]; then
-  CAMPAIGN_FILE="${CAMPAIGN_DIR}/${CAMPAIGN_NAME}.ref"
-  if [ ! -f "${CAMPAIGN_FILE}" ]; then
-    echo "ERROR: Campaign '${CAMPAIGN_NAME}' not found at ${CAMPAIGN_FILE}" >&2
-    echo "Run 'bash campaign-list.sh' to see available campaigns." >&2
+# Load from run record if a run ID was given
+if [ -n "${RUN_ID}" ]; then
+  RUN_FILE="${HISTORY_DIR}/${RUN_ID}.run"
+  if [ ! -f "${RUN_FILE}" ]; then
+    echo "ERROR: Run '${RUN_ID}' not found." >&2
+    echo "Use 'fsx-list' to see available runs." >&2
     exit 1
   fi
   # shellcheck source=/dev/null
-  source "${CAMPAIGN_FILE}"
-  echo "Loaded campaign record: ${CAMPAIGN_FILE}"
+  source "${RUN_FILE}"
+  echo "Loaded run record: ${RUN_FILE}"
 fi
 
 # Source sysconfig for any vars not yet set
@@ -79,8 +83,10 @@ GRANULARITY="per-job"
 
 mkdir -p /home/alice/logs
 
+CAMPAIGN_NAME="${LABEL:-restore}"
+
 echo "=== Submitting FSx restore chain ==="
-echo "  Campaign:       ${CAMPAIGN_NAME:-manual}"
+echo "  Run ID:         ${RUN_ID:-manual}"
 echo "  S3 data:        s3://${S3_DATA_BUCKET}/${S3_PREFIX}/"
 echo "  Burst subnet:   ${BURST_SUBNET_ID}"
 echo "  FSx SG:         ${FSX_SG_ID}"

@@ -1,0 +1,114 @@
+#!/bin/bash
+# =============================================================================
+# fsx-list — Show your FSx scratch storage runs
+#
+# Installed to /opt/slurm/bin/fsx-list (in PATH for all users).
+#
+# Shows active runs (FSx currently provisioned) and completed runs (FSx
+# destroyed, data in S3). Use the run ID with fsx-restore or fsx-purge.
+#
+# Usage:
+#   fsx-list                # summary view
+#   fsx-list --details      # include S3 object counts
+# =============================================================================
+
+set -euo pipefail
+
+STATE_DIR="${HOME}/.fsx-state"
+HISTORY_DIR="${HOME}/.fsx-history"
+SHOW_DETAILS=false
+
+if [[ "${1:-}" == "--details" ]]; then
+  SHOW_DETAILS=true
+fi
+
+HAS_ACTIVE=false
+HAS_COMPLETED=false
+
+# -------------------------------------------------------------------------
+# Active runs (FSx currently provisioned)
+# -------------------------------------------------------------------------
+if [ -d "${STATE_DIR}" ] && ls "${STATE_DIR}"/*.env &>/dev/null; then
+  echo ""
+  echo "ACTIVE (FSx running):"
+  echo ""
+  printf "  %-12s %-24s %-14s %-8s %s\n" "RUN" "FSX ID" "STATE" "SIZE" "STARTED"
+  printf "  %-12s %-24s %-14s %-8s %s\n" "---" "------" "-----" "----" "-------"
+
+  for state_file in "${STATE_DIR}"/*.env; do
+    [ -f "$state_file" ] || continue
+
+    FSX_ID="" AWS_REGION="" CREATED_BY_JOB="" FSX_STORAGE_GB="" GRANULARITY=""
+    # shellcheck source=/dev/null
+    source "$state_file"
+
+    FSX_STATE=$(aws fsx describe-file-systems \
+      --file-system-ids "${FSX_ID}" \
+      --region "${AWS_REGION:-us-west-2}" \
+      --query 'FileSystems[0].Lifecycle' \
+      --output text 2>/dev/null || echo "not-found")
+
+    RUN_KEY="${CREATED_BY_JOB:-$(basename "$state_file" .env | sed 's/^job-//')}"
+    SIZE_GB="${FSX_STORAGE_GB:-1200}"
+
+    # Get creation time from file modification time
+    STARTED=$(stat -f '%Sm' -t '%b %d %H:%M' "$state_file" 2>/dev/null || \
+              stat -c '%y' "$state_file" 2>/dev/null | cut -d. -f1 || echo "unknown")
+
+    printf "  %-12s %-24s %-14s %-8s %s\n" "${RUN_KEY}" "${FSX_ID}" "${FSX_STATE}" "${SIZE_GB} GB" "${STARTED}"
+    HAS_ACTIVE=true
+  done
+  echo ""
+fi
+
+# -------------------------------------------------------------------------
+# Completed runs (FSx destroyed, data in S3)
+# -------------------------------------------------------------------------
+if [ -d "${HISTORY_DIR}" ] && ls "${HISTORY_DIR}"/*.run &>/dev/null; then
+  echo ""
+  echo "COMPLETED (data in S3):"
+  echo ""
+  printf "  %-12s %-20s %-12s %-8s %s\n" "RUN" "LABEL" "COMPLETED" "SIZE" "RESULTS"
+  printf "  %-12s %-20s %-12s %-8s %s\n" "---" "-----" "---------" "----" "-------"
+
+  for run_file in "${HISTORY_DIR}"/*.run; do
+    [ -f "$run_file" ] || continue
+
+    RUN_ID="" LABEL="" S3_DATA_BUCKET="" S3_PREFIX="" RESULTS_BUCKET="" \
+      COMPLETED_AT="" AWS_REGION="" FSX_STORAGE_GB=""
+    # shellcheck source=/dev/null
+    source "$run_file"
+
+    COMPLETED_SHORT="${COMPLETED_AT:0:10}"
+    SIZE_GB="${FSX_STORAGE_GB:-1200}"
+    RESULTS_PATH="~/results/fsx-job-${RUN_ID}-task-0/"
+
+    printf "  %-12s %-20s %-12s %-8s %s\n" \
+      "${RUN_ID}" "${LABEL:-—}" "${COMPLETED_SHORT}" "${SIZE_GB} GB" "${RESULTS_PATH}"
+
+    if $SHOW_DETAILS; then
+      S3_URI="s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/"
+      OBJ_COUNT=$(aws s3 ls "${S3_URI}" --recursive --region "${AWS_REGION}" 2>/dev/null | wc -l || echo 0)
+      echo "    S3 data:    ${S3_URI} (${OBJ_COUNT} objects)"
+      if [ "${RESULTS_BUCKET}" != "none" ] && [ -n "${RESULTS_BUCKET}" ]; then
+        RESULTS_URI="s3://${RESULTS_BUCKET}/runs/${RUN_ID}/"
+        RESULTS_COUNT=$(aws s3 ls "${RESULTS_URI}" --recursive --region "${AWS_REGION}" 2>/dev/null | wc -l || echo 0)
+        echo "    Durable:    ${RESULTS_URI} (${RESULTS_COUNT} objects)"
+      fi
+    fi
+  done
+  echo ""
+fi
+
+if ! $HAS_ACTIVE && ! $HAS_COMPLETED; then
+  echo "No FSx scratch runs found."
+  echo ""
+  echo "Submit a job with scratch storage:"
+  echo "  fsx-sbatch myjob.sh"
+  exit 0
+fi
+
+echo "Commands:"
+echo "  fsx-restore <RUN>    Re-create FSx from S3 data and verify"
+echo "  fsx-purge <RUN>      Delete S3 data for a completed run"
+echo "  fsx-list --details   Show S3 object counts"

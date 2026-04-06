@@ -76,14 +76,17 @@ ENDSSH
   }
 }
 
-# Deploy fsx-sbatch wrapper to /opt/slurm/bin/ (in PATH ahead of real sbatch)
-resource "null_resource" "deploy_fsx_sbatch" {
+# Deploy fsx-sbatch + fsx-list/purge/restore to /opt/slurm/bin/
+resource "null_resource" "deploy_fsx_commands" {
   depends_on = [null_resource.write_sysconfig]
 
   triggers = {
-    head_node_ip  = local.head_node_ip
-    wrapper_hash  = filemd5("${local.scripts_dir}/jobs/scenario4/wrapper/fsx-sbatch")
-    example_hash  = filemd5("${local.scripts_dir}/jobs/scenario4/wrapper/example-job.sh")
+    head_node_ip   = local.head_node_ip
+    sbatch_hash    = filemd5("${local.scripts_dir}/jobs/scenario4/wrapper/fsx-sbatch")
+    list_hash      = filemd5("${local.scripts_dir}/jobs/scenario4/fsx-list")
+    purge_hash     = filemd5("${local.scripts_dir}/jobs/scenario4/fsx-purge")
+    restore_hash   = filemd5("${local.scripts_dir}/jobs/scenario4/fsx-restore")
+    example_hash   = filemd5("${local.scripts_dir}/jobs/scenario4/wrapper/example-job.sh")
   }
 
   provisioner "local-exec" {
@@ -91,14 +94,21 @@ resource "null_resource" "deploy_fsx_sbatch" {
       SSH="ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15"
       SCP="scp -i ${var.key_path} -o StrictHostKeyChecking=no"
 
-      $SCP ${local.scripts_dir}/jobs/scenario4/wrapper/fsx-sbatch \
-        rocky@${local.head_node_ip}:/tmp/fsx-sbatch
-      $SCP ${local.scripts_dir}/jobs/scenario4/wrapper/example-job.sh \
-        rocky@${local.head_node_ip}:/tmp/fsx-wrapper-example-job.sh
+      $SCP \
+        ${local.scripts_dir}/jobs/scenario4/wrapper/fsx-sbatch \
+        ${local.scripts_dir}/jobs/scenario4/fsx-list \
+        ${local.scripts_dir}/jobs/scenario4/fsx-purge \
+        ${local.scripts_dir}/jobs/scenario4/fsx-restore \
+        ${local.scripts_dir}/jobs/scenario4/wrapper/example-job.sh \
+        rocky@${local.head_node_ip}:/tmp/
 
       $SSH rocky@${local.head_node_ip} "
-        sudo install -o root -g root -m 0755 /tmp/fsx-sbatch /opt/slurm/bin/fsx-sbatch
-        sudo install -o root -g root -m 0755 /tmp/fsx-wrapper-example-job.sh \
+        sudo install -o root -g root -m 0755 /tmp/fsx-sbatch  /opt/slurm/bin/fsx-sbatch
+        sudo install -o root -g root -m 0755 /tmp/fsx-list    /opt/slurm/bin/fsx-list
+        sudo install -o root -g root -m 0755 /tmp/fsx-purge   /opt/slurm/bin/fsx-purge
+        sudo install -o root -g root -m 0755 /tmp/fsx-restore /opt/slurm/bin/fsx-restore
+        sudo mkdir -p /opt/slurm/etc/workloads/jobs/scenario4/wrapper
+        sudo install -o root -g root -m 0755 /tmp/example-job.sh \
           /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
       "
     EOT
