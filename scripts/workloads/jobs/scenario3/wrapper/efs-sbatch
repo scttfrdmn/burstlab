@@ -122,7 +122,8 @@ fi
 # ---------------------------------------------------------------------------
 # Submit workload job
 # ---------------------------------------------------------------------------
-WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "${PASSTHROUGH_ARGS[@]}" "$EXPORT_ARG")
+# IMPORTANT: --export must come BEFORE the script path.
+WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "$EXPORT_ARG" "${PASSTHROUGH_ARGS[@]}")
 echo "efs-sbatch: workload job submitted: ${WORKLOAD_JOB_ID}" >&2
 
 # ---------------------------------------------------------------------------
