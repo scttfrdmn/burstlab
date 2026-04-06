@@ -87,6 +87,44 @@ resource "aws_s3_bucket_public_access_block" "fsx_data" {
 }
 
 # =============================================================================
+# S3 BUCKET — Durable results (persists across terraform destroy)
+# =============================================================================
+# In a multi-account burst setup, this bucket lives in the burst account alongside
+# the FSx filesystems. Results are copied here after each FSx flush so they survive
+# independently of the ephemeral data bucket. force_destroy=false means terraform
+# destroy will refuse to delete this bucket if it contains data — use campaign-purge.sh
+# to explicitly clean up when done.
+
+resource "aws_s3_bucket" "fsx_results" {
+  bucket_prefix = "${var.cluster_name}-fsx-results-"
+  force_destroy = false
+
+  tags = {
+    Project     = "burstlab"
+    ClusterName = var.cluster_name
+    Scenario    = "ephemeral-fsx"
+    Durable     = "true"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "fsx_results" {
+  bucket = aws_s3_bucket.fsx_results.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "fsx_results" {
+  bucket                  = aws_s3_bucket.fsx_results.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# =============================================================================
 # IAM — FSx + S3 lifecycle permissions
 # =============================================================================
 
@@ -135,6 +173,21 @@ resource "aws_iam_role_policy" "burst_node_fsx_lifecycle" {
         Resource = [
           aws_s3_bucket.fsx_data.arn,
           "${aws_s3_bucket.fsx_data.arn}/*"
+        ]
+      },
+      {
+        Sid    = "S3ResultsBucket"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = [
+          aws_s3_bucket.fsx_results.arn,
+          "${aws_s3_bucket.fsx_results.arn}/*"
         ]
       },
       {

@@ -237,6 +237,43 @@ For large files, increase `max_pages_per_rpc` to 512.
 
 ---
 
+## Restore Test: S3 as Permanent Store
+
+The strongest proof that "S3 is the ground truth" is recreating an FSx filesystem
+from previously-flushed S3 data and verifying the content is intact.
+
+```bash
+# Phase 1 — Write chain (creates FSx, runs workload, flushes to S3, destroys FSx)
+RESULTS_BUCKET=$(terraform output -raw s3_results_bucket) \
+  bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
+
+# After the chain completes, list campaigns:
+bash /opt/slurm/etc/workloads/jobs/scenario4/campaign-list.sh
+
+# Phase 2 — Restore chain (creates new FSx from the same S3 data, verifies checksums)
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain-restore.sh \
+  --campaign-name <NAME>
+# Check verification output:
+cat /home/alice/logs/fsx-verify-restore-*.out
+```
+
+The restore chain creates a brand new FSx filesystem linked to the same S3 prefix.
+Files appear immediately as stubs (AutoImportPolicy), hydrate from S3 on first read,
+and SHA256 checksums are verified against the manifest written during the original chain.
+
+**Two S3 buckets:**
+- **Data bucket** (ephemeral, `force_destroy=true`): Input staging + FSx scratch. Cleaned
+  up by `terraform destroy`.
+- **Results bucket** (durable, `force_destroy=false`): Permanent results copied by job3
+  after S3 flush. Persists across `terraform destroy`. Cleaned up explicitly with
+  `campaign-purge.sh`.
+
+In a multi-account burst setup, the results bucket lives in the burst account alongside
+the FSx filesystems. This separation makes the ownership model explicit: the data bucket
+is ephemeral infrastructure, the results bucket is the customer's permanent store.
+
+---
+
 ## Cost Notes
 
 - FSx SCRATCH_2: $0.14/GB-month (1,200 GB = ~$5.40/day = $0.23/hr)

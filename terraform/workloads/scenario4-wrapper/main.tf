@@ -36,21 +36,23 @@ data "terraform_remote_state" "scenario4" {
 }
 
 locals {
-  head_node_ip   = data.terraform_remote_state.cluster.outputs.head_node_public_ip
-  s3_data_bucket = data.terraform_remote_state.scenario4.outputs.s3_data_bucket
-  burst_subnet_id = data.terraform_remote_state.scenario4.outputs.burst_subnet_id
-  fsx_sg_id      = data.terraform_remote_state.scenario4.outputs.fsx_sg_id
-  scripts_dir    = "${path.module}/../../../scripts/workloads"
+  head_node_ip     = data.terraform_remote_state.cluster.outputs.head_node_public_ip
+  s3_data_bucket   = data.terraform_remote_state.scenario4.outputs.s3_data_bucket
+  s3_results_bucket = data.terraform_remote_state.scenario4.outputs.s3_results_bucket
+  burst_subnet_id  = data.terraform_remote_state.scenario4.outputs.burst_subnet_id
+  fsx_sg_id        = data.terraform_remote_state.scenario4.outputs.fsx_sg_id
+  scripts_dir      = "${path.module}/../../../scripts/workloads"
 }
 
 # Write /etc/sysconfig/burstlab-workloads on the head node so prolog/epilog and
 # wrapper scripts can read cluster-specific values without requiring env vars.
 resource "null_resource" "write_sysconfig" {
   triggers = {
-    head_node_ip   = local.head_node_ip
-    s3_data_bucket = local.s3_data_bucket
-    burst_subnet_id = local.burst_subnet_id
-    fsx_sg_id      = local.fsx_sg_id
+    head_node_ip      = local.head_node_ip
+    s3_data_bucket    = local.s3_data_bucket
+    s3_results_bucket = local.s3_results_bucket
+    burst_subnet_id   = local.burst_subnet_id
+    fsx_sg_id         = local.fsx_sg_id
   }
 
   provisioner "local-exec" {
@@ -66,6 +68,8 @@ resource "null_resource" "write_sysconfig" {
           echo "FSX_SG_ID=${local.fsx_sg_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^S3_DATA_BUCKET=' /etc/sysconfig/burstlab-workloads || \
           echo "S3_DATA_BUCKET=${local.s3_data_bucket}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
+        grep -q '^RESULTS_BUCKET=' /etc/sysconfig/burstlab-workloads || \
+          echo "RESULTS_BUCKET=${local.s3_results_bucket}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         sudo chmod 644 /etc/sysconfig/burstlab-workloads
 ENDSSH
     EOT
