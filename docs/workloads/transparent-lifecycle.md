@@ -4,6 +4,25 @@ Scenarios 3 (EFS) and 4 (FSx) demonstrate ephemeral storage that is created when
 starts and destroyed when it ends. This document compares the four approaches available,
 from most explicit to most transparent.
 
+For the cluster user's perspective, see [user-guide.md](user-guide.md).
+
+### Testing Status
+
+| Approach | Gen 1 | Gen 2 | Gen 3 | Notes |
+|----------|-------|-------|-------|-------|
+| **0 — Chain** | Tested (FSx + EFS) | Not tested | Not tested | End-to-end on live Gen 1 cluster |
+| **A — Wrapper** | Not tested | Not tested | Not tested | Uses same fsx-lifecycle.sh as tested chain |
+| **B — Prolog/Epilog** | Not tested | Not tested | Not tested | Requires `scontrol update ... Environment=` (Slurm 21.08+, all gens qualify) |
+| **C — Burst Buffer** | Cannot run | Not tested | Not tested | Requires `burst_buffer_lua.so` — not in current AMIs; needs `--with-lua` rebuild |
+
+The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
+`efs-lifecycle.sh` libraries. The primary risk is in the integration glue (env
+injection, `scontrol update`, combined dispatcher), not in the AWS API calls.
+
+Gen 2 and Gen 3 use different Slurm versions (23.11 and 24.05) but the lifecycle
+scripts use only stable Slurm APIs. The main Gen 2/3 risk is untested cloud-init
+paths for the Lustre client and mount tooling.
+
 ---
 
 ## The Four Approaches
