@@ -159,6 +159,10 @@ echo "  Workload completed in ${ELAPSED}s"
 OUTPUT_COUNT=$(ls "${OUTPUT_DIR}/" 2>/dev/null | wc -l)
 echo "  Output: ${OUTPUT_COUNT} files in ${OUTPUT_DIR}"
 
+# Record this job's Slurm ID in the state file so job3 can use it as
+# the history key — ensures fsx-list shows the correct results path.
+echo "WORKLOAD_JOB_ID=${SLURM_JOB_ID}" >> "${STATE_FILE}"
+
 # Copy results to permanent EFS as well
 RESULTS_DIR="/home/alice/results/fsx-job-${SLURM_JOB_ID}-task-${TASK_ID}"
 mkdir -p "${RESULTS_DIR}"

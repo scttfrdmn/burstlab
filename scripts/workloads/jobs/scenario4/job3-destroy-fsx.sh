@@ -86,10 +86,11 @@ fi
 
 # Copy results to the durable results bucket (if configured)
 RESULTS_BUCKET="${RESULTS_BUCKET:-}"
-# Use the workload job ID as the history key (what the user recognizes)
-# For wrapper/prolog submissions, CREATED_BY_JOB is the workload job ID.
-# For chain submissions, it's the JOB_REF from step 0.
-HISTORY_KEY="${CREATED_BY_JOB:-${SLURM_JOB_ID}}"
+# Use the workload job's Slurm ID as history key so fsx-list shows the
+# correct ~/results/fsx-job-<N>-task-0/ path that job2 wrote.
+# WORKLOAD_JOB_ID is appended to the state file by job2 at runtime.
+# Falls back to CREATED_BY_JOB (chain: job1's Slurm ID) or this job's ID.
+HISTORY_KEY="${WORKLOAD_JOB_ID:-${CREATED_BY_JOB:-${SLURM_JOB_ID}}}"
 HISTORY_LABEL="${CAMPAIGN_NAME:-default}"
 if [ -n "${RESULTS_BUCKET}" ]; then
   echo ""
@@ -119,6 +120,7 @@ S3_PREFIX=${S3_PREFIX}
 S3_OUTPUT_URI=s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/
 RESULTS_BUCKET=${RESULTS_BUCKET:-none}
 RESULTS_URI=${RESULTS_BUCKET:+s3://${RESULTS_BUCKET}/runs/${HISTORY_KEY}/}
+EFS_RESULTS=~/results/fsx-job-${HISTORY_KEY}-task-0
 BURST_SUBNET_ID=${BURST_SUBNET_ID:-}
 FSX_SG_ID=${FSX_SG_ID:-}
 AWS_REGION=${AWS_REGION}

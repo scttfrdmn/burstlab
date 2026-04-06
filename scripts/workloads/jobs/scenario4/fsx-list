@@ -75,13 +75,15 @@ if [ -d "${HISTORY_DIR}" ] && ls "${HISTORY_DIR}"/*.run &>/dev/null; then
     [ -f "$run_file" ] || continue
 
     RUN_ID="" LABEL="" S3_DATA_BUCKET="" S3_PREFIX="" RESULTS_BUCKET="" \
-      COMPLETED_AT="" AWS_REGION="" FSX_STORAGE_GB=""
+      COMPLETED_AT="" AWS_REGION="" FSX_STORAGE_GB="" EFS_RESULTS=""
     # shellcheck source=/dev/null
     source "$run_file"
 
     COMPLETED_SHORT="${COMPLETED_AT:0:10}"
     SIZE_GB="${FSX_STORAGE_GB:-1200}"
-    RESULTS_PATH="~/results/fsx-job-${RUN_ID}-task-0/"
+    # EFS_RESULTS written by job3 (from WORKLOAD_JOB_ID). Fall back to
+    # constructing from RUN_ID for old run files that lack the field.
+    RESULTS_PATH="${EFS_RESULTS:-~/results/fsx-job-${RUN_ID}-task-0/}"
 
     printf "  %-12s %-20s %-12s %-8s %s\n" \
       "${RUN_ID}" "${LABEL:-—}" "${COMPLETED_SHORT}" "${SIZE_GB} GB" "${RESULTS_PATH}"
