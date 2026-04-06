@@ -42,14 +42,14 @@ echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/moun
 chmod 440 /etc/sudoers.d/alice-mount
 
 # Pre-install Lustre client for FSx Lustre mounts (Scenario 4 workloads).
-# Write the repo file directly (gpgcheck=0; the AWS-provided repo file lacks gpgkey=
-# and uses $basearch substitution that breaks in some contexts).
-# The kmod-lustre-client package uses kernel ABI compatibility (weak-modules) and
-# works on Rocky 8.x kernels despite being built against a specific point release.
-cat > /etc/yum.repos.d/fsx-lustre-client.repo << 'REPOEOF'
+# Detect OS major version to select the correct AWS FSx Lustre client repo.
+# Rocky 8 → el/8, Rocky 9 → el/9. Rocky 10 (el/10) may not have packages yet;
+# skip_if_unavailable=1 handles that gracefully.
+OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
+cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
 [aws-fsx]
 name=AWS FSx Packages - x86_64
-baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/8/x86_64/
+baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/$${OS_MAJOR}/x86_64/
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1

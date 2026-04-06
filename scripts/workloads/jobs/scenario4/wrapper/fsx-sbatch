@@ -169,7 +169,9 @@ fi
 # ---------------------------------------------------------------------------
 # Submit workload job
 # ---------------------------------------------------------------------------
-WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "${NEW_ARGS[@]}" "$EXPORT_ARG")
+# IMPORTANT: --export must come BEFORE the script path. Slurm treats everything
+# after the script path as script arguments, not sbatch options.
+WORKLOAD_JOB_ID=$("$REAL_SBATCH" --parsable "$EXPORT_ARG" "${NEW_ARGS[@]}")
 echo "fsx-sbatch: job ${WORKLOAD_JOB_ID} submitted" >&2
 
 # ---------------------------------------------------------------------------
