@@ -205,6 +205,30 @@ S3 (input/)              FSx (AVAILABLE)
 
 ---
 
+## FSx Lustre Namespace Path Behavior
+
+FSx SCRATCH_2 with legacy data repository associations (ImportPath/ExportPath in
+`LustreConfiguration`) does **not** strip the ImportPath prefix from Lustre namespace
+paths. This is critical to understand for the restore workflow.
+
+**What actually happens:**
+- `ImportPath = s3://bucket/jobs/wrap-123` acts as a **filter** — it controls which
+  S3 objects are imported, but does NOT define a Lustre root mapping
+- S3 object `jobs/wrap-123/output/0/file.txt` appears in Lustre at the **full S3 key
+  path**: `<mount_point>/jobs/wrap-123/output/0/file.txt`
+- Writing to Lustre path `jobs/wrap-123/output/0/file.txt` exports to S3 at the same
+  full key path via ExportPath
+
+**Practical impact:**
+- The `$SCRATCH` variable in job scripts points to the mount point, not to any prefix
+  subdirectory. Your job should write to `$SCRATCH` directly and the full path hierarchy
+  is preserved in S3.
+- On restore, `job4-verify-restore.sh` looks for output at
+  `<mount_point>/${S3_PREFIX}/output/`, not `<mount_point>/output/`, because the full
+  S3 key hierarchy is mirrored into the Lustre namespace.
+
+---
+
 ## Troubleshooting
 
 **Job 1 fails: `FSx service-linked role`**
@@ -217,6 +241,11 @@ cd terraform/workloads/scenario4-ephemeral-fsx/
 # create_fsx_service_linked_role = false
 terraform apply
 ```
+
+This is a **common blocker on the second run** of Terraform in a fresh AWS account.
+The service-linked role is account-scoped; Terraform tries to create it on the first
+apply, and the creation fails on subsequent applies if `create_fsx_service_linked_role`
+is still `true`. Set it to `false` after the first successful apply.
 
 **Job 1 fails: `Timeout waiting for FSx`**
 
@@ -242,31 +271,50 @@ For large files, increase `max_pages_per_rpc` to 512.
 The strongest proof that "S3 is the ground truth" is recreating an FSx filesystem
 from previously-flushed S3 data and verifying the content is intact.
 
+**Using the wrapper commands (recommended after deploying `scenario4-wrapper`):**
+
 ```bash
-# Phase 1 — Write chain (creates FSx, runs workload, flushes to S3, destroys FSx)
+# Phase 1 — Submit with fsx-sbatch (creates FSx, runs workload, flushes to S3, destroys FSx)
+fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
+
+# After the chain completes, view the run record:
+fsx-list                 # shows RUN_ID, label, completed date, S3 URI, results path
+fsx-list --details       # shows S3 object count per run
+
+# Phase 2 — Restore (creates new FSx from the same S3 data, verifies checksums, destroys)
+fsx-restore <RUN_ID>
+# Check verification output:
+cat /home/alice/logs/fsx-verify-restore-*.out
+
+# Phase 3 — Purge S3 data when no longer needed
+fsx-purge <RUN_ID>       # removes S3 data; EFS results (~/results/) are preserved
+```
+
+**Using the raw chain scripts (chain approach):**
+
+```bash
+# Phase 1 — Write chain
 RESULTS_BUCKET=$(terraform output -raw s3_results_bucket) \
   bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
-# After the chain completes, list campaigns:
-bash /opt/slurm/etc/workloads/jobs/scenario4/campaign-list.sh
-
-# Phase 2 — Restore chain (creates new FSx from the same S3 data, verifies checksums)
+# Phase 2 — Restore chain
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain-restore.sh \
-  --campaign-name <NAME>
-# Check verification output:
+  --s3-data-bucket <BUCKET> --s3-prefix <PREFIX>
 cat /home/alice/logs/fsx-verify-restore-*.out
 ```
 
 The restore chain creates a brand new FSx filesystem linked to the same S3 prefix.
-Files appear immediately as stubs (AutoImportPolicy), hydrate from S3 on first read,
-and SHA256 checksums are verified against the manifest written during the original chain.
+Files appear as stubs immediately (full S3 key hierarchy mirrored into Lustre namespace
+— see [FSx Lustre Namespace Path Behavior](#fsx-lustre-namespace-path-behavior) above),
+hydrate from S3 on first read, and SHA256 checksums are verified against the manifest
+written during the original chain.
 
 **Two S3 buckets:**
 - **Data bucket** (ephemeral, `force_destroy=true`): Input staging + FSx scratch. Cleaned
   up by `terraform destroy`.
 - **Results bucket** (durable, `force_destroy=false`): Permanent results copied by job3
   after S3 flush. Persists across `terraform destroy`. Cleaned up explicitly with
-  `campaign-purge.sh`.
+  `fsx-purge <RUN_ID>`.
 
 In a multi-account burst setup, the results bucket lives in the burst account alongside
 the FSx filesystems. This separation makes the ownership model explicit: the data bucket
@@ -313,7 +361,7 @@ The FSx filesystem appears in the AWS console during the workload and disappears
 ### Approach B — Prolog/Epilog
 
 Deploy with `terraform/workloads/scenario4-prolog-epilog/`. Patches `slurm.conf` with
-`SlurmctldProlog` and `SlurmctldEpilog`.
+`PrologSlurmctld` and `EpilogSlurmctld`.
 
 ```bash
 # Standard sbatch — no wrapper needed:

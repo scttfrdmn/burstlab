@@ -120,11 +120,22 @@ CAMPAIGN_NAME=protein-sweep AWS_REGION=us-west-2 EFS_SG_ID=$EFS_SG_ID \
 | Phase | Duration |
 |-------|----------|
 | EFS create to `available` | ~30-60 seconds |
-| Mount target creation | ~30 seconds |
+| Mount target creation (per AZ) | ~30 seconds |
+| DNS propagation wait | **~90 seconds** |
 | Job 1 total (with polling) | ~2-3 minutes |
 | Job 2 (demo workload) | ~1-2 minutes |
 | Job 3 (destroy) | ~1-2 minutes |
 | Total chain | ~5-7 minutes |
+
+> **Why two mount targets?** EFS DNS resolves to an AZ-local endpoint. Burst
+> nodes can land in either of two availability zones (cloud subnets a and b).
+> Both mount targets must exist and be `available` before jobs are submitted,
+> otherwise nodes in the second AZ cannot resolve the EFS hostname.
+>
+> **Why the DNS wait?** EFS DNS for a newly-created mount target can take up to
+> 90 seconds to propagate after the mount target enters `available` state. The
+> wrapper (`efs-sbatch`) waits 90 seconds before submitting the workload job to
+> prevent intermittent mount failures.
 
 ---
 
@@ -197,10 +208,17 @@ Deploy with `terraform/workloads/scenario3-wrapper/`. Installs `efs-sbatch` to
 efs-sbatch /opt/slurm/etc/workloads/jobs/scenario3/wrapper/example-job.sh
 ```
 
-The wrapper creates EFS inline (terminal shows progress), submits the workload with
-`EFS_STATE_FILE` injected into the environment, and queues the destroy job with
-`--dependency=afterok`. The user sees one job ID. The destroy job appears in `squeue`
+The wrapper creates EFS inline (terminal shows progress, ~60s), creates mount targets
+in **both** cloud subnets (a and b), waits 90 seconds for DNS propagation, submits the
+workload with `EFS_STATE_FILE` injected into the environment, and queues the destroy job
+with `--dependency=afterok`. The user sees one job ID. The destroy job appears in `squeue`
 as `(Dependency)` but can be ignored.
+
+> **IAM prerequisite (manual step):** Compute nodes (`EpoxyChronicleInstanceRole`) need
+> `elasticfilesystem:*` permission to run the destroy job. Terraform deploys an
+> `aws_iam_policy` but does **not** automatically attach it to the compute role. Attach
+> the `burstlab-workloads-efs-lifecycle` inline policy to `EpoxyChronicleInstanceRole`
+> in the IAM console, or the destroy job will fail with an AccessDenied error.
 
 **SA talking point:** "One command, one job ID. The EFS lifecycle — create, inject,
 destroy — is completely hidden. If the cluster already has a similar wrapper for other
@@ -209,7 +227,7 @@ purposes, migration cost is zero."
 ### Approach B — Prolog/Epilog
 
 Deploy with `terraform/workloads/scenario3-prolog-epilog/`. Patches `slurm.conf` with
-`SlurmctldProlog` and `SlurmctldEpilog` pointing to a combined storage dispatcher.
+`PrologSlurmctld` and `EpilogSlurmctld` pointing to a combined storage dispatcher.
 
 ```bash
 # Standard sbatch — no wrapper needed:

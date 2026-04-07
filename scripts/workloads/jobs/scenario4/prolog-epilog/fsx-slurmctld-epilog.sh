@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# fsx-slurmctld-epilog.sh — SlurmctldEpilog for ephemeral FSx Lustre
+# fsx-slurmctld-epilog.sh — EpilogSlurmctld for ephemeral FSx Lustre
 #
 # Referenced in slurm.conf:
-#   SlurmctldEpilog=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
+#   EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
 #
 # This script is combined with efs-slurmctld-epilog.sh into a single
 # storage-slurmctld-epilog.sh by the Terraform module.
@@ -15,6 +15,8 @@
 # =============================================================================
 
 set -euo pipefail
+
+export PATH="/usr/local/bin:${PATH}"
 
 # Not an FSx job
 if [[ ! "${SLURM_JOB_COMMENT:-}" =~ ^fsx: ]]; then
@@ -37,7 +39,7 @@ source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh
 # ---------------------------------------------------------------------------
 # Find the state file for this job
 # ---------------------------------------------------------------------------
-STATE_FILE="$(eval echo "~${SLURM_JOB_USER}/.fsx-state")/job-${SLURM_JOB_ID}.env"
+STATE_FILE="/opt/slurm/var/fsx-state/${SLURM_JOB_USER}/job-${SLURM_JOB_ID}.env"
 
 if [ ! -f "${STATE_FILE}" ]; then
   # Nothing to destroy — prolog may have failed before creating FSx

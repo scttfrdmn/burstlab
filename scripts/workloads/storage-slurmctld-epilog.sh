@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
-# storage-slurmctld-epilog.sh — Combined SlurmctldEpilog for FSx and EFS
+# storage-slurmctld-epilog.sh — Combined EpilogSlurmctld for FSx and EFS
 #
 # Deployed to /opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
 # Referenced in slurm.conf:
-#   SlurmctldEpilog=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
+#   EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
 # =============================================================================
 
 set -euo pipefail
