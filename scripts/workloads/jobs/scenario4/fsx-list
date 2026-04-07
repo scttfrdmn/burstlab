@@ -87,6 +87,7 @@ if [ -d "${HISTORY_DIR}" ] && ls "${HISTORY_DIR}"/*.run &>/dev/null; then
 
     printf "  %-12s %-20s %-12s %-8s %s\n" \
       "${RUN_ID}" "${LABEL:-—}" "${COMPLETED_SHORT}" "${SIZE_GB} GB" "${RESULTS_PATH}"
+    HAS_COMPLETED=true
 
     if $SHOW_DETAILS; then
       S3_URI="s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/"
