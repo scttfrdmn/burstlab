@@ -89,12 +89,28 @@ _fail() { echo "  [FAIL] $1"; ((FAIL++)); }
 echo ""
 echo "=== Verification ==="
 
-# Check 1: Output directory exists
+# FSx initial S3 metadata import is asynchronous — it completes in the
+# background after the filesystem enters AVAILABLE. Listing the mount root
+# triggers namespace population. We retry up to 3 minutes.
+echo "Waiting for S3 namespace to populate in Lustre..."
 OUTPUT_DIR="${MOUNT_POINT}/output"
-if [ -d "${OUTPUT_DIR}" ]; then
+POPULATED=false
+for attempt in $(seq 1 12); do
+  # ls on root triggers FSx to import S3 metadata for top-level objects
+  ls "${MOUNT_POINT}/" &>/dev/null || true
+  if [ -d "${OUTPUT_DIR}" ]; then
+    POPULATED=true
+    break
+  fi
+  echo "  attempt ${attempt}/12: output/ not yet visible — waiting 15s..."
+  sleep 15
+done
+
+# Check 1: Output directory exists
+if $POPULATED; then
   _pass "output/ directory exists in Lustre namespace"
 else
-  _fail "output/ directory NOT found — S3 data may not have imported"
+  _fail "output/ directory NOT found after 3 minutes — S3 data may not have imported"
   sudo umount "${MOUNT_POINT}" && rmdir "${MOUNT_POINT}"
   exit 1
 fi

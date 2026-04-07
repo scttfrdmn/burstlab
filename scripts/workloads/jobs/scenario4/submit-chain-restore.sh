@@ -127,7 +127,6 @@ FSX_ID=$(fsx_create \
 echo "  Created: ${FSX_ID}"
 
 fsx_wait_available "${FSX_ID}"
-
 FSX_DNS=$(fsx_get_dns "${FSX_ID}")
 FSX_MOUNT_NAME=$(aws fsx describe-file-systems \
   --file-system-ids "${FSX_ID}" \
