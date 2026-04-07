@@ -33,10 +33,14 @@ data "terraform_remote_state" "scenario3" {
 }
 
 locals {
-  head_node_ip    = data.terraform_remote_state.cluster.outputs.head_node_public_ip
-  burst_subnet_id = data.terraform_remote_state.scenario3.outputs.burst_subnet_id
-  efs_sg_id       = data.terraform_remote_state.scenario3.outputs.efs_sg_id
-  scripts_dir     = "${path.module}/../../../scripts/workloads"
+  head_node_ip      = data.terraform_remote_state.cluster.outputs.head_node_public_ip
+  burst_subnet_id   = data.terraform_remote_state.scenario3.outputs.burst_subnet_id
+  # Also get cloud_subnet_a_id for EFS — burst nodes can land in either AZ,
+  # and EFS DNS is AZ-specific (only resolves if a mount target exists in the
+  # same AZ). Creating mount targets in both subnets ensures reliable DNS.
+  cloud_subnet_a_id = data.terraform_remote_state.cluster.outputs.cloud_subnet_a_id
+  efs_sg_id         = data.terraform_remote_state.scenario3.outputs.efs_sg_id
+  scripts_dir       = "${path.module}/../../../scripts/workloads"
 }
 
 # Write /etc/sysconfig/burstlab-workloads (EFS-specific fields)
@@ -44,9 +48,10 @@ locals {
 # to include both FSx and EFS variables.
 resource "null_resource" "write_sysconfig" {
   triggers = {
-    head_node_ip    = local.head_node_ip
-    burst_subnet_id = local.burst_subnet_id
-    efs_sg_id       = local.efs_sg_id
+    head_node_ip      = local.head_node_ip
+    burst_subnet_id   = local.burst_subnet_id
+    cloud_subnet_a_id = local.cloud_subnet_a_id
+    efs_sg_id         = local.efs_sg_id
   }
 
   provisioner "local-exec" {
@@ -61,6 +66,11 @@ resource "null_resource" "write_sysconfig" {
           echo "BURST_SUBNET_ID=${local.burst_subnet_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^EFS_SG_ID=' /etc/sysconfig/burstlab-workloads || \
           echo "EFS_SG_ID=${local.efs_sg_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
+        # CLOUD_SUBNET_A_ID: needed for EFS second mount target in us-west-2a.
+        # EFS DNS is AZ-specific — burst nodes in cloud_a won't resolve EFS
+        # DNS unless a mount target also exists in cloud_a.
+        grep -q '^CLOUD_SUBNET_A_ID=' /etc/sysconfig/burstlab-workloads || \
+          echo "CLOUD_SUBNET_A_ID=${local.cloud_subnet_a_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         sudo chmod 644 /etc/sysconfig/burstlab-workloads
 ENDSSH
     EOT

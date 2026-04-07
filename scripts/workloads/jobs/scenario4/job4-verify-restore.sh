@@ -90,19 +90,24 @@ echo ""
 echo "=== Verification ==="
 
 # FSx initial S3 metadata import is asynchronous — it completes in the
-# background after the filesystem enters AVAILABLE. Listing the mount root
-# triggers namespace population. We retry up to 3 minutes.
-echo "Waiting for S3 namespace to populate in Lustre..."
+# background after the filesystem enters AVAILABLE. The initial import of
+# a small number of objects can take 5-15 min. Listing directories at each
+# level forces FSx to contact S3 and populate the namespace for that level.
+echo "Waiting for S3 namespace to populate in Lustre (up to 10 min)..."
 OUTPUT_DIR="${MOUNT_POINT}/output"
 POPULATED=false
-for attempt in $(seq 1 12); do
-  # ls on root triggers FSx to import S3 metadata for top-level objects
-  ls "${MOUNT_POINT}/" &>/dev/null || true
+for attempt in $(seq 1 40); do
+  # Progressively list deeper paths to trigger lazy discovery at each level
+  ls "${MOUNT_POINT}/" 2>/dev/null || true
+  ls "${MOUNT_POINT}/output/" 2>/dev/null || true
+
+  ROOT_ENTRIES=$(ls "${MOUNT_POINT}/" 2>/dev/null | wc -l | tr -d ' ')
   if [ -d "${OUTPUT_DIR}" ]; then
     POPULATED=true
+    echo "  attempt ${attempt}: output/ found (root has ${ROOT_ENTRIES} entries)"
     break
   fi
-  echo "  attempt ${attempt}/12: output/ not yet visible — waiting 15s..."
+  echo "  attempt ${attempt}/40: output/ not visible (root=${ROOT_ENTRIES} entries) — waiting 15s..."
   sleep 15
 done
 
