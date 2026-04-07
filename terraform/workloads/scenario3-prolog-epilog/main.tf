@@ -1,5 +1,5 @@
 # =============================================================================
-# SCENARIO 3 — Prolog/Epilog approach (SlurmctldProlog + SlurmctldEpilog)
+# SCENARIO 3 — Prolog/Epilog approach (PrologSlurmctld + EpilogSlurmctld)
 # =============================================================================
 # Deploys EFS lifecycle prolog/epilog scripts and patches slurm.conf.
 # Jobs with #SBATCH --comment=efs trigger automatic EFS create/destroy.
@@ -136,19 +136,23 @@ resource "null_resource" "patch_slurm_conf" {
         rocky@${local.head_node_ip} << 'ENDSSH'
         CONF=/opt/slurm/etc/slurm.conf
 
-        grep -q '^SlurmctldProlog=' "$CONF" || \
-          echo 'SlurmctldProlog=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh' \
+        grep -q '^PrologSlurmctld=' "$CONF" || \
+          echo 'PrologSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh' \
             | sudo tee -a "$CONF" > /dev/null
 
-        grep -q '^SlurmctldEpilog=' "$CONF" || \
-          echo 'SlurmctldEpilog=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh' \
+        grep -q '^EpilogSlurmctld=' "$CONF" || \
+          echo 'EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh' \
             | sudo tee -a "$CONF" > /dev/null
 
         grep -q '^PrologEpilogTimeout=' "$CONF" || \
           echo 'PrologEpilogTimeout=1800' \
             | sudo tee -a "$CONF" > /dev/null
 
-        /opt/slurm/bin/scontrol reconfigure
+        grep -q '^PrepPlugins=' "$CONF" || \
+          echo 'PrepPlugins=prep/script' \
+            | sudo tee -a "$CONF" > /dev/null
+
+        sudo SLURM_CONF=/opt/slurm/etc/slurm.conf /opt/slurm/bin/scontrol reconfigure
         echo "slurm.conf patched and scontrol reconfigure done"
 ENDSSH
     EOT

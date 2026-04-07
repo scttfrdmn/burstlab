@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# efs-slurmctld-epilog.sh — SlurmctldEpilog for ephemeral EFS
+# efs-slurmctld-epilog.sh — EpilogSlurmctld for ephemeral EFS
 #
 # Referenced in slurm.conf (combined with FSx epilog by Terraform):
-#   SlurmctldEpilog=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
+#   EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
 #
 # Destroys the ephemeral EFS filesystem after the job completes.
 # Results on permanent cluster EFS (/home/alice/results/) are preserved —
@@ -11,6 +11,8 @@
 # =============================================================================
 
 set -euo pipefail
+
+export PATH="/usr/local/bin:${PATH}"
 
 # Not an EFS job
 if [[ "${SLURM_JOB_COMMENT:-}" != "efs" ]]; then
@@ -27,7 +29,7 @@ export AWS_REGION
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
 
-STATE_FILE="$(eval echo "~${SLURM_JOB_USER}/.efs-state")/job-${SLURM_JOB_ID}.env"
+STATE_FILE="/opt/slurm/var/efs-state/${SLURM_JOB_USER}/job-${SLURM_JOB_ID}.env"
 
 if [ ! -f "${STATE_FILE}" ]; then
   echo "EFS epilog: no state file for job ${SLURM_JOB_ID} — nothing to destroy"

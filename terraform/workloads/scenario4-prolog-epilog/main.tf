@@ -1,10 +1,10 @@
 # =============================================================================
-# SCENARIO 4 — Prolog/Epilog approach (SlurmctldProlog + SlurmctldEpilog)
+# SCENARIO 4 — Prolog/Epilog approach (PrologSlurmctld + EpilogSlurmctld)
 # =============================================================================
 # Deploys FSx lifecycle prolog/epilog scripts and patches slurm.conf to
-# reference them. The SlurmctldProlog creates FSx when a job has
+# reference them. The PrologSlurmctld creates FSx when a job has
 # #SBATCH --comment=fsx:N, injects FSX_STATE_FILE into the job environment,
-# and the SlurmctldEpilog flushes and destroys after the job completes.
+# and the EpilogSlurmctld flushes and destroys after the job completes.
 #
 # Prerequisites:
 #   scenario4-ephemeral-fsx/ must be applied first (S3 bucket, IAM, SLRs).
@@ -130,7 +130,7 @@ resource "null_resource" "deploy_prolog_epilog" {
   }
 }
 
-# Patch slurm.conf to add SlurmctldProlog, SlurmctldEpilog, PrologEpilogTimeout
+# Patch slurm.conf to add PrologSlurmctld, EpilogSlurmctld, PrologEpilogTimeout
 # Idempotent: grep before appending. scontrol reconfigure applies without restart.
 resource "null_resource" "patch_slurm_conf" {
   depends_on = [null_resource.deploy_prolog_epilog]
@@ -147,14 +147,15 @@ resource "null_resource" "patch_slurm_conf" {
         rocky@${local.head_node_ip} << 'ENDSSH'
         CONF=/opt/slurm/etc/slurm.conf
 
-        # Append SlurmctldProlog if not already present
-        grep -q '^SlurmctldProlog=' "$CONF" || \
-          echo 'SlurmctldProlog=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh' \
+        # Append PrologSlurmctld if not already present
+        # NOTE: Slurm 22.05 uses PrologSlurmctld/EpilogSlurmctld (not SlurmctldProlog/Epilog)
+        grep -q '^PrologSlurmctld=' "$CONF" || \
+          echo 'PrologSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh' \
             | sudo tee -a "$CONF" > /dev/null
 
-        # Append SlurmctldEpilog if not already present
-        grep -q '^SlurmctldEpilog=' "$CONF" || \
-          echo 'SlurmctldEpilog=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh' \
+        # Append EpilogSlurmctld if not already present
+        grep -q '^EpilogSlurmctld=' "$CONF" || \
+          echo 'EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh' \
             | sudo tee -a "$CONF" > /dev/null
 
         # Append PrologEpilogTimeout if not already present
@@ -162,8 +163,14 @@ resource "null_resource" "patch_slurm_conf" {
           echo 'PrologEpilogTimeout=1800' \
             | sudo tee -a "$CONF" > /dev/null
 
-        # Reload slurmctld without restart
-        /opt/slurm/bin/scontrol reconfigure
+        # PrepPlugins=prep/script is required in Slurm 22.05 for PrologSlurmctld/EpilogSlurmctld
+        # to actually execute. Without it the PREP framework defaults but does not run scripts.
+        grep -q '^PrepPlugins=' "$CONF" || \
+          echo 'PrepPlugins=prep/script' \
+            | sudo tee -a "$CONF" > /dev/null
+
+        # Reload slurmctld without restart (requires root; rocky has sudo NOPASSWD)
+        sudo SLURM_CONF=/opt/slurm/etc/slurm.conf /opt/slurm/bin/scontrol reconfigure
         echo "slurm.conf patched and scontrol reconfigure done"
 ENDSSH
     EOT

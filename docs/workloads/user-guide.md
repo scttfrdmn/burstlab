@@ -158,13 +158,20 @@ echo "NFS scratch is mounted"
 ```bash
 $ efs-sbatch quick-job.sh
 efs-sbatch: creating ephemeral EFS filesystem...
-efs-sbatch: EFS fs-0abc123 is available — submitting job...
+efs-sbatch: EFS fs-0abc123 is available — waiting 90s for DNS propagation...
 efs-sbatch: workload job submitted: 63
 63
 ```
 
-Ready in about 60 seconds instead of 10 minutes. The filesystem is destroyed
-after your job finishes.
+Ready in about 2-3 minutes (EFS available in ~60s, plus a 90-second DNS
+propagation wait before submitting). The filesystem is destroyed after your
+job finishes.
+
+> **Why the 90-second wait?** EFS DNS is AZ-specific. The burst node may land
+> in either of two availability zones, and DNS for a new mount target can take
+> up to 90 seconds to resolve after the target enters `available` state. The
+> wrapper waits before submitting to prevent mount failures on nodes in the
+> second AZ.
 
 ### 3. If something goes wrong
 
@@ -239,6 +246,14 @@ Lustre sizes must be multiples of 1200 GB.
 The cleanup job runs after your workload (success or failure). If both fail,
 the filesystem stays running until the cluster admin cleans up. Check `fsx-list`
 or `efs-cleanup` to see if anything is orphaned.
+
+**The `fsx-list`, `fsx-restore`, `fsx-purge`, and `efs-cleanup` commands aren't in my PATH.**
+
+These are installed to `/opt/slurm/bin/` when the wrapper module is deployed.
+That directory is added to PATH via `/etc/profile.d/slurm.sh` at login. If the
+commands are missing, your cluster admin needs to deploy the wrapper Terraform
+module (`scenario4-wrapper` or `scenario3-wrapper`). Log out and back in after
+they do.
 
 **Can I submit with regular `sbatch` instead of `fsx-sbatch`?**
 

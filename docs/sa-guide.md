@@ -294,6 +294,14 @@ fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
 The contrast — three job IDs vs one — is the demo moment. "The customer's users never
 change how they submit. The create, inject, flush, destroy is all invisible."
 
+> **Manual IAM step required before demo:** The wrapper's destroy jobs run on compute
+> nodes (`EpoxyChronicleInstanceRole`). That role needs `elasticfilesystem:*` and
+> `fsx:DescribeFileSystems` permissions — these are **not** attached by Terraform
+> automatically. Before demoing the EFS or FSx wrapper, attach the
+> `burstlab-workloads-efs-lifecycle` inline policy to `EpoxyChronicleInstanceRole`
+> in the IAM console. Without it, destroy jobs fail with AccessDenied. This is a
+> one-time step per cluster deploy.
+
 See [workloads/overview.md](workloads/overview.md) and
 [workloads/transparent-lifecycle.md](workloads/transparent-lifecycle.md) for full talking
 points per approach.

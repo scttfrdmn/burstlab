@@ -11,8 +11,8 @@ For the cluster user's perspective, see [user-guide.md](user-guide.md).
 | Approach | Gen 1 | Gen 2 | Gen 3 | Notes |
 |----------|-------|-------|-------|-------|
 | **0 — Chain** | Tested (FSx + EFS) | Not tested | Not tested | End-to-end on live Gen 1 cluster |
-| **A — Wrapper** | Not tested | Not tested | Not tested | Uses same fsx-lifecycle.sh as tested chain |
-| **B — Prolog/Epilog** | Not tested | Not tested | Not tested | Requires `scontrol update ... Environment=` (Slurm 21.08+, all gens qualify) |
+| **A — Wrapper** | Tested (FSx + EFS) | Not tested | Not tested | fsx-sbatch + efs-sbatch end-to-end on Gen 1; fsx-restore + fsx-purge verified |
+| **B — Prolog/Epilog** | Tested (FSx + EFS) | Not tested | Not tested | `scontrol update Environment=` NOT supported in 22.05 (23.02+); job uses deterministic state file path instead |
 | **C — Burst Buffer** | Cannot run | Not tested | Not tested | Requires `burst_buffer_lua.so` — not in current AMIs; needs `--with-lua` rebuild |
 
 The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
@@ -34,8 +34,8 @@ paths for the Lustre client and mount tooling.
 | **Visible to user** | 3 job IDs with dependencies | 1 job ID | 1 job ID; job in CF during provisioning | BF → R → CG states |
 | **Where storage is created** | Burst node (Job 1) | Head node (wrapper) | Head node (prolog) | Head node (data_in hook) |
 | **Deployment required** | None | `scenario{3,4}-wrapper/` | `scenario{3,4}-prolog-epilog/` | `scenario4-burst-buffer/` |
-| **slurm.conf change** | None | None | `SlurmctldProlog/Epilog` added | `BurstBufferType` added |
-| **Slurm version req.** | Any | Any (21.08+ for env inject) | 21.08+ (`scontrol update ... Environment=`) | Requires `burst_buffer/lua.so` in build |
+| **slurm.conf change** | None | None | `PrologSlurmctld/Epilog` added | `BurstBufferType` added |
+| **Slurm version req.** | Any | Any | Any (PREP plugin `prep/script` required; env inject via `scontrol update Environment=` works on 23.02+, not 22.05) | Requires `burst_buffer/lua.so` in build |
 | **FSx support** | Yes | Yes | Yes | Yes |
 | **EFS support** | Yes | Yes | Yes | No (BB is for high-perf scratch) |
 
@@ -106,11 +106,25 @@ else — the FSx create, the environment injection, the flush and destroy — is
 If a customer's users already submit jobs to the cluster, the only change is the
 command prefix."
 
+**Live testing notes (Gen 1):**
+- FSx Lustre legacy DRA mirrors the **full S3 key path** from the bucket root into the
+  Lustre namespace. `ImportPath` is a filter, not a root mapping. Data written to Lustre
+  path `output/` is exported to S3 at `${S3_PREFIX}/output/` (via ExportPath). On restore,
+  the same S3 data appears in Lustre at `${MOUNT_POINT}/${S3_PREFIX}/output/`.
+- EFS mount targets must exist in **both** cloud subnets (a and b). EFS DNS is AZ-specific;
+  burst nodes can land in either AZ. Without the second mount target, the DNS fails to
+  resolve on nodes in the wrong AZ.
+- EFS DNS propagation takes up to 90s after a mount target enters `available` state. The
+  wrapper waits 90s before submitting the workload job.
+- Compute nodes (`EpoxyChronicleInstanceRole`) require `elasticfilesystem:*` and
+  `fsx:DescribeFileSystems` IAM permissions for the destroy jobs to work. Add inline policy
+  `burstlab-workloads-efs-lifecycle` to the compute node role.
+
 ---
 
 ## Approach B — Prolog/Epilog
 
-Uses Slurm's `SlurmctldProlog` and `SlurmctldEpilog` hooks, which run on the head node
+Uses Slurm's `PrologSlurmctld` and `EpilogSlurmctld` hooks, which run on the head node
 as `SlurmUser` before and after every job.
 
 ```bash
@@ -118,9 +132,13 @@ sbatch --comment=fsx:1200 --partition=aws myjob.sh
 ```
 
 The prolog checks `SLURM_JOB_COMMENT`:
-- `fsx:N` → creates FSx, waits for AVAILABLE, injects `FSX_STATE_FILE` via `scontrol update`
-- `efs`   → creates EFS, waits for mount target, injects `EFS_STATE_FILE`
+- `fsx:N` → creates FSx, waits for AVAILABLE, writes state file to `/opt/slurm/var/fsx-state/$USER/job-$ID.env`
+- `efs`   → creates EFS, waits for available + mount target, writes state file to `/opt/slurm/var/efs-state/$USER/job-$ID.env`
 - anything else → exit 0 immediately (zero cost for all other jobs)
+
+> **Note:** `scontrol update JobId=N Environment=VAR=VAL` is not supported in Slurm 22.05
+> (added in 23.02). The prolog writes state to a deterministic NFS path; the job script
+> derives the path from `$SLURM_JOB_ID` instead of reading an injected env var.
 
 Jobs without the trigger comment run without any overhead.
 
@@ -129,13 +147,37 @@ Jobs without the trigger comment run without any overhead.
 cd terraform/workloads/scenario4-prolog-epilog/
 terraform init && terraform apply
 # Deploys scripts to /opt/slurm/etc/scripts/
-# Idempotently patches slurm.conf with SlurmctldProlog/Epilog/PrologEpilogTimeout=1800
-# Runs scontrol reconfigure (no slurmctld restart needed)
+# Idempotently patches slurm.conf:
+#   PrologSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh
+#   EpilogSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-epilog.sh
+#   PrologEpilogTimeout=1800
+#   PrepPlugins=prep/script   ← REQUIRED in Slurm 22.05 for PrologSlurmctld to fire
+# After patching, slurmctld must be RESTARTED (not just reconfigured) for
+# PrepPlugins to take effect. The Terraform module runs scontrol reconfigure;
+# restart slurmctld manually if PrologSlurmctld is not being called.
 ```
+
+**Live testing notes (Gen 1, Slurm 22.05):**
+- `SlurmUser` runs with PATH `/sbin:/bin:/usr/sbin:/usr/bin`. The prolog scripts prepend
+  `/usr/local/bin` where the AWS CLI lives.
+- `PrologSlurmctld`/`EpilogSlurmctld` are implemented via the PREP plugin framework in
+  22.05. They are silently ignored unless `PrepPlugins=prep/script` is in slurm.conf.
+  After adding this line, slurmctld must be **restarted** (not just reconfigured) to load
+  the plugin.
+- The state file is written to `/opt/slurm/var/{fsx,efs}-state/$USER/job-$ID.env` (NFS
+  path, writable by `slurm` user, readable from all nodes). Home dirs (chmod 700) are not
+  accessible to the `slurm` user.
+- The job script uses `set -a; source "$STATE_FILE"; set +a` before `exec`ing the workload
+  script — `set -a` is required so the sourced variables are exported into the child
+  process (plain `source` only sets them in the current shell).
+- The job should poll up to 30s for the state file (NFS attribute cache may briefly hide
+  a file written by the prolog 0.1 seconds earlier on the head node).
+- EFS: `efs_wait_available` must be called **before** `efs_add_mount_target` — EFS rejects
+  `CreateMountTarget` while still in `creating` state (`IncorrectFileSystemLifeCycleState`).
 
 **Coexistence:** If both scenario3-prolog-epilog and scenario4-prolog-epilog are applied,
 they share a single combined `storage-slurmctld-prolog.sh` dispatcher that handles both
-`fsx:` and `efs` comment prefixes. Slurm only allows one `SlurmctldProlog` line.
+`fsx:` and `efs` comment prefixes. Slurm only allows one `PrologSlurmctld` line.
 
 **When to use:** Clusters that already use prolog/epilog for other purposes (license
 checkout, CVMFS warming, container pull). The `--comment` convention integrates cleanly
@@ -228,7 +270,7 @@ Customer question: "How do we hide the create/destroy from our users?"
 Is the cluster new or are they adding bursting from scratch?
   → Burst Buffer (C) if they know DataWarp/Cray, otherwise Prolog/Epilog (B)
 
-Does the cluster already have SlurmctldProlog configured?
+Does the cluster already have PrologSlurmctld configured?
   → Prolog/Epilog (B) — add storage lifecycle to the existing hook
 
 Does the customer want zero scheduler config changes?

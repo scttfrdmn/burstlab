@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# fsx-slurmctld-prolog.sh — SlurmctldProlog for ephemeral FSx Lustre
+# fsx-slurmctld-prolog.sh — PrologSlurmctld for ephemeral FSx Lustre
 #
 # Installed to /opt/slurm/etc/scripts/ and referenced in slurm.conf:
-#   SlurmctldProlog=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh
+#   PrologSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh
 #   PrologEpilogTimeout=1800
 #
 # This script (and efs-slurmctld-prolog.sh) are combined into a single
@@ -13,7 +13,7 @@
 # Trigger: #SBATCH --comment=fsx:<storage_gb>
 #   Example: #SBATCH --comment=fsx:1200
 #
-# Slurm env vars available to SlurmctldProlog:
+# Slurm env vars available to PrologSlurmctld:
 #   SLURM_JOB_ID, SLURM_JOB_COMMENT, SLURM_JOB_USER,
 #   SLURM_JOB_PARTITION, SLURM_JOB_UID
 #
@@ -28,6 +28,10 @@
 # =============================================================================
 
 set -euo pipefail
+
+# SlurmUser runs with a minimal PATH — ensure /usr/local/bin is included
+# for the AWS CLI (installed at /usr/local/bin/aws)
+export PATH="/usr/local/bin:${PATH}"
 
 # Not an FSx job — exit immediately (no cost for normal jobs)
 if [[ ! "${SLURM_JOB_COMMENT:-}" =~ ^fsx:([0-9]+)$ ]]; then
@@ -83,8 +87,10 @@ FSX_MOUNT_NAME=$(aws fsx describe-file-systems \
   --query 'FileSystems[0].LustreConfiguration.MountName' \
   --output text)
 
-# Write state file (owned by the submitting user)
-STATE_DIR=$(eval echo "~${SLURM_JOB_USER}/.fsx-state")
+# Write state file — use /opt/slurm/var (NFS, writable by slurm user, readable
+# from all nodes). Cannot use ~/. fsx-state: slurm user has no access to user
+# home dirs (chmod 700).
+STATE_DIR="/opt/slurm/var/fsx-state/${SLURM_JOB_USER}"
 mkdir -p "${STATE_DIR}"
 chmod 755 "${STATE_DIR}"
 STATE_FILE="${STATE_DIR}/job-${SLURM_JOB_ID}.env"
@@ -99,13 +105,16 @@ CREATED_BY_JOB=${JOB_REF}
 GRANULARITY=${GRANULARITY}
 CAMPAIGN_NAME=${CAMPAIGN_NAME}
 EOF
-chown "${SLURM_JOB_UID}" "${STATE_FILE}" 2>/dev/null || true
-chmod 644 "${STATE_FILE}"
+# chown requires root on NFS — use world-writable so the job user can append
+# (WORKLOAD_JOB_ID gets appended by job2-run-workload.sh after the workload).
+chmod 666 "${STATE_FILE}"
 
 # ---------------------------------------------------------------------------
-# Inject FSX_STATE_FILE into the job's environment
-# Slurm 21.08+ supports: scontrol update JobId=N Environment="KEY=VAL"
-# This appends to the job's existing environment (does not replace).
+# Attempt to inject FSX_STATE_FILE into the job's environment.
+# NOTE: scontrol update Environment= is NOT supported in Slurm 22.05
+# (added in 23.02+). On 22.05 this always falls through to the fallback.
+# The example-job.sh derives the state file path from SLURM_JOB_ID directly
+# so the env injection failure does not matter in practice.
 # ---------------------------------------------------------------------------
 SLURM_BIN=/opt/slurm/bin
 "${SLURM_BIN}/scontrol" update \
