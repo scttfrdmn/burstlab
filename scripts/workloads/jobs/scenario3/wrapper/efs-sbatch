@@ -56,10 +56,18 @@ if ! grep -q '^#SBATCH[[:space:]]\+--comment=efs' "$JOB_SCRIPT" 2>/dev/null; the
 fi
 
 # ---------------------------------------------------------------------------
+# Source cluster config (set by Terraform — provides infrastructure vars)
+# ---------------------------------------------------------------------------
+if [ -f /etc/sysconfig/burstlab-workloads ]; then
+  # shellcheck source=/dev/null
+  source /etc/sysconfig/burstlab-workloads
+fi
+
+# ---------------------------------------------------------------------------
 # Validate required env vars
 # ---------------------------------------------------------------------------
-: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set (from terraform output -raw burst_subnet_id)}"
-: "${EFS_SG_ID:?EFS_SG_ID must be set (from terraform output -raw efs_sg_id)}"
+: "${BURST_SUBNET_ID:?BURST_SUBNET_ID must be set — is the workloads overlay deployed?}"
+: "${EFS_SG_ID:?EFS_SG_ID must be set — is the workloads overlay deployed?}"
 : "${AWS_REGION:?AWS_REGION must be set}"
 
 export AWS_REGION BURST_SUBNET_ID EFS_SG_ID
@@ -77,9 +85,25 @@ JOB_REF="wrap-$(date +%s)"
 export GRANULARITY CAMPAIGN_NAME JOB_REF
 
 EFS_ID=$(efs_create "${JOB_REF}")
-efs_add_mount_target "${EFS_ID}" "${BURST_SUBNET_ID}" "${EFS_SG_ID}"
 efs_wait_available "${EFS_ID}"
+
+# Create mount targets in BOTH cloud subnets (a and b).
+# EFS DNS is AZ-specific: it only resolves to the mount target in the SAME
+# AZ as the client. Burst nodes can land in either us-west-2a (cloud_a) or
+# us-west-2b (cloud_b) via the EC2 Fleet. Without mount targets in both,
+# burst nodes in the "wrong" AZ get "Name or service not known".
+efs_add_mount_target "${EFS_ID}" "${BURST_SUBNET_ID}" "${EFS_SG_ID}"
+if [ -n "${CLOUD_SUBNET_A_ID:-}" ] && [ "${CLOUD_SUBNET_A_ID}" != "${BURST_SUBNET_ID}" ]; then
+  efs_add_mount_target "${EFS_ID}" "${CLOUD_SUBNET_A_ID}" "${EFS_SG_ID}"
+fi
 efs_wait_mount_target "${EFS_ID}"
+
+# DNS propagation: AWS documents up to 90s for EFS mount target DNS to
+# resolve after the mount target reaches 'available' state. Without this
+# wait, jobs that start quickly on pre-warmed burst nodes fail with
+# "Name or service not known" because DNS hasn't propagated yet.
+echo "efs-sbatch: waiting 90s for EFS DNS to propagate..." >&2
+sleep 90
 EFS_DNS="${EFS_ID}.efs.${AWS_REGION}.amazonaws.com"
 
 # Write state file
