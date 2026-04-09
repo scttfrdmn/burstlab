@@ -128,6 +128,20 @@ efs_wait_mount_target() {
 }
 
 # -----------------------------------------------------------------------------
+# efs_get_mount_target_ip <efs_id>
+# Returns the IP address of the first available mount target.
+# Use this as a fallback when DNS has not yet propagated.
+# -----------------------------------------------------------------------------
+efs_get_mount_target_ip() {
+  local efs_id="$1"
+  aws efs describe-mount-targets \
+    --file-system-id "$efs_id" \
+    --region "${AWS_REGION}" \
+    --query 'MountTargets[0].IpAddress' \
+    --output text 2>/dev/null
+}
+
+# -----------------------------------------------------------------------------
 # efs_destroy <efs_id>
 # Deletes all mount targets then the filesystem. Polls until mount targets
 # are fully deleted before calling DeleteFileSystem.

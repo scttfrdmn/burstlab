@@ -64,11 +64,16 @@ fi
 
 echo "  Current state: ${CURRENT_STATE}"
 
-# Flush results from FSx back to S3 via data repository export task
-# This ensures output files written during Job 2 are durably persisted to S3.
+# Flush results from FSx back to S3 via data repository export task.
+# Skip when SKIP_EXPORT=true (restore chain: data already in S3, nothing new to flush).
 echo ""
-echo "Flushing results from FSx to s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/..."
-TASK_ID=$(fsx_flush_to_s3 "${FSX_ID}" "output/")
+TASK_ID=""
+if [ "${SKIP_EXPORT:-false}" = "true" ]; then
+  echo "Skipping S3 export (SKIP_EXPORT=true — restore chain, data already in S3)."
+else
+  echo "Flushing results from FSx to s3://${S3_DATA_BUCKET}/${S3_PREFIX}/output/..."
+  TASK_ID=$(fsx_flush_to_s3 "${FSX_ID}" "output/")
+fi
 
 if [ -n "${TASK_ID}" ]; then
   echo "  Export task: ${TASK_ID}"

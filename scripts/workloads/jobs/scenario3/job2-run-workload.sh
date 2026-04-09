@@ -52,10 +52,11 @@ TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
 MOUNT_POINT="/tmp/efs-${EFS_ID}-${SLURM_JOB_ID}-${TASK_ID}"
 mkdir -p "${MOUNT_POINT}"
 
-echo "Mounting ${EFS_DNS}:/ at ${MOUNT_POINT}..."
+EFS_MOUNT_HOST="${EFS_MOUNT_IP:-${EFS_DNS}}"
+echo "Mounting ${EFS_MOUNT_HOST}:/ at ${MOUNT_POINT}..."
 sudo mount -t nfs4 \
   -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
-  "${EFS_DNS}:/" \
+  "${EFS_MOUNT_HOST}:/" \
   "${MOUNT_POINT}"
 
 echo "  Mounted successfully."
