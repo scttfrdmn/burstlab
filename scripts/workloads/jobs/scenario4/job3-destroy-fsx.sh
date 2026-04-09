@@ -24,6 +24,7 @@
 #SBATCH --error=/home/alice/logs/fsx-destroy-%j.err
 
 set -euo pipefail
+export PATH="/usr/local/bin:${PATH}"
 mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/fsx-lifecycle.sh

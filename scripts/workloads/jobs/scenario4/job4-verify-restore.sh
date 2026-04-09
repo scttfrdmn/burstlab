@@ -23,6 +23,7 @@
 #SBATCH --error=/home/alice/logs/fsx-verify-restore-%j.err
 
 set -euo pipefail
+export PATH="/usr/local/bin:${PATH}"
 mkdir -p /home/alice/logs
 
 # Ensure Lustre kernel module is loaded

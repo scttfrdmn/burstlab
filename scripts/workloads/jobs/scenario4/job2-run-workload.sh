@@ -24,6 +24,7 @@
 #SBATCH --error=/home/alice/logs/fsx-workload-%j.err
 
 set -euo pipefail
+export PATH="/usr/local/bin:${PATH}"
 mkdir -p /home/alice/logs
 
 # Ensure Lustre kernel module is loaded (pre-installed at node boot via burst-node-init.sh.tpl)

@@ -211,6 +211,9 @@ if mountpoint -q /home; then
     chmod 600 /home/alice/.ssh/authorized_keys
     echo "SSH key installed for alice."
   fi
+  # Workload job output and results directories
+  mkdir -p /home/alice/logs /home/alice/results
+  chown alice:alice /home/alice/logs /home/alice/results
   echo "Created /home/alice home directory on EFS."
 fi
 

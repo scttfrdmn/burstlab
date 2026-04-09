@@ -38,6 +38,19 @@ FSX_STATE_DIR="${FSX_STATE_DIR:-/home/alice/.fsx-state}"
 FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
 S3_DATA_PREFIX="${S3_DATA_PREFIX:-data/}"
 
+# Lustre version for FSx SCRATCH_2 filesystem. Must match the Lustre client
+# installed on burst nodes. EL8 repos have 2.12, EL9 repos have 2.15.
+# Auto-detect from OS if not explicitly set.
+if [ -z "${FSX_LUSTRE_VERSION:-}" ]; then
+  _os_major=$(. /etc/os-release 2>/dev/null && echo "${VERSION_ID%%.*}" || echo "8")
+  if [ "$_os_major" -ge 9 ] 2>/dev/null; then
+    FSX_LUSTRE_VERSION="2.15"
+  else
+    FSX_LUSTRE_VERSION="2.12"
+  fi
+  unset _os_major
+fi
+
 # -----------------------------------------------------------------------------
 # fsx_create <job_id> <s3_bucket> [s3_prefix] [subnet_id] [sg_id] [storage_gb]
 # Creates a SCRATCH_2 FSx Lustre filesystem with S3 data repository association.
@@ -69,7 +82,7 @@ fsx_create() {
 
   aws fsx create-file-system \
     --file-system-type LUSTRE \
-    --file-system-type-version "2.15" \
+    --file-system-type-version "${FSX_LUSTRE_VERSION}" \
     --storage-capacity "$storage_gb" \
     --storage-type SSD \
     --subnet-ids "$subnet_id" \
