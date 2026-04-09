@@ -233,6 +233,7 @@ module "compute_nodes" {
 
   head_node_private_ip = local.head_node_private_ip
   onprem_cidr          = module.vpc.onprem_subnet_cidr
+  iam_instance_profile = module.iam.head_node_instance_profile_name
 
   depends_on = [time_sleep.efs_dns]
 }

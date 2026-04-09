@@ -67,22 +67,22 @@ RHEL 10's DEFAULT crypto policy raises the minimum RSA key size from 2048 bits (
 to 3072 bits. Standard EC2 key pairs are 2048-bit RSA and are silently rejected by sshd when
 this policy is in effect — the connection resets before the SSH version string exchange.
 
-The Gen 3 Packer AMI sets the crypto policy to `LEGACY` via:
-```
-sudo update-crypto-policies --set LEGACY
-```
+**BurstLab uses an Ed25519 key (`burstlab-key`), which is not affected by the RSA size
+restriction.** Gen 3 stays on the `DEFAULT` crypto policy with no modification needed.
 
-The `LEGACY` policy matches RHEL 9's DEFAULT behavior and accepts 2048-bit RSA keys. This
-allows existing `burstlab-key` EC2 key pairs to work without requiring users to create new
-4096-bit or Ed25519 keys.
+This is the cleanest solution: Ed25519 keys are smaller, faster, and not subject to the
+RSA minimum-size policy. An earlier version of BurstLab used RSA-2048 and worked around this
+by setting `update-crypto-policies --set LEGACY`, but switching to Ed25519 eliminates the
+need to weaken the crypto policy.
 
-The policy is set at AMI build time and persists to disk (`/etc/crypto-policies/config`).
-sshd reads it on startup and applies it to all connections — no runtime restart needed.
+If you bring your own RSA-2048 key instead of using `burstlab-key`, you have two options:
+1. **Recommended:** create an Ed25519 key pair instead (`aws ec2 create-key-pair --key-type ed25519 ...`)
+2. **Workaround:** set `update-crypto-policies --set LEGACY` on the instance to allow RSA-2048
 
-Verify on a running Gen 3 instance:
+Verify the crypto policy on a running Gen 3 instance:
 ```bash
 update-crypto-policies --show
-# Should print: LEGACY
+# Should print: DEFAULT
 ```
 
 ### 4. slurmrestd NOT built on Rocky 10
@@ -218,7 +218,7 @@ Slurm 24.05 ignores them with a warning if present on v2 systems.
 | Repo extra | powertools | crb | crb + epel |
 | cgroup | v1 | v2 (EC2 AMI — no v1) | v2 (required) |
 | iptables | iptables-services | iptables-services | iptables-nft |
-| crypto policy | DEFAULT (RSA-2048 ok) | DEFAULT (RSA-2048 ok) | LEGACY (allows RSA-2048) |
+| crypto policy | DEFAULT | DEFAULT | DEFAULT (Ed25519 key; RSA-2048 blocked) |
 | `SlurmctldParameters` | *(none)* | idle_on_node_suspend | idle_on_node_suspend, cloud_reg_addrs |
 | slurmrestd | not built | built, not started | **not built** (http-parser-devel not in EPEL 10) |
 | Cloud node IP | DNS/subnet match | DNS/subnet match | registered at connect |
@@ -269,15 +269,15 @@ scontrol show node aws-burst-0 | grep NodeAddr
 ## Troubleshooting Gen 3-Specific Issues
 
 **SSH connection reset immediately (`kex_exchange_identification: read: Connection reset`):**
-- Rocky 10 DEFAULT crypto policy rejects RSA keys < 3072 bits. The `burstlab-key` EC2 key
-  pair is 2048-bit RSA. The Gen 3 AMI sets `update-crypto-policies --set LEGACY` to allow it.
-- Verify: `ssh rocky@<ip> 'update-crypto-policies --show'` should print `LEGACY`.
-- If a manually-built AMI is missing the policy: `sudo update-crypto-policies --set LEGACY`
-  on the running instance, then reconnect.
+- Rocky 10 DEFAULT crypto policy rejects RSA keys < 3072 bits. BurstLab's `burstlab-key` is
+  Ed25519 and is not affected. If you see this error, you are likely using your own RSA-2048 key.
+- Verify: `ssh rocky@<ip> 'update-crypto-policies --show'` should print `DEFAULT`.
+- Fix: either switch to an Ed25519 key pair (recommended) or run
+  `sudo update-crypto-policies --set LEGACY` on the instance to allow RSA-2048, then reconnect.
 - **Known issue with SSH ControlMaster:** If your `~/.ssh/config` has `ControlMaster auto`
   with `ControlPersist`, the initial connection may succeed (reusing an existing master socket)
   but subsequent fresh connections fail after the persist timeout expires. This is what makes
-  the problem intermittent. The crypto policy fix addresses the root cause.
+  the problem intermittent. Switching to an Ed25519 key addresses the root cause.
 
 **slurmd fails with `cgroup namespace not found` or `cgroup/v1 not supported`:**
 - Rocky 10 has no v1. Confirm `cgroup.conf` has `CgroupPlugin=cgroup/v2`.
