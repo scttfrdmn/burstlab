@@ -300,6 +300,7 @@ module "burst_config" {
   head_node_private_ip = local.head_node_private_ip
 
   aws_region = var.aws_region
+  generation = "gen1"
 }
 
 # =============================================================================

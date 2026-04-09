@@ -165,11 +165,11 @@ init scripts are unchanged because `iptables-nft` provides compatible command-li
 *Python 3.12 default.* Rocky 10 ships Python 3.12 as the default. boto3 installs cleanly.
 No shim is needed (same as Gen 2).
 
-*RSA-2048 blocked by RHEL 10 crypto policy.* RHEL 10's `DEFAULT` crypto policy blocks
-RSA-2048 keys. If the EC2 key pair used for SSH is RSA-2048, SSH connections to Gen 3
-nodes will fail with `no matching host key type`. The Gen 3 Packer AMI sets
-`LEGACY` crypto policy to allow RSA-2048. (EC2 key pairs generated in the console are
-RSA-2048; ED25519 key pairs are not affected and do not require this workaround.)
+*Ed25519 SSH key — no crypto policy workaround needed.* RHEL 10's `DEFAULT` crypto
+policy raises the minimum RSA key size to 3072 bits, which would block the 2048-bit RSA
+keys that EC2 generates by default. BurstLab uses an Ed25519 key (`burstlab-key`), which
+is not affected by the RSA size restriction. Gen 3 stays on the `DEFAULT` crypto policy
+with no modification needed.
 
 **Relevant customer profiles:**
 - Building a new cluster from scratch (greenfield deployment)
@@ -229,7 +229,7 @@ Gen 3 (Rocky 10, Slurm 24.05)
   ├── cgroup v2 only (v1 kernel support removed in RHEL 10)
   ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
   ├── iptables-nft (iptables-services removed from RHEL 10)
-  └── LEGACY crypto policy for RSA-2048 SSH key compatibility
+  └── Ed25519 SSH key (avoids RSA-2048 restriction in RHEL 10 DEFAULT crypto policy)
 ```
 
 ---

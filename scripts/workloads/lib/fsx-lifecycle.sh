@@ -39,8 +39,8 @@ FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
 S3_DATA_PREFIX="${S3_DATA_PREFIX:-data/}"
 
 # Lustre version for FSx SCRATCH_2 filesystem. Must match the Lustre client
-# installed on burst nodes. EL8 repos have 2.12, EL9 repos have 2.15.
-# Auto-detect from OS if not explicitly set.
+# installed on burst nodes: EL8 → 2.12, EL9/EL10 → 2.15.
+# Auto-detect from OS major version if not explicitly set.
 if [ -z "${FSX_LUSTRE_VERSION:-}" ]; then
   _os_major=$(. /etc/os-release 2>/dev/null && echo "${VERSION_ID%%.*}" || echo "8")
   if [ "$_os_major" -ge 9 ] 2>/dev/null; then

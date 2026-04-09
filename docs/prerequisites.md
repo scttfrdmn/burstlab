@@ -103,9 +103,9 @@ chmod 400 ~/.ssh/burstlab-key.pem
 ```
 
 > **Rocky 10 / Gen 3 note:** RHEL 10's default crypto policy blocks RSA-2048 SSH keys.
-> EC2 key pairs created in the console are RSA-2048. If you plan to deploy Gen 3, use
-> an ED25519 key pair (not affected) or the Gen 3 AMI handles this via `LEGACY` crypto
-> policy. See [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md) for details.
+> BurstLab's `burstlab-key` is Ed25519, which is not affected by this RSA size restriction.
+> No crypto policy change is needed on Gen 3 nodes. If you bring your own RSA-2048 key,
+> see [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md) for details on the restriction.
 
 ---
 

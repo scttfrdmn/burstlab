@@ -54,7 +54,7 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 REPOEOF
-yum install -y kmod-lustre-client lustre-client 2>/dev/null || true
+dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
 
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
 # that blocks munge (873), slurmctld (6817), and NFS (2049).

@@ -282,19 +282,13 @@ build {
       # =======================================================================
       # STEP 10: SELinux permissive + crypto policy
       #
-      # Rocky 10 (RHEL 10) DEFAULT crypto policy sets minimum RSA key length
-      # to 3072 bits. Standard EC2 key pairs are 2048-bit RSA and are rejected
-      # by sshd under the DEFAULT policy. Set to LEGACY to allow 2048-bit RSA
-      # (same behavior as RHEL 9 DEFAULT). This ensures existing EC2 key pairs
-      # work without requiring the user to create a new 4096-bit or Ed25519 key.
+      # Rocky 10 (RHEL 10) DEFAULT crypto policy sets minimum RSA key size
+      # to 3072 bits. We use Ed25519 key pairs (burstlab-key) which are not
+      # affected by RSA size requirements, so no crypto policy change is needed.
       # =======================================================================
-      "echo '==> [10/12] Setting SELinux to permissive + crypto policy to LEGACY'",
+      "echo '==> [10/12] Setting SELinux to permissive'",
       "sudo setenforce 0 || true",
       "sudo sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config",
-      # Set crypto policy to LEGACY. This writes /etc/crypto-policies/config.
-      # sshd picks it up at next boot — no restart needed here during the Packer
-      # build (restarting sshd would terminate Packer's SSH connection).
-      "sudo update-crypto-policies --set LEGACY",
 
       # =======================================================================
       # STEP 11: Disable firewalld
