@@ -49,6 +49,8 @@ dnf makecache --refresh || true
 # -----------------------------------------------------------------------------
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
 getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /home/alice alice
+# Correct home dir if AMI was built with legacy /u/home/alice path
+getent passwd alice | grep -q '/u/home/alice' && usermod -d /home/alice alice || true
 
 # -----------------------------------------------------------------------------
 # 2. Set hostname
