@@ -86,7 +86,7 @@ fi
 # -------------------------------------------------------------------------
 STALE_FILES=()
 if [ -d "${STATE_DIR}" ]; then
-  for state_file in "${STATE_DIR}"/*.env 2>/dev/null; do
+  for state_file in "${STATE_DIR}"/*.env; do
     [ -f "$state_file" ] || continue
 
     EFS_ID=""

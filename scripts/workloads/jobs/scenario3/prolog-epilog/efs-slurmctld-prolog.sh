@@ -54,6 +54,10 @@ efs_wait_available "${EFS_ID}"
 efs_add_mount_target "${EFS_ID}" "${BURST_SUBNET_ID}" "${EFS_SG_ID}"
 efs_wait_mount_target "${EFS_ID}"
 EFS_DNS="${EFS_ID}.efs.${AWS_REGION}.amazonaws.com"
+EFS_MOUNT_IP=$(efs_get_mount_target_ip "${EFS_ID}")
+if [ -z "${EFS_MOUNT_IP}" ] || [ "${EFS_MOUNT_IP}" = "None" ]; then
+  echo "WARNING: could not resolve mount target IP; job will fall back to DNS" >&2
+fi
 
 # Write state file — use /opt/slurm/var (NFS, writable by slurm user, readable
 # from all nodes). Cannot use ~/.efs-state: slurm user has no access to user
@@ -65,6 +69,7 @@ STATE_FILE="${STATE_DIR}/job-${SLURM_JOB_ID}.env"
 cat > "${STATE_FILE}" << EOF
 EFS_ID=${EFS_ID}
 EFS_DNS=${EFS_DNS}
+EFS_MOUNT_IP=${EFS_MOUNT_IP}
 AWS_REGION=${AWS_REGION}
 BURST_SUBNET_ID=${BURST_SUBNET_ID}
 EFS_SG_ID=${EFS_SG_ID}

@@ -69,6 +69,7 @@ fsx_create() {
 
   aws fsx create-file-system \
     --file-system-type LUSTRE \
+    --file-system-type-version "2.15" \
     --storage-capacity "$storage_gb" \
     --storage-type SSD \
     --subnet-ids "$subnet_id" \

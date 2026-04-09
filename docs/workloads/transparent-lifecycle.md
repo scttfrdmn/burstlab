@@ -12,16 +12,29 @@ For the cluster user's perspective, see [user-guide.md](user-guide.md).
 |----------|-------|-------|-------|-------|
 | **0 — Chain** | Tested (FSx + EFS) | Not tested | Not tested | End-to-end on live Gen 1 cluster |
 | **A — Wrapper** | Tested (FSx + EFS) | Not tested | Not tested | fsx-sbatch + efs-sbatch end-to-end on Gen 1; fsx-restore + fsx-purge verified |
-| **B — Prolog/Epilog** | Tested (FSx + EFS) | Not tested | Not tested | `scontrol update Environment=` NOT supported in 22.05 (23.02+); job uses deterministic state file path instead |
+| **B — Prolog/Epilog** | Tested (FSx + EFS) | Tested (FSx + EFS) | Not tested | `scontrol update Environment=` NOT supported in 22.05 or 23.11; job uses deterministic state file path instead |
 | **C — Burst Buffer** | Cannot run | Not tested | Not tested | Requires `burst_buffer_lua.so` — not in current AMIs; needs `--with-lua` rebuild |
 
 The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
 `efs-lifecycle.sh` libraries. The primary risk is in the integration glue (env
 injection, `scontrol update`, combined dispatcher), not in the AWS API calls.
 
-Gen 2 and Gen 3 use different Slurm versions (23.11 and 24.05) but the lifecycle
-scripts use only stable Slurm APIs. The main Gen 2/3 risk is untested cloud-init
-paths for the Lustre client and mount tooling.
+Gen 2 (Slurm 23.11, Rocky 9) is fully validated for Approach B. Gen 3 (Slurm 24.05,
+Rocky 10) is not yet tested. The lifecycle scripts use only stable Slurm APIs.
+
+**Gen 2 operational notes (Slurm 23.11.10, Rocky 9, AMI `ami-069e41e072fedcf8e`):**
+- `scontrol update Environment=` is NOT supported in 23.11.10 (returns "Update of
+  this parameter is not supported") — deterministic state file path workaround required
+- **FSx Lustre version:** The AWS EL9 Lustre client repo only provides version 2.15.x
+  packages. FSx SCRATCH_2 defaults to Lustre 2.10 which is incompatible with the 2.15
+  client (`Server MGS version (2.10) refused connection from client 2.15`). Always specify
+  `--file-system-type-version "2.15"` when creating FSx for Rocky 9 burst nodes. This is
+  already set in `scripts/workloads/lib/fsx-lifecycle.sh`.
+- **EFS DNS propagation:** Route 53 private hosted zone records for new EFS mount targets
+  take >5 minutes to propagate after the mount target reaches `available` state — even
+  head node `nslookup` fails during this window. Mount using the IP address directly
+  (returned by `efs_get_mount_target_ip()` in `efs-lifecycle.sh`). The prolog writes
+  `EFS_MOUNT_IP` to the state file; the job script uses `${EFS_MOUNT_IP:-${EFS_DNS}}`.
 
 ---
 

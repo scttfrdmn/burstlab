@@ -83,31 +83,32 @@ echo "  Mounted successfully."
 PASS=0
 FAIL=0
 
-_pass() { echo "  [PASS] $1"; ((PASS++)); }
-_fail() { echo "  [FAIL] $1"; ((FAIL++)); }
+_pass() { echo "  [PASS] $1"; PASS=$((PASS + 1)); }
+_fail() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
 
 echo ""
 echo "=== Verification ==="
 
-# FSx initial S3 metadata import is asynchronous — it completes in the
-# background after the filesystem enters AVAILABLE. The initial import of
-# a small number of objects can take 5-15 min. Listing directories at each
-# level forces FSx to contact S3 and populate the namespace for that level.
+# FSx legacy DRA mirrors the FULL S3 key path from the bucket root.
+# ImportPath is used only as a filter — it does NOT strip the prefix from
+# Lustre paths. So data at S3 key "${S3_PREFIX}/output/..." appears in
+# Lustre at "${MOUNT_POINT}/${S3_PREFIX}/output/...".
+DATA_ROOT="${MOUNT_POINT}/${S3_PREFIX}"
 echo "Waiting for S3 namespace to populate in Lustre (up to 10 min)..."
-OUTPUT_DIR="${MOUNT_POINT}/output"
+OUTPUT_DIR="${DATA_ROOT}/output"
 POPULATED=false
 for attempt in $(seq 1 40); do
   # Progressively list deeper paths to trigger lazy discovery at each level
   ls "${MOUNT_POINT}/" 2>/dev/null || true
-  ls "${MOUNT_POINT}/output/" 2>/dev/null || true
+  ls "${DATA_ROOT}/" 2>/dev/null || true
+  ls "${DATA_ROOT}/output/" 2>/dev/null || true
 
-  ROOT_ENTRIES=$(ls "${MOUNT_POINT}/" 2>/dev/null | wc -l | tr -d ' ')
   if [ -d "${OUTPUT_DIR}" ]; then
     POPULATED=true
-    echo "  attempt ${attempt}: output/ found (root has ${ROOT_ENTRIES} entries)"
+    echo "  attempt ${attempt}: output/ found"
     break
   fi
-  echo "  attempt ${attempt}/40: output/ not visible (root=${ROOT_ENTRIES} entries) — waiting 15s..."
+  echo "  attempt ${attempt}/40: output/ not visible — waiting 15s..."
   sleep 15
 done
 
@@ -115,7 +116,7 @@ done
 if $POPULATED; then
   _pass "output/ directory exists in Lustre namespace"
 else
-  _fail "output/ directory NOT found after 3 minutes — S3 data may not have imported"
+  _fail "output/ directory NOT found after 10 minutes — S3 data may not have imported"
   sudo umount "${MOUNT_POINT}" && rmdir "${MOUNT_POINT}"
   exit 1
 fi
@@ -129,7 +130,7 @@ else
 fi
 
 # Check 3: Input directory exists (data from original staging)
-INPUT_DIR="${MOUNT_POINT}/input"
+INPUT_DIR="${DATA_ROOT}/input"
 if [ -d "${INPUT_DIR}" ]; then
   INPUT_COUNT=$(find "${INPUT_DIR}" -type f 2>/dev/null | wc -l)
   _pass "input/ directory exists with ${INPUT_COUNT} files"
@@ -140,7 +141,7 @@ fi
 # Check 4: HSM state of output files (should be stubs before read)
 echo ""
 echo "Pre-hydration HSM state (files should be 'released' stubs):"
-for f in "${OUTPUT_DIR}"/*/* 2>/dev/null; do
+for f in "${OUTPUT_DIR}"/*/*; do
   [ -f "$f" ] || continue
   HSM=$(lfs hsm_state "$f" 2>/dev/null | awk '{print $2}' || echo "unknown")
   FNAME=$(basename "$f")
@@ -154,7 +155,8 @@ echo "Reading files to trigger S3 hydration..."
 START=$(date +%s)
 
 CHECKSUMS_FILE=$(mktemp)
-for f in "${OUTPUT_DIR}"/*/* 2>/dev/null; do
+trap "rm -f '${CHECKSUMS_FILE}'" EXIT
+for f in "${OUTPUT_DIR}"/*/*; do
   [ -f "$f" ] || continue
   FNAME=$(echo "$f" | sed "s|${OUTPUT_DIR}/||")
   FILE_START=$(date +%s)
@@ -171,7 +173,7 @@ _pass "Hydrated ${HYDRATED_COUNT} files from S3 in ${ELAPSED}s"
 # Check 6: Post-hydration HSM state (should no longer be 'released')
 echo ""
 echo "Post-hydration HSM state (files should now be local):"
-for f in "${OUTPUT_DIR}"/*/* 2>/dev/null; do
+for f in "${OUTPUT_DIR}"/*/*; do
   [ -f "$f" ] || continue
   HSM=$(lfs hsm_state "$f" 2>/dev/null | awk '{print $2}' || echo "unknown")
   FNAME=$(basename "$f")

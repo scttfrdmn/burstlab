@@ -51,9 +51,8 @@ if [ -d "${STATE_DIR}" ] && ls "${STATE_DIR}"/*.env &>/dev/null; then
     RUN_KEY="${CREATED_BY_JOB:-$(basename "$state_file" .env | sed 's/^job-//')}"
     SIZE_GB="${FSX_STORAGE_GB:-1200}"
 
-    # Get creation time from file modification time
-    STARTED=$(stat -f '%Sm' -t '%b %d %H:%M' "$state_file" 2>/dev/null || \
-              stat -c '%y' "$state_file" 2>/dev/null | cut -d. -f1 || echo "unknown")
+    # Get creation time from file modification time (Linux stat)
+    STARTED=$(stat -c '%y' "$state_file" 2>/dev/null | cut -d' ' -f1 || echo "unknown")
 
     printf "  %-12s %-24s %-14s %-8s %s\n" "${RUN_KEY}" "${FSX_ID}" "${FSX_STATE}" "${SIZE_GB} GB" "${STARTED}"
     HAS_ACTIVE=true
