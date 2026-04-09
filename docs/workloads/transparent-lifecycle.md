@@ -25,11 +25,10 @@ Rocky 10) is not yet tested. The lifecycle scripts use only stable Slurm APIs.
 **Gen 2 operational notes (Slurm 23.11.10, Rocky 9, AMI `ami-069e41e072fedcf8e`):**
 - `scontrol update Environment=` is NOT supported in 23.11.10 (returns "Update of
   this parameter is not supported") — deterministic state file path workaround required
-- **FSx Lustre version:** The AWS EL9 Lustre client repo only provides version 2.15.x
-  packages. FSx SCRATCH_2 defaults to Lustre 2.10 which is incompatible with the 2.15
-  client (`Server MGS version (2.10) refused connection from client 2.15`). Always specify
-  `--file-system-type-version "2.15"` when creating FSx for Rocky 9 burst nodes. This is
-  already set in `scripts/workloads/lib/fsx-lifecycle.sh`.
+- **FSx Lustre version:** The Lustre client version varies by OS: EL8 has 2.12.x, EL9 has
+  2.15.x. FSx SCRATCH_2 must be created with a matching `--file-system-type-version`.
+  `fsx-lifecycle.sh` auto-detects the OS major version and sets `FSX_LUSTRE_VERSION`
+  accordingly (override via env var if needed).
 - **EFS DNS propagation:** Route 53 private hosted zone records for new EFS mount targets
   take >5 minutes to propagate after the mount target reaches `available` state — even
   head node `nslookup` fails during this window. Mount using the IP address directly
