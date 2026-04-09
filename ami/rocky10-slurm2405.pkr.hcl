@@ -189,6 +189,12 @@ build {
 
       "sudo dnf install -y git curl wget jq rsync nfs-utils stunnel || true",
 
+      # AWS Systems Manager agent — enables SSM Session Manager as a fallback
+      # access path when SSH is unavailable. Connects outbound; no inbound ports needed.
+      # Requires AmazonSSMManagedInstanceCore IAM policy on the instance role.
+      "sudo dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm 2>&1 | tail -3 || true",
+      "sudo systemctl enable amazon-ssm-agent",
+
       # =======================================================================
       # STEP 3: Users
       # =======================================================================
@@ -200,8 +206,10 @@ build {
       "getent group slurm  >/dev/null 2>&1 || sudo groupadd -g 1001 slurm",
       "getent passwd slurm >/dev/null 2>&1 || sudo useradd -u 1001 -g slurm -s /sbin/nologin -d /var/lib/slurm -r slurm",
 
+      # alice: demo HPC user. Home is /home/alice (on EFS, created at runtime).
+      # -M: do NOT create home dir — /home is not mounted during AMI build.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -M alice",
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /home/alice -M alice",
 
       # =======================================================================
       # STEP 4: Download Slurm 24.05.x source

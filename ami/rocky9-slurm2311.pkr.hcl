@@ -183,6 +183,14 @@ build {
       # Development tools
       "sudo dnf install -y git curl wget jq rsync nfs-utils stunnel || true",
 
+      # AWS Systems Manager agent — enables SSM Session Manager as a fallback
+      # access path when SSH is unavailable (e.g., sshd misconfiguration, key issues).
+      # The agent requires no open inbound ports; it connects outbound to SSM endpoints.
+      # Requires AmazonSSMManagedInstanceCore IAM policy on the instance role (added
+      # to head node and burst node roles in the IAM Terraform module).
+      "sudo dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm 2>&1 | tail -3 || true",
+      "sudo systemctl enable amazon-ssm-agent",
+
       # =======================================================================
       # STEP 3: Pin munge and slurm users/groups to consistent UID/GID
       # Same IDs as Gen 1 to ensure EFS ownership is consistent if a site
@@ -197,9 +205,10 @@ build {
       "getent passwd slurm >/dev/null 2>&1 || sudo useradd -u 1001 -g slurm -s /sbin/nologin -d /var/lib/slurm -r slurm",
 
       # alice: demo HPC user (UID/GID 2000). -M prevents home dir creation
-      # during AMI build (/u does not exist until EFS is mounted at runtime).
+      # during AMI build (/home is not mounted until EFS attaches at runtime).
+      # Home is /home/alice on EFS — cloud-init creates the directory at first boot.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -M alice",
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /home/alice -M alice",
 
       # =======================================================================
       # STEP 4: Download Slurm 23.11.x source

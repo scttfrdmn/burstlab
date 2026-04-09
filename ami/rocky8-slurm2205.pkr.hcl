@@ -230,6 +230,12 @@ build {
       # NFS client — needed to mount EFS (amazon-efs-utils uses NFS under the hood)
       "sudo dnf install -y nfs-utils",
 
+      # AWS Systems Manager agent — enables SSM Session Manager as a fallback
+      # access path when SSH is unavailable. Connects outbound; no inbound ports needed.
+      # Requires AmazonSSMManagedInstanceCore IAM policy on the instance role.
+      "sudo dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm 2>&1 | tail -3 || true",
+      "sudo systemctl enable amazon-ssm-agent",
+
       # =======================================================================
       # STEP 3: Pin munge and slurm users/groups to consistent UID/GID
       #
@@ -257,14 +263,14 @@ build {
       "getent passwd slurm >/dev/null 2>&1 || sudo useradd -u 1001 -g slurm -s /sbin/nologin -d /var/lib/slurm -r slurm",
 
       # alice — demo HPC cluster user (UID/GID 2000)
-      # Home is /u/home/alice (on EFS), created at runtime by head-node-init.
+      # Home is /home/alice (on EFS), created at runtime by head-node-init.
       # We pre-create the user here with a consistent UID/GID so that files
       # alice writes on EFS show the same ownership on ALL nodes (head, compute, burst).
-      # -M: do NOT create home directory. /u does not exist during AMI build (EFS mount point).
+      # -M: do NOT create home directory. /home is not mounted until EFS attaches at runtime.
       # Rocky 8 /etc/default/useradd has CREATE_HOME=yes, so -M is required to prevent useradd
-      # from trying to create /u/home/alice and failing. head-node-init creates it on EFS at runtime.
+      # from trying to create /home/alice during AMI build. head-node-init creates it on EFS at runtime.
       "getent group alice  >/dev/null 2>&1 || sudo groupadd -g 2000 alice",
-      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /u/home/alice -M alice",
+      "getent passwd alice >/dev/null 2>&1 || sudo useradd -u 2000 -g alice -s /bin/bash -d /home/alice -M alice",
 
       # =======================================================================
       # STEP 4: Download Slurm 22.05.11 source
