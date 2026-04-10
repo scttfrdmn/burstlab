@@ -12,7 +12,7 @@ For the cluster user's perspective, see [user-guide.md](user-guide.md).
 |----------|-------|-------|-------|-------|
 | **0 — Chain** | Tested (FSx + EFS) | Not tested | Not tested | End-to-end on live Gen 1 cluster |
 | **A — Wrapper** | Tested (FSx + EFS) | Not tested | Not tested | fsx-sbatch + efs-sbatch end-to-end on Gen 1; fsx-restore + fsx-purge verified |
-| **B — Prolog/Epilog** | Tested (FSx + EFS) | Tested (FSx + EFS) | Not tested | `scontrol update Environment=` NOT supported in 22.05 or 23.11; job uses deterministic state file path instead |
+| **B — Prolog/Epilog** | Tested (FSx + EFS) | Tested (FSx + EFS) | Tested (EFS only) | FSx blocked: no EL10 Lustre client in AWS repo. EFS works. `scontrol update Environment=` NOT supported in 22.05 or 23.11; state file path instead |
 | **C — Burst Buffer** | Cannot run | Not tested | Not tested | Requires `burst_buffer_lua.so` — not in current AMIs; needs `--with-lua` rebuild |
 
 The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
@@ -20,7 +20,7 @@ The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
 injection, `scontrol update`, combined dispatcher), not in the AWS API calls.
 
 Gen 2 (Slurm 23.11, Rocky 9) is fully validated for Approach B. Gen 3 (Slurm 24.05,
-Rocky 10) is not yet tested. The lifecycle scripts use only stable Slurm APIs.
+Rocky 10) is validated for EFS only — FSx Lustre is blocked (see Gen 3 notes below).
 
 **Gen 2 operational notes (Slurm 23.11.10, Rocky 9, AMI `ami-069e41e072fedcf8e`):**
 - `scontrol update Environment=` is NOT supported in 23.11.10 (returns "Update of
@@ -34,6 +34,17 @@ Rocky 10) is not yet tested. The lifecycle scripts use only stable Slurm APIs.
   head node `nslookup` fails during this window. Mount using the IP address directly
   (returned by `efs_get_mount_target_ip()` in `efs-lifecycle.sh`). The prolog writes
   `EFS_MOUNT_IP` to the state file; the job script uses `${EFS_MOUNT_IP:-${EFS_DNS}}`.
+
+**Gen 3 operational notes (Slurm 24.05.5, Rocky 10, AMI `ami-0e6d8478ca888e22d`):**
+- **FSx Lustre: blocked.** The AWS FSx Lustre client repo (`fsx-lustre-client-repo.s3.amazonaws.com`)
+  does not publish packages for `el/10`. `burst-node-init.sh.tpl` installs with
+  `skip_if_unavailable=1`, so the node boots cleanly but has no Lustre kernel module.
+  FSx workloads fail at `modprobe lustre`. EFS workloads are unaffected.
+- **EFS:** Fully functional. IP-based mount workaround applies here too.
+- **Crypto policy:** DEFAULT (no LEGACY). `burstlab-key` is Ed25519 across all
+  generations, which is not affected by RHEL 10's RSA-3072 minimum.
+- **PrologSlurmctld syntax:** Slurm 24.05 shows `PrologSlurmctld[0]` (array syntax)
+  in `scontrol show config`, but behavior is identical.
 
 ---
 
