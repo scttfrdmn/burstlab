@@ -1,11 +1,12 @@
 # BurstLab Generations: The Why and the What
 
-BurstLab ships three complete, independently-deployable cluster configurations. This
-document explains why, what each one is for, and how to choose the right one.
+BurstLab ships five complete, independently-deployable cluster configurations spanning
+two OS families (RHEL/Rocky and Ubuntu). This document explains why, what each one is
+for, and how to choose the right one.
 
 ---
 
-## Why Three Generations?
+## Why Five Generations?
 
 HPC environments are not uniform. An SA engaging with five different research
 computing teams in a single week might encounter:
@@ -14,37 +15,43 @@ computing teams in a single week might encounter:
   22.05, which they compiled from source three years ago and haven't touched since
 - A team that upgraded to Rocky 9 last year and is on Slurm 23.11
 - A brand-new cluster deployed on Rocky 10 with Slurm 24.05
+- An academic research computing group standardized on Ubuntu 22.04 with Slurm 23.11
+- A cloud-native HPC startup running Ubuntu 24.04 with Slurm 24.05
 
 A demo that only works on one configuration is limited. If you show a customer running
 Slurm 22.05 a Gen 3 demo with `cloud_reg_addrs`, they cannot replicate it — the feature
-does not exist in their version. The demo loses credibility.
+does not exist in their version. If you show a Rocky-based demo to an Ubuntu shop, they'll
+spend the entire meeting translating package names and paths instead of focusing on the
+bursting architecture.
 
-BurstLab models the three most common live environments an SA encounters today.
+BurstLab models the five most common live environments an SA encounters today: three
+RHEL/Rocky generations (8, 9, 10) and two Ubuntu LTS generations (22.04, 24.04).
 Each generation is a complete, deployable cluster, not a variation of a single codebase.
 The goal is to deploy a cluster that matches what a customer is actually running, walk
 through the exact configuration they need, and hand over working IaC when the meeting ends.
 
 ---
 
-## What Is Identical Across All Three
+## What Is Identical Across All Five
 
 Before covering what differs, it is worth being explicit about what is the same:
 
 - **Infrastructure**: the same six Terraform modules (VPC, IAM, EFS, head-node,
   compute-nodes, burst-config). The modules are not forked per generation — they are
   shared. Generation-specific differences are in config templates and Packer AMIs only.
-- **AWS Plugin for Slurm v2**: all three generations run the same plugin version with
+- **AWS Plugin for Slurm v2**: all five generations run the same plugin version with
   the same `resume.py`, `suspend.py`, `change_state.py`, and `generate_conf.py` scripts.
-  The plugin protocol has not changed between Slurm 22.05 and 24.05.
+  The plugin protocol has not changed between Slurm 22.05 and 24.05, and works identically
+  on both RHEL/Rocky and Ubuntu.
 - **Scripts**: `validate-cluster.sh`, `demo-burst.sh`, and `check-quotas.sh` are
   generation-agnostic. The same 40-point validation and the same demo flow work on
-  all three generations.
+  all five generations.
 - **Deploy workflow**: `packer build` → `terraform apply` → SSH in → validate → demo.
   The steps are identical; only the AMI name and tfvars directory change.
 - **Network architecture**: same four-subnet VPC, same EFS layout, same NAT setup,
   same security groups. An architecture diagram drawn for Gen 1 describes Gen 3 faithfully.
 - **Alice**: the demo HPC user with UID/GID 2000 and home directory at `/home/alice`
-  exists on all three generations.
+  exists on all five generations.
 
 ---
 
@@ -184,6 +191,80 @@ with no modification needed.
 
 ---
 
+## Generation 4 — Ubuntu 22.04 LTS + Slurm 23.11
+
+**The target customer**: an HPC team running Ubuntu-based clusters. Ubuntu is
+the second most popular Linux distribution for HPC after RHEL/Rocky/CentOS, commonly
+seen in academic research computing environments and cloud-native HPC deployments.
+
+**What changes from Gen 2 (Rocky 9 + Slurm 23.11):**
+
+*Package manager: apt.* Ubuntu uses `apt-get` instead of `dnf`. Package names follow
+Debian conventions (`libssl-dev` not `openssl-devel`, `-dev` suffix not `-devel`).
+System paths differ: `/etc/default/` not `/etc/sysconfig/`, `/usr/sbin/nologin` not
+`/sbin/nologin`, PAM modules at `/usr/lib/x86_64-linux-gnu/security`.
+
+*AppArmor instead of SELinux.* Ubuntu uses AppArmor for mandatory access control. Slurm
+runs unconfined (no AppArmor profiles exist for Slurm by default). Init scripts leave
+AppArmor enabled for system daemons but do not need permissive mode for Slurm.
+
+*ufw firewall instead of firewalld.* Ubuntu's default firewall is `ufw` (Uncomplicated
+Firewall). BurstLab disables it in favor of VPC security groups, same as Gen 1-3.
+
+*SSH user: ubuntu.* Ubuntu AMIs use the `ubuntu` user (not `rocky`). SSH with:
+`ssh -i ~/.ssh/<key>.pem ubuntu@<head_node_public_ip>`.
+
+*FSx Lustre: BLOCKED.* The AWS FSx Lustre client repository has no Ubuntu packages
+(same limitation as Gen 3/Rocky 10). EFS workloads are fully functional. Lustre client
+compilation from source is deferred as a future side project.
+
+**Relevant customer profiles:**
+- Running Ubuntu 22.04 (Jammy Jellyfish) on head node or compute nodes
+- Slurm 23.x compiled from source or installed via Ubuntu repos
+- Academic research computing environments
+- Cloud-native HPC teams using Ubuntu as their standard
+
+**Files:**
+- AMI: `ami/ubuntu2204-slurm2311.pkr.hcl`
+- Config: `configs/gen4-slurm2311-ubuntu2204/`
+- Terraform: `terraform/generations/gen4-slurm2311-ubuntu2204/`
+
+---
+
+## Generation 5 — Ubuntu 24.04 LTS + Slurm 24.05
+
+**The target customer**: an HPC team running the latest Ubuntu LTS release
+with Slurm 24.05. Ubuntu 24.04 (Noble Numbat) shipped in April 2024 and represents
+the current state-of-the-art for Ubuntu-based HPC clusters.
+
+**What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
+
+*Same Slurm version, different OS family.* Gen 5 uses the same Slurm 24.05 as Gen 3,
+including `cloud_reg_addrs` for dynamic burst node IP registration. The OS-level
+differences mirror Gen 4: apt package manager, AppArmor, ufw firewall, ubuntu SSH user.
+
+*Python 3.12.* Ubuntu 24.04 ships Python 3.12 as the default python3 (same version as
+Rocky 10). boto3 installs cleanly via pip with `--break-system-packages` flag (PEP 668).
+
+*cgroup v2 only.* Ubuntu 24.04 uses cgroup v2 exclusively, same as Rocky 10. Slurm
+cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd integration.
+
+*FSx Lustre: BLOCKED.* Same limitation as Gen 4 — no Ubuntu packages in AWS repo.
+EFS workloads fully functional.
+
+**Relevant customer profiles:**
+- Running Ubuntu 24.04 (Noble Numbat) on head node or compute nodes
+- Slurm 24.05 compiled from source or installed via Ubuntu repos
+- Early adopters of `cloud_reg_addrs` on Ubuntu
+- Cloud-native HPC teams standardizing on Ubuntu 24.04 LTS
+
+**Files:**
+- AMI: `ami/ubuntu2404-slurm2405.pkr.hcl`
+- Config: `configs/gen5-slurm2405-ubuntu2404/`
+- Terraform: `terraform/generations/gen5-slurm2405-ubuntu2404/`
+
+---
+
 ## Which Generation Should I Use?
 
 | Customer Environment | Recommended Generation | Reason |
@@ -193,17 +274,28 @@ with no modification needed.
 | Rocky 9, AlmaLinux 9, RHEL 9, Slurm 23.x | **Gen 2** | Exact match |
 | Rocky 9, Slurm 24.x (early adopter) | **Gen 2 or Gen 3** | OS matches Gen 2; Slurm version matches Gen 3. Cloud_reg_addrs may not be available in their 24.05 build — verify. |
 | Rocky 10, RHEL 10, Slurm 24.05+ | **Gen 3** | Exact match |
+| Ubuntu 22.04, Slurm 23.x | **Gen 4** | Exact match — Ubuntu 22.04 + Slurm 23.11 |
+| Ubuntu 24.04, Slurm 24.05+ | **Gen 5** | Exact match — Ubuntu 24.04 + Slurm 24.05 with cloud_reg_addrs |
+| Ubuntu (any version), Slurm 22.x or 24.x | **Gen 4 or Gen 5** | Match Slurm version first (Gen 4 for 22.x/23.x, Gen 5 for 24.x), note OS version differences |
 | Not sure / first contact | **Gen 1** | Covers the largest installed base. You can always show Gen 3 diffs once you know their environment. |
 
-When in doubt, deploy Gen 1. It is the most representative of what HPC teams are
-actually struggling with today, and the Plugin v2 setup complexity is most visible on
-Gen 1 (the Python shim, the cgroup v1 config, the pre-enumerated nodes). Showing a
-customer a working Gen 1 cluster is more persuasive than showing a Gen 3 cluster that
-requires Slurm 24.05 they do not have.
+When in doubt:
+- **For RHEL/Rocky customers**, deploy Gen 1. It is the most representative of what HPC
+  teams are actually struggling with today, and the Plugin v2 setup complexity is most
+  visible on Gen 1 (the Python shim, the cgroup v1 config, the pre-enumerated nodes).
+- **For Ubuntu customers**, deploy Gen 4. It covers the largest Ubuntu installed base
+  (22.04 LTS) and uses the well-understood Slurm 23.11 feature set.
+
+Showing a customer a working cluster that matches their OS family is more persuasive
+than showing a Gen 3/Gen 5 cluster that requires Slurm 24.05 features they do not have,
+or demonstrating on a different OS that forces them to mentally translate every path
+and package name.
 
 ---
 
 ## The Generation Arc at a Glance
+
+### RHEL/Rocky Track
 
 ```
 Gen 1 (Rocky 8, Slurm 22.05)
@@ -230,6 +322,29 @@ Gen 3 (Rocky 10, Slurm 24.05)
   ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
   ├── iptables-nft (iptables-services removed from RHEL 10)
   └── Ed25519 SSH key (avoids RSA-2048 restriction in RHEL 10 DEFAULT crypto policy)
+```
+
+### Ubuntu Track
+
+```
+Gen 4 (Ubuntu 22.04 LTS, Slurm 23.11)
+  ├── Python 3.10 → boto3 installs directly
+  ├── cgroup v2 (default on Ubuntu 22.04)
+  ├── apt package manager, AppArmor, ufw firewall
+  ├── SSH user: ubuntu
+  ├── FSx Lustre: BLOCKED (no Ubuntu packages in AWS repo)
+  └── idle_on_node_suspend parameter (new in 23.11)
+
+        ↓ OS upgrade: Ubuntu 22.04 → Ubuntu 24.04
+        ↓ Slurm upgrade: 23.11 → 24.05
+
+Gen 5 (Ubuntu 24.04 LTS, Slurm 24.05)
+  ├── Python 3.12 → boto3 installs directly
+  ├── cgroup v2 only
+  ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
+  ├── apt package manager, AppArmor, ufw firewall
+  ├── SSH user: ubuntu
+  └── FSx Lustre: BLOCKED (no Ubuntu packages in AWS repo)
 ```
 
 ---

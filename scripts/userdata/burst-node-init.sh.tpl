@@ -23,9 +23,15 @@ exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab burst node init started: $(date) ==="
 
 # -----------------------------------------------------------------------------
-# 1. Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
+# 1. Detect OS family (RHEL-based vs Debian-based)
 # -----------------------------------------------------------------------------
 OS_ID=$(. /etc/os-release && echo "$ID")
+OS_FAMILY="rhel"
+if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
+  OS_FAMILY="debian"
+fi
+
+# Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
 if [ "$OS_ID" = "centos" ]; then
   sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
   sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
@@ -33,6 +39,11 @@ if [ "$OS_ID" = "centos" ]; then
 fi
 
 # Ensure cluster users exist with pinned UID/GID (alice = demo HPC user)
+# Ubuntu uses /usr/sbin/nologin, RHEL uses /sbin/nologin
+NOLOGIN="/sbin/nologin"
+if [ "$OS_FAMILY" = "debian" ]; then
+  NOLOGIN="/usr/sbin/nologin"
+fi
 getent group  alice >/dev/null 2>&1 || groupadd  -g 2000 alice
 getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash -d /home/alice alice
 
@@ -42,11 +53,11 @@ echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/moun
 chmod 440 /etc/sudoers.d/alice-mount
 
 # Pre-install Lustre client for FSx Lustre mounts (Scenario 4 workloads).
-# Detect OS major version to select the correct AWS FSx Lustre client repo.
-# Rocky 8 → el/8, Rocky 9 → el/9. Rocky 10 (el/10) may not have packages yet;
-# skip_if_unavailable=1 handles that gracefully.
-OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
-cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
+# RHEL/Rocky: Use AWS FSx Lustre client repo (el/8, el/9, el/10).
+# Ubuntu: AWS repo has no Ubuntu packages — skip with warning.
+if [ "$OS_FAMILY" = "rhel" ]; then
+  OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
+  cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
 [aws-fsx]
 name=AWS FSx Packages - x86_64
 baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/$${OS_MAJOR}/x86_64/
@@ -54,7 +65,10 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 REPOEOF
-dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
+  dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
+else
+  echo "NOTICE: AWS FSx Lustre client not available for Ubuntu (packages do not exist). EFS workloads unaffected."
+fi
 
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
 # that blocks munge (873), slurmctld (6817), and NFS (2049).
@@ -90,7 +104,12 @@ fi
 echo "SLURM_NODENAME: $SLURM_NODENAME"
 
 # Export for slurmd systemd unit
-echo "SLURM_NODENAME=$SLURM_NODENAME" > /etc/sysconfig/slurmd
+# RHEL: /etc/sysconfig/slurmd, Ubuntu: /etc/default/slurmd
+if [ "$OS_FAMILY" = "rhel" ]; then
+  echo "SLURM_NODENAME=$SLURM_NODENAME" > /etc/sysconfig/slurmd
+else
+  echo "SLURM_NODENAME=$SLURM_NODENAME" > /etc/default/slurmd
+fi
 
 # -----------------------------------------------------------------------------
 # 3. Set hostname to match Slurm node name
@@ -173,10 +192,15 @@ done
 # systemd to time out waiting for the PID file and mark the service failed.
 # Use the AMI binary path (/opt/slurm-baked/sbin/slurmd) to match the base unit.
 # SLURM_CONF is already set in the base service Environment= directive.
+# RHEL: /etc/sysconfig/slurmd, Ubuntu: /etc/default/slurmd
+ENV_FILE="/etc/sysconfig/slurmd"
+if [ "$OS_FAMILY" = "debian" ]; then
+  ENV_FILE="/etc/default/slurmd"
+fi
 mkdir -p /etc/systemd/system/slurmd.service.d
 cat > /etc/systemd/system/slurmd.service.d/nodename.conf << EOF
 [Service]
-EnvironmentFile=/etc/sysconfig/slurmd
+EnvironmentFile=$ENV_FILE
 ExecStart=
 ExecStart=/opt/slurm-baked/sbin/slurmd -N \$SLURM_NODENAME \$SLURMD_OPTIONS
 EOF

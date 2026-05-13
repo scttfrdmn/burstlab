@@ -31,19 +31,24 @@ You should see all PASSes. Fix any failures before the meeting. A non-functional
 
 ### Choose the Right Generation
 
-All three generations are fully built and tested. Match the customer's environment:
+All five generations are fully built and tested. Match the customer's environment:
 
 | Customer Environment | Use | Why |
 |---|---|---|
-| CentOS 8, Rocky 8, RHEL 8 — Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm, same Python 3.6 boto3 shim they need |
+| CentOS 8, Rocky 8, RHEL 8 — Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm, Python 3.6 boto3 shim |
 | Rocky 9, AlmaLinux 9, RHEL 9 — Slurm 23.x | **Gen 2** | Exact match — Python 3.9 native, cgroup v2 |
 | Rocky 10, RHEL 10 — Slurm 24.05+ | **Gen 3** | Exact match — `cloud_reg_addrs`, cgroup v2 only |
-| Not sure / first contact | **Gen 1** | Covers the largest installed base; most relatable config problems |
-| CentOS 7 or older RHEL | **Gen 1** as reference | Note the OS differences; the Slurm and Plugin v2 config is identical |
+| Ubuntu 22.04 — Slurm 23.x | **Gen 4** | Ubuntu match — apt/AppArmor, Python 3.10, EFS only |
+| Ubuntu 24.04 — Slurm 24.05+ | **Gen 5** | Ubuntu match — apt/AppArmor, Python 3.12, `cloud_reg_addrs` |
+| Not sure / first contact (RHEL) | **Gen 1** | Covers largest RHEL installed base |
+| Not sure / first contact (Ubuntu) | **Gen 4** | Covers largest Ubuntu installed base |
+| CentOS 7 or older RHEL | **Gen 1** as reference | Note OS differences; Slurm/Plugin config identical |
 
-For customers on CentOS 8 or Rocky 8 with Slurm 22.05: Gen 1 is exactly right.
+**Note:** FSx Lustre is blocked on Gen 3 (Rocky 10), Gen 4 (Ubuntu 22.04), and Gen 5 (Ubuntu 24.04)
+due to missing Lustre client packages. EFS workloads work on all generations.
 
-See [generations.md](generations.md) for the full narrative on each generation.
+See [generations.md](generations.md) for detailed comparison and [README-ubuntu.md](../README-ubuntu.md)
+for Ubuntu-specific notes.
 
 ### Have These Open in Separate Windows
 

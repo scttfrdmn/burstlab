@@ -1,0 +1,44 @@
+# =============================================================================
+# terraform.tfvars.example — BurstLab Gen 3 (Rocky 10 + Slurm 24.05)
+# =============================================================================
+# Copy to terraform.tfvars and fill in the required values:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Required values (no defaults):
+#   key_name      — your EC2 key pair name
+#   head_node_ami — AMI built by Packer (see below)
+# =============================================================================
+
+# AWS configuration
+aws_region  = "us-west-2"
+aws_profile = "aws"
+
+# Cluster name — distinguishes Gen 3 from Gen 1 and Gen 2 in the same account.
+cluster_name = "burstlab-gen3"
+
+# SSH key pair name (REQUIRED)
+key_name = "your-key-pair-name"
+
+# Head node AMI (REQUIRED)
+# Build with: AWS_PROFILE=aws packer build ami/rocky10-slurm2405.pkr.hcl
+# Get the latest built AMI:
+#   AWS_PROFILE=aws aws ec2 describe-images --owners self \
+#     --filters 'Name=name,Values=burstlab-gen3-*' \
+#     --query 'sort_by(Images, &CreationDate)[-1].{ID:ImageId,Name:Name}' \
+#     --output table
+#
+# NOTE: Rocky 10 AMI availability — verify Rocky 10 AMIs are published in
+# us-west-2 before building. Check with:
+#   AWS_PROFILE=aws aws ec2 describe-images --owners 792107900819 \
+#     --filters 'Name=name,Values=Rocky-10*' \
+#     --query 'Images[*].Name' --output text
+head_node_ami = "ami-XXXXXXXX"
+
+# Instance types (optional — defaults shown)
+# head_node_instance_type    = "m7a.2xlarge"
+# compute_node_instance_type = "m7a.2xlarge"
+# burst_node_instance_type   = "m7a.2xlarge"
+
+# Cluster size (optional — defaults shown)
+# compute_node_count = 4
+# max_burst_nodes    = 10

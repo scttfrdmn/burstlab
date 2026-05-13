@@ -19,9 +19,15 @@ exec > >(tee /var/log/burstlab-init.log) 2>&1
 echo "=== BurstLab compute node init started: $(date) ==="
 
 # -----------------------------------------------------------------------------
-# 1. Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
+# 1. Detect OS family and fix repos if needed
 # -----------------------------------------------------------------------------
 OS_ID=$(. /etc/os-release && echo "$ID")
+OS_FAMILY="rhel"
+if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
+  OS_FAMILY="debian"
+fi
+
+# Fix repos if needed (CentOS 8 only — Rocky 8 repos are active)
 if [ "$OS_ID" = "centos" ]; then
   sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
   sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo

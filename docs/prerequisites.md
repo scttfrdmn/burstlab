@@ -102,10 +102,11 @@ aws --profile aws ec2 create-key-pair \
 chmod 400 ~/.ssh/burstlab-key.pem
 ```
 
-> **Rocky 10 / Gen 3 note:** RHEL 10's default crypto policy blocks RSA-2048 SSH keys.
+> **Rocky 10 / Gen 3-5 note:** RHEL 10's default crypto policy blocks RSA-2048 SSH keys.
 > BurstLab's `burstlab-key` is Ed25519, which is not affected by this RSA size restriction.
-> No crypto policy change is needed on Gen 3 nodes. If you bring your own RSA-2048 key,
-> see [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md) for details on the restriction.
+> No crypto policy change is needed. Ubuntu generations (Gen 4-5) also support Ed25519 natively.
+> If you bring your own RSA-2048 key, see [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md)
+> for details on the RHEL 10 restriction.
 
 ---
 
@@ -152,14 +153,14 @@ plus headroom.
 ### VPC Limit: Running Multiple Generations
 
 The default VPC limit is 5 per region. BurstLab uses 1 VPC per generation deployed.
-If you deploy all three generations simultaneously you need 3 VPCs — this works within
-the default limit.
+If you deploy all five generations simultaneously you need 5 VPCs — this matches the
+default limit exactly.
 
-If you already have 4 or 5 VPCs in the region from other projects, you will hit the
-limit when deploying. Either:
+If you already have VPCs in the region from other projects, you may hit the limit when
+deploying. Either:
 - Deploy generations sequentially (destroy Gen N before deploying Gen N+1) — this always
-  works within default limits and is the recommended workflow
-- Request a VPC limit increase before deploying multiple generations in parallel
+  works within default limits and is the recommended workflow for demos
+- Request a VPC limit increase if you need multiple generations running in parallel
 
 ---
 

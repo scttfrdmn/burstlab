@@ -25,12 +25,17 @@ echo "=== BurstLab head node init started: $(date) ==="
 
 
 # -----------------------------------------------------------------------------
-# 1. Fix repos if needed
-# On CentOS 8 (TCU's actual OS): redirect EOL repos to vault.centos.org.
-# On Rocky Linux 8 (our AMI base): repos are active, no fix needed.
+# 1. Detect OS family and fix repos if needed
 # -----------------------------------------------------------------------------
 echo "--- Checking OS and fixing repos if needed ---"
 OS_ID=$(. /etc/os-release && echo "$ID")
+OS_FAMILY="rhel"
+if [ "$OS_ID" = "ubuntu" ] || [ "$OS_ID" = "debian" ]; then
+  OS_FAMILY="debian"
+fi
+
+# CentOS 8: redirect EOL repos to vault.centos.org.
+# Rocky Linux: repos are active, no fix needed.
 if [ "$OS_ID" = "centos" ]; then
   echo "CentOS 8 detected — redirecting to vault.centos.org"
   sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo
@@ -39,7 +44,13 @@ if [ "$OS_ID" = "centos" ]; then
 else
   echo "$OS_ID detected — repos are active, no vault redirect needed"
 fi
-dnf makecache --refresh || true
+
+# Refresh package cache
+if [ "$OS_FAMILY" = "rhel" ]; then
+  dnf makecache --refresh || true
+else
+  apt-get update -y || true
+fi
 
 # -----------------------------------------------------------------------------
 # 1b. Ensure cluster users exist with pinned UID/GID
@@ -106,8 +117,15 @@ echo "NAT configured on $ETH"
 # Persist NAT rules so they survive head node reboot.
 # We don't use iptables-services (it has DROP defaults that kill SSH), so we
 # save the rules manually and restore them via a dedicated systemd service.
-iptables-save > /etc/sysconfig/iptables-burstlab.rules
-cat > /etc/systemd/system/burstlab-nat.service << 'NATSERVICE'
+# RHEL: /etc/sysconfig/iptables-burstlab.rules
+# Ubuntu: /etc/iptables-burstlab.rules
+if [ "$OS_FAMILY" = "rhel" ]; then
+  RULES_PATH="/etc/sysconfig/iptables-burstlab.rules"
+else
+  RULES_PATH="/etc/iptables-burstlab.rules"
+fi
+iptables-save > "$RULES_PATH"
+cat > /etc/systemd/system/burstlab-nat.service << NATSERVICE
 [Unit]
 Description=BurstLab NAT rules (iptables masquerade for cluster nodes)
 After=network-online.target
@@ -115,14 +133,14 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/sbin/iptables-restore /etc/sysconfig/iptables-burstlab.rules
+ExecStart=/sbin/iptables-restore $RULES_PATH
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 NATSERVICE
 systemctl enable burstlab-nat.service
-echo "NAT rules persisted to /etc/sysconfig/iptables-burstlab.rules"
+echo "NAT rules persisted to $RULES_PATH"
 
 # -----------------------------------------------------------------------------
 # 4. Mount EFS
@@ -146,9 +164,16 @@ echo "${efs_dns_name}:/home /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1
 # /opt/slurm — Slurm binaries, configs, and plugin shared across all nodes
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
+# Determine SSH user based on OS family (rocky for RHEL/Rocky, ubuntu for Ubuntu)
+if [ "$OS_FAMILY" = "debian" ]; then
+  SSH_USER="ubuntu"
+else
+  SSH_USER="rocky"
+fi
+
 # Read the EC2 key pair's public key from IMDS before the bootstrap mount.
-# We inject it into EFS /home/rocky during bootstrap so rocky can SSH in
-# after /home is mounted from EFS (which shadows any local /home/rocky).
+# We inject it into EFS /home/$SSH_USER during bootstrap so the SSH user can SSH in
+# after /home is mounted from EFS (which shadows any local /home/$SSH_USER).
 _IMDS_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
   -H "X-aws-ec2-metadata-token-ttl-seconds: 300" || true)
 _EC2_PUBKEY=$(curl -sf -H "X-aws-ec2-metadata-token: $_IMDS_TOKEN" \
@@ -169,13 +194,13 @@ done
 if [ "$_EFS_BOOTSTRAP_MOUNTED" = "1" ]; then
   mkdir -p /mnt/efs-bootstrap/slurm
   mkdir -p /mnt/efs-bootstrap/home/alice
-  mkdir -p /mnt/efs-bootstrap/home/rocky/.ssh
-  # Inject rocky's SSH key into EFS during bootstrap so it's present before /home mounts
+  mkdir -p /mnt/efs-bootstrap/home/$SSH_USER/.ssh
+  # Inject SSH user's key into EFS during bootstrap so it's present before /home mounts
   if [ -n "$_EC2_PUBKEY" ]; then
-    echo "$_EC2_PUBKEY" > /mnt/efs-bootstrap/home/rocky/.ssh/authorized_keys
-    chmod 600 /mnt/efs-bootstrap/home/rocky/.ssh/authorized_keys
-    chmod 700 /mnt/efs-bootstrap/home/rocky/.ssh
-    chown -R rocky:rocky /mnt/efs-bootstrap/home/rocky
+    echo "$_EC2_PUBKEY" > /mnt/efs-bootstrap/home/$SSH_USER/.ssh/authorized_keys
+    chmod 600 /mnt/efs-bootstrap/home/$SSH_USER/.ssh/authorized_keys
+    chmod 700 /mnt/efs-bootstrap/home/$SSH_USER/.ssh
+    chown -R $SSH_USER:$SSH_USER /mnt/efs-bootstrap/home/$SSH_USER
   fi
   umount /mnt/efs-bootstrap
   echo "EFS /slurm and /home directories ensured."

@@ -1,12 +1,12 @@
 # Quickstart: Deploy Your First BurstLab Cluster
 
 This guide walks you through building and deploying a complete **Gen 1** BurstLab cluster
-(Rocky Linux 8 + Slurm 22.05) from scratch. Gen 1 is the recommended starting point —
-it matches the environment most HPC teams are actually running today.
+(Rocky Linux 8 + Slurm 22.05) from scratch. Gen 1 is the recommended starting point for
+RHEL/Rocky customers — it matches the environment most HPC teams are actually running today.
 
-Gen 2 (Rocky 9 + Slurm 23.11) and Gen 3 (Rocky 10 + Slurm 24.05) follow the **identical
-workflow** with different AMIs and `terraform/generations/` paths. See
-[generations.md](generations.md) to choose the right generation for your customer.
+**All generations follow the identical workflow** with different AMIs and `terraform/generations/`
+paths. For Ubuntu clusters, see [README-ubuntu.md](../README-ubuntu.md) for Gen 4/5-specific
+quick start. See [generations.md](generations.md) to choose the right generation for your customer.
 
 **Total time: about 30-40 minutes** (most of that is waiting, not working).
 
@@ -223,7 +223,9 @@ The instances are running but still configuring themselves. SSH in and watch:
 ssh -i ~/.ssh/burstlab-key.pem rocky@<head_node_public_ip>
 ```
 
-> SSH may not respond for the first 1-2 minutes while the instance boots. If it times out, wait 30 seconds and try again.
+> **Note:** SSH user is `rocky` for Gen 1-3 (RHEL/Rocky), `ubuntu` for Gen 4-5 (Ubuntu).
+> SSH may not respond for the first 1-2 minutes while the instance boots. If it times out,
+> wait 30 seconds and try again.
 
 Tail the init log:
 
