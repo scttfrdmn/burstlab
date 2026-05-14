@@ -53,11 +53,21 @@ echo 'alice ALL=(root) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/sbin/moun
 chmod 440 /etc/sudoers.d/alice-mount
 
 # Pre-install Lustre client for FSx Lustre mounts (Scenario 4 workloads).
-# RHEL/Rocky: Use AWS FSx Lustre client repo (el/8, el/9, el/10).
-# Ubuntu: AWS repo has no Ubuntu packages — skip with warning.
+# Rocky 8/9: Use AWS FSx Lustre client repo (available for el8/el9).
+# Rocky 10: Use burstlab-lustre GitHub release (AWS repo has no el10 packages).
+# Ubuntu: Use burstlab-lustre GitHub release (AWS repo has no Ubuntu packages).
 if [ "$OS_FAMILY" = "rhel" ]; then
   OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
-  cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
+  if [ "$OS_MAJOR" = "10" ]; then
+    # Rocky 10: Install from burstlab-lustre GitHub release
+    echo "Installing Lustre 2.17.0 from burstlab-lustre (Rocky 10)..."
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/kmod-lustre-client-2.17.0-1.el10.x86_64.rpm
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-2.17.0-1.el10.x86_64.rpm
+    dnf install -y ./kmod-lustre-client-*.rpm ./lustre-client-*.rpm && rm -f *.rpm
+    modprobe lustre && echo "Lustre 2.17.0 loaded successfully"
+  else
+    # Rocky 8/9: Use AWS FSx Lustre repo
+    cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
 [aws-fsx]
 name=AWS FSx Packages - x86_64
 baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/$${OS_MAJOR}/x86_64/
@@ -65,9 +75,26 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 REPOEOF
-  dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
+    dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
+  fi
 else
-  echo "NOTICE: AWS FSx Lustre client not available for Ubuntu (packages do not exist). EFS workloads unaffected."
+  # Ubuntu: Install from burstlab-lustre GitHub release
+  . /etc/os-release
+  if [ "$VERSION_ID" = "22.04" ]; then
+    echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 22.04)..."
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.8.0-1053-aws_2.17.53-1_amd64.deb
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2204_2.17.53-1_amd64.deb
+    apt-get install -y ./*.deb && rm -f *.deb
+    modprobe lustre && echo "Lustre 2.17.53 loaded successfully"
+  elif [ "$VERSION_ID" = "24.04" ]; then
+    echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 24.04)..."
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.17.0-1013-aws_2.17.53-1_amd64.deb
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2404_2.17.53-1_amd64.deb
+    apt-get install -y ./*.deb && rm -f *.deb
+    modprobe lustre && echo "Lustre 2.17.53 loaded successfully"
+  else
+    echo "WARNING: Ubuntu $VERSION_ID not supported. FSx Lustre unavailable. EFS workloads unaffected."
+  fi
 fi
 
 # Disable iptables-services (installed in AMI) — default rules have REJECT catch-all
