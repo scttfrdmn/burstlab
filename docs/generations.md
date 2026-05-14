@@ -214,9 +214,7 @@ Firewall). BurstLab disables it in favor of VPC security groups, same as Gen 1-3
 *SSH user: ubuntu.* Ubuntu AMIs use the `ubuntu` user (not `rocky`). SSH with:
 `ssh -i ~/.ssh/<key>.pem ubuntu@<head_node_public_ip>`.
 
-*FSx Lustre: BLOCKED.* The AWS FSx Lustre client repository has no Ubuntu packages
-(same limitation as Gen 3/Rocky 10). EFS workloads are fully functional. Lustre client
-compilation from source is deferred as a future side project.
+*FSx Lustre: Available via burstlab-lustre.* AWS doesn't provide Lustre packages for Ubuntu 22.04. Install Lustre 2.17.53 clients from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) to enable FSx support. EFS workloads work without additional setup.
 
 **Relevant customer profiles:**
 - Running Ubuntu 22.04 (Jammy Jellyfish) on head node or compute nodes
@@ -249,8 +247,7 @@ Rocky 10). boto3 installs cleanly via pip with `--break-system-packages` flag (P
 *cgroup v2 only.* Ubuntu 24.04 uses cgroup v2 exclusively, same as Rocky 10. Slurm
 cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd integration.
 
-*FSx Lustre: BLOCKED.* Same limitation as Gen 4 — no Ubuntu packages in AWS repo.
-EFS workloads fully functional.
+*FSx Lustre: Available via burstlab-lustre.* AWS doesn't provide Lustre packages for Ubuntu 24.04. Install Lustre 2.17.53 clients from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) to enable FSx support. EFS workloads work without additional setup.
 
 **Relevant customer profiles:**
 - Running Ubuntu 24.04 (Noble Numbat) on head node or compute nodes
@@ -332,7 +329,7 @@ Gen 4 (Ubuntu 22.04 LTS, Slurm 23.11)
   ├── cgroup v2 (default on Ubuntu 22.04)
   ├── apt package manager, AppArmor, ufw firewall
   ├── SSH user: ubuntu
-  ├── FSx Lustre: BLOCKED (no Ubuntu packages in AWS repo)
+  ├── FSx Lustre: requires burstlab-lustre (Lustre 2.17.53)
   └── idle_on_node_suspend parameter (new in 23.11)
 
         ↓ OS upgrade: Ubuntu 22.04 → Ubuntu 24.04
@@ -344,7 +341,7 @@ Gen 5 (Ubuntu 24.04 LTS, Slurm 24.05)
   ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
   ├── apt package manager, AppArmor, ufw firewall
   ├── SSH user: ubuntu
-  └── FSx Lustre: BLOCKED (no Ubuntu packages in AWS repo)
+  └── FSx Lustre: requires burstlab-lustre (Lustre 2.17.53)
 ```
 
 ---
