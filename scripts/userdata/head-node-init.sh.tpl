@@ -64,6 +64,57 @@ getent passwd alice >/dev/null 2>&1 || useradd -M -u 2000 -g alice -s /bin/bash 
 getent passwd alice | grep -q '/u/home/alice' && usermod -d /home/alice alice || true
 
 # -----------------------------------------------------------------------------
+# 1c. Pre-install Lustre client for FSx Lustre mounts (Scenario 4 workloads)
+# Rocky 8/9: Use AWS FSx Lustre client repo (available for el8/el9).
+# Rocky 10: Use burstlab-lustre GitHub release (AWS repo has no el10 packages).
+# Ubuntu: Use burstlab-lustre GitHub release (AWS repo has no Ubuntu packages).
+# -----------------------------------------------------------------------------
+echo "--- Installing Lustre client ---"
+if [ "$OS_FAMILY" = "rhel" ]; then
+  OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
+  if [ "$OS_MAJOR" = "10" ]; then
+    # Rocky 10: Install from burstlab-lustre GitHub release
+    echo "Installing Lustre 2.17.0 from burstlab-lustre (Rocky 10)..."
+    cd /tmp
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/kmod-lustre-client-2.17.0-1.el10.x86_64.rpm
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-2.17.0-1.el10.x86_64.rpm
+    dnf install -y ./kmod-lustre-client-*.rpm ./lustre-client-*.rpm && rm -f *.rpm
+    modprobe lustre && echo "✅ Lustre 2.17.0 loaded successfully" || echo "⚠️  Lustre load deferred until after reboot"
+  else
+    # Rocky 8/9: Use AWS FSx Lustre repo
+    cat > /etc/yum.repos.d/fsx-lustre-client.repo << REPOEOF
+[aws-fsx]
+name=AWS FSx Packages - x86_64
+baseurl=https://fsx-lustre-client-repo.s3.amazonaws.com/el/$${OS_MAJOR}/x86_64/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+REPOEOF
+    dnf install -y kmod-lustre-client lustre-client && echo "✅ Lustre client installed from AWS repo"
+  fi
+else
+  # Ubuntu: Install from burstlab-lustre GitHub release
+  . /etc/os-release
+  if [ "$VERSION_ID" = "22.04" ]; then
+    echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 22.04)..."
+    cd /tmp
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.8.0-1053-aws_2.17.53-1_amd64.deb
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2204_2.17.53-1_amd64.deb
+    apt-get install -y ./*.deb && rm -f *.deb
+    modprobe lustre && echo "✅ Lustre 2.17.53 loaded successfully" || echo "⚠️  Lustre load deferred until after reboot"
+  elif [ "$VERSION_ID" = "24.04" ]; then
+    echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 24.04)..."
+    cd /tmp
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.17.0-1013-aws_2.17.53-1_amd64.deb
+    curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2404_2.17.53-1_amd64.deb
+    apt-get install -y ./*.deb && rm -f *.deb
+    modprobe lustre && echo "✅ Lustre 2.17.53 loaded successfully" || echo "⚠️  Lustre load deferred until after reboot"
+  else
+    echo "⚠️  Ubuntu $VERSION_ID not supported. FSx Lustre unavailable. EFS workloads unaffected."
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # 2. Set hostname
 # -----------------------------------------------------------------------------
 echo "--- Setting hostname ---"
