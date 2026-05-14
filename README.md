@@ -158,24 +158,22 @@ Each is an independently deployable cluster matching a specific customer environ
 
 | Generation | OS | Slurm | Key Features | When to Use |
 |---|---|---|---|---|
-| **Gen 1** | Rocky 8 | 22.05.x | Python 3.6 boto3 shim; cgroup v1 | RHEL/Rocky 8, Slurm 22.x — largest installed base |
-| **Gen 2** | Rocky 9 | 23.11.x | Python 3.9 native; cgroup v2; `idle_on_node_suspend` | RHEL/Rocky 9, Slurm 23.x |
-| **Gen 3** | Rocky 10 | 24.05.x | `cloud_reg_addrs`; cgroup v2 only; Ed25519 key | RHEL/Rocky 10, Slurm 24.x; greenfield |
+| **Gen 1** | Rocky 8 | 22.05.x | Python 3.6 boto3 shim; cgroup v1; FSx ✅ | RHEL/Rocky 8, Slurm 22.x — largest installed base |
+| **Gen 2** | Rocky 9 | 23.11.x | Python 3.9 native; cgroup v2; FSx ✅ | RHEL/Rocky 9, Slurm 23.x |
+| **Gen 3** | Rocky 10 | 24.05.x | `cloud_reg_addrs`; cgroup v2 only; Ed25519; [FSx requires burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) | RHEL/Rocky 10, Slurm 24.x; greenfield |
 
 ### Ubuntu Track
 
 | Generation | OS | Slurm | Key Features | When to Use |
 |---|---|---|---|---|
-| **Gen 4** | Ubuntu 22.04 | 23.11.x | apt/AppArmor; Python 3.10; cgroup v2; FSx blocked | Ubuntu 22.04, Slurm 23.x; academic/cloud-native |
-| **Gen 5** | Ubuntu 24.04 | 24.05.x | apt/AppArmor; Python 3.12; `cloud_reg_addrs`; FSx blocked | Ubuntu 24.04, Slurm 24.x; latest LTS |
+| **Gen 4** | Ubuntu 22.04 | 23.11.x | apt/AppArmor; Python 3.10; cgroup v2; [FSx requires burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) | Ubuntu 22.04, Slurm 23.x; academic/cloud-native/NVIDIA |
+| **Gen 5** | Ubuntu 24.04 | 24.05.x | apt/AppArmor; Python 3.12; `cloud_reg_addrs`; [FSx requires burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) | Ubuntu 24.04, Slurm 24.x; latest LTS |
 
 **Start with Gen 1 for RHEL/Rocky customers** or **Gen 4 for Ubuntu customers** unless you know
 the specific OS and Slurm version. Most HPC teams struggling with cloud bursting today are on
 Rocky 8 with Slurm 22.05.
 
-**Note:** FSx Lustre is blocked on Gen 3 (Rocky 10), Gen 4 (Ubuntu 22.04), and Gen 5 (Ubuntu 24.04)
-due to missing Lustre client packages in AWS repositories. EFS workloads are fully functional on all
-generations.
+**FSx Lustre on Gen 3-5:** AWS doesn't provide Lustre packages for Rocky 10 or Ubuntu LTS versions. Install Lustre clients from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) to enable FSx support on Gen 3, Gen 4, and Gen 5 clusters. EFS workloads work on all generations without additional setup.
 
 See [docs/generations.md](docs/generations.md) for detailed comparison, decision tables, and
 architectural differences between generations. See [README-ubuntu.md](README-ubuntu.md) for
