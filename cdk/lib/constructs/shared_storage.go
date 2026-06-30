@@ -66,7 +66,7 @@ type BurstlabSharedStorage struct {
 // NewBurstlabSharedStorage creates the EFS file system and mount targets.
 func NewBurstlabSharedStorage(scope constructs.Construct, id string, props *BurstlabSharedStorageProps) *BurstlabSharedStorage {
 	this := &BurstlabSharedStorage{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	cn := props.ClusterName
 

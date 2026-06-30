@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -80,7 +81,7 @@ type BurstlabComputeNodes struct {
 // NewBurstlabComputeNodes creates Count compute node EC2 instances.
 func NewBurstlabComputeNodes(scope constructs.Construct, id string, props *BurstlabComputeNodesProps) *BurstlabComputeNodes {
 	this := &BurstlabComputeNodes{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	if props.InstanceType == "" {
 		props.InstanceType = "m7a.large"
@@ -114,7 +115,7 @@ func NewBurstlabComputeNodes(scope constructs.Construct, id string, props *Burst
 			// Compute nodes do not need an IAM profile for the basic use case.
 			// If SSM access is required, add a profile with SSMManagedInstanceCore.
 			UserData: jsii.String(base64.StdEncoding.EncodeToString([]byte(userData))),
-			Tags: &[]*awsec2.CfnTag{
+			Tags: &[]*awscdk.CfnTag{
 				{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-%s", cn, nodeName))},
 				{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 				{Key: jsii.String("Generation"), Value: jsii.String("gen1")},

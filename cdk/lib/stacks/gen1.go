@@ -187,13 +187,13 @@ func NewGen1Stack(scope constructs.Construct, id string, props *Gen1StackProps) 
 	// in the shell heredoc inside UserData — CloudFormation resolves them before
 	// the EC2 instance is launched.
 	partitionsJSON := renderTemplate(configDir+"/partitions.json.tpl", map[string]string{
-		"${max_burst_nodes}":      fmt.Sprintf("%d", maxBurstNodes),
-		"${aws_region}":           awsRegion,
-		"${launch_template_id}":   *burstConfig.LaunchTemplateId, // CFn token string
-		"${burst_instance_type}":  burstInstType,
-		"${cloud_subnet_a_id}":    *vpc.CloudSubnetAId, // CFn token string
-		"${cloud_subnet_b_id}":    *vpc.CloudSubnetBId, // CFn token string
-		"${cluster_name}":         cn,
+		"${max_burst_nodes}":     fmt.Sprintf("%d", maxBurstNodes),
+		"${aws_region}":          awsRegion,
+		"${launch_template_id}":  *burstConfig.LaunchTemplateId, // CFn token string
+		"${burst_instance_type}": burstInstType,
+		"${cloud_subnet_a_id}":   *vpc.CloudSubnetAId, // CFn token string
+		"${cloud_subnet_b_id}":   *vpc.CloudSubnetBId, // CFn token string
+		"${cluster_name}":        cn,
 	})
 
 	// -------------------------------------------------------------------------

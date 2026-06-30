@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -51,8 +52,8 @@ type BurstlabIam struct {
 
 // policyDocument builds a minimal IAM policy document JSON string.
 type policyDoc struct {
-	Version   string        `json:"Version"`
-	Statement []policyStmt  `json:"Statement"`
+	Version   string       `json:"Version"`
+	Statement []policyStmt `json:"Statement"`
 }
 
 type policyStmt struct {
@@ -64,7 +65,7 @@ type policyStmt struct {
 // NewBurstlabIam creates IAM roles and instance profiles for BurstLab.
 func NewBurstlabIam(scope constructs.Construct, id string, props *BurstlabIamProps) *BurstlabIam {
 	this := &BurstlabIam{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	cn := props.ClusterName
 
@@ -113,7 +114,7 @@ func NewBurstlabIam(scope constructs.Construct, id string, props *BurstlabIamPro
 				})),
 			},
 		},
-		Tags: &[]*awsiam.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
 			{Key: jsii.String("ManagedBy"), Value: jsii.String("cdk")},
@@ -185,7 +186,7 @@ func NewBurstlabIam(scope constructs.Construct, id string, props *BurstlabIamPro
 				})),
 			},
 		},
-		Tags: &[]*awsiam.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
 			{Key: jsii.String("ManagedBy"), Value: jsii.String("cdk")},

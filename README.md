@@ -103,12 +103,14 @@ burstlab/
 │           ├── scenario3/             # Ephemeral EFS: chain, wrapper, prolog/epilog
 │           └── scenario4/             # Ephemeral FSx: chain, wrapper, prolog/epilog, BB
 │
-└── ami/
-    ├── rocky8-slurm2205.pkr.hcl     # Packer: Rocky 8 + Slurm 22.05 (Gen 1)
-    ├── rocky9-slurm2311.pkr.hcl     # Packer: Rocky 9 + Slurm 23.11 (Gen 2)
-    ├── rocky10-slurm2405.pkr.hcl    # Packer: Rocky 10 + Slurm 24.05 (Gen 3)
-    ├── ubuntu2204-slurm2311.pkr.hcl # Packer: Ubuntu 22.04 + Slurm 23.11 (Gen 4)
-    └── ubuntu2404-slurm2405.pkr.hcl # Packer: Ubuntu 24.04 + Slurm 24.05 (Gen 5)
+├── ami/
+│   ├── rocky8-slurm2205.pkr.hcl     # Packer: Rocky 8 + Slurm 22.05 (Gen 1)
+│   ├── rocky9-slurm2311.pkr.hcl     # Packer: Rocky 9 + Slurm 23.11 (Gen 2)
+│   ├── rocky10-slurm2405.pkr.hcl    # Packer: Rocky 10 + Slurm 24.05 (Gen 3)
+│   ├── ubuntu2204-slurm2311.pkr.hcl # Packer: Ubuntu 22.04 + Slurm 23.11 (Gen 4)
+│   └── ubuntu2404-slurm2405.pkr.hcl # Packer: Ubuntu 24.04 + Slurm 24.05 (Gen 5)
+│
+└── cdk/                             # Experimental CDK (Go), Gen 1 only — see cdk/README.md
 ```
 
 ---
@@ -219,6 +221,18 @@ See [docs/workloads/overview.md](docs/workloads/overview.md) for scenario select
 storage tier decision matrix, and granularity modes (per-job, per-array, per-campaign).
 See [docs/workloads/transparent-lifecycle.md](docs/workloads/transparent-lifecycle.md)
 for a full comparison of the three transparent lifecycle approaches.
+
+---
+
+## Alternative IaC: CDK (Go, experimental)
+
+The primary, fully-supported implementation is **Terraform** (all five
+generations + the workloads overlay). For teams that prefer a CDK /
+CloudFormation workflow, `cdk/` provides an **experimental AWS CDK (Go)**
+implementation that currently covers **Gen 1 only** and does not include the
+workloads overlay. It reuses the same config and UserData templates as
+Terraform. See [cdk/README.md](cdk/README.md) for scope, build, and deploy
+instructions.
 
 ---
 

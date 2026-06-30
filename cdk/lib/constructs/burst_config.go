@@ -26,6 +26,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -74,7 +75,7 @@ type BurstlabBurstConfig struct {
 // NewBurstlabBurstConfig creates the EC2 launch template for burst nodes.
 func NewBurstlabBurstConfig(scope constructs.Construct, id string, props *BurstlabBurstConfigProps) *BurstlabBurstConfig {
 	this := &BurstlabBurstConfig{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	cn := props.ClusterName
 
@@ -117,7 +118,7 @@ func NewBurstlabBurstConfig(scope constructs.Construct, id string, props *Burstl
 			TagSpecifications: &[]*awsec2.CfnLaunchTemplate_TagSpecificationProperty{
 				{
 					ResourceType: jsii.String("instance"),
-					Tags: &[]*awsec2.CfnTag{
+					Tags: &[]*awscdk.CfnTag{
 						{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 						{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
 						{Key: jsii.String("Cluster"), Value: jsii.String(cn)},
@@ -127,7 +128,7 @@ func NewBurstlabBurstConfig(scope constructs.Construct, id string, props *Burstl
 				},
 				{
 					ResourceType: jsii.String("volume"),
-					Tags: &[]*awsec2.CfnTag{
+					Tags: &[]*awscdk.CfnTag{
 						{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 						{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
 						{Key: jsii.String("Cluster"), Value: jsii.String(cn)},

@@ -24,6 +24,7 @@ package constructs
 import (
 	"fmt"
 
+	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -105,7 +106,7 @@ type BurstlabVpc struct {
 // NewBurstlabVpc creates the full BurstLab VPC topology.
 func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcProps) *BurstlabVpc {
 	this := &BurstlabVpc{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	// Apply defaults
 	if props.VpcCidr == "" {
@@ -141,7 +142,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 		CidrBlock:          jsii.String(props.VpcCidr),
 		EnableDnsSupport:   jsii.Bool(true),
 		EnableDnsHostnames: jsii.Bool(true),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-vpc", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -157,7 +158,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 	// yum repos). Only attached to this VPC.
 	// -------------------------------------------------------------------------
 	igw := awsec2.NewCfnInternetGateway(this, jsii.String("Igw"), &awsec2.CfnInternetGatewayProps{
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-igw", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -182,7 +183,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 		CidrBlock:           jsii.String(props.ManagementSubnetCidr),
 		AvailabilityZone:    jsii.String(props.AzA),
 		MapPublicIpOnLaunch: jsii.Bool(false),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-mgmt-subnet", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -199,7 +200,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 		CidrBlock:           jsii.String(props.OnpremSubnetCidr),
 		AvailabilityZone:    jsii.String(props.AzA),
 		MapPublicIpOnLaunch: jsii.Bool(false),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-onprem-subnet", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -215,7 +216,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 		CidrBlock:           jsii.String(props.CloudSubnetACidr),
 		AvailabilityZone:    jsii.String(props.AzA),
 		MapPublicIpOnLaunch: jsii.Bool(false),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-cloud-a-subnet", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -232,7 +233,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 		CidrBlock:           jsii.String(props.CloudSubnetBCidr),
 		AvailabilityZone:    jsii.String(props.AzB),
 		MapPublicIpOnLaunch: jsii.Bool(false),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-cloud-b-subnet", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -250,7 +251,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 	// reach the internet (SSH ingress, AWS API, yum repos).
 	mgmtRtb := awsec2.NewCfnRouteTable(this, jsii.String("ManagementRouteTable"), &awsec2.CfnRouteTableProps{
 		VpcId: vpc.Ref(),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-mgmt-rtb", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -260,9 +261,9 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 
 	// Default route via IGW for the management subnet.
 	awsec2.NewCfnRoute(this, jsii.String("ManagementDefaultRoute"), &awsec2.CfnRouteProps{
-		RouteTableId:        mgmtRtb.Ref(),
+		RouteTableId:         mgmtRtb.Ref(),
 		DestinationCidrBlock: jsii.String("0.0.0.0/0"),
-		GatewayId:           igw.Ref(),
+		GatewayId:            igw.Ref(),
 	})
 
 	awsec2.NewCfnSubnetRouteTableAssociation(this, jsii.String("ManagementRtbAssoc"), &awsec2.CfnSubnetRouteTableAssociationProps{
@@ -274,7 +275,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 	// route after the head node EC2 instance is created (its ENI ID is needed).
 	onpremRtb := awsec2.NewCfnRouteTable(this, jsii.String("OnpremRouteTable"), &awsec2.CfnRouteTableProps{
 		VpcId: vpc.Ref(),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-onprem-rtb", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -292,7 +293,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 	// The head-node construct adds the NAT default route after EC2 launch.
 	cloudRtb := awsec2.NewCfnRouteTable(this, jsii.String("CloudRouteTable"), &awsec2.CfnRouteTableProps{
 		VpcId: vpc.Ref(),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-cloud-rtb", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -346,7 +347,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 				CidrIp:      jsii.String("0.0.0.0/0"),
 			},
 		},
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-head-node-sg", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -379,7 +380,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 				CidrIp:      jsii.String("0.0.0.0/0"),
 			},
 		},
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-compute-node-sg", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -412,7 +413,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 				CidrIp:      jsii.String("0.0.0.0/0"),
 			},
 		},
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-burst-node-sg", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -444,7 +445,7 @@ func NewBurstlabVpc(scope constructs.Construct, id string, props *BurstlabVpcPro
 				CidrIp:      jsii.String("0.0.0.0/0"),
 			},
 		},
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-efs-sg", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
