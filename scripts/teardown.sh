@@ -75,7 +75,9 @@ fi
 # Step 2: Terminate any burst EC2 instances (includes zombies from prior runs)
 # -----------------------------------------------------------------------------
 _info "Cleaning up burst EC2 instances..."
-AWS_PROFILE=$AWS_PROFILE CLUSTER=$CLUSTER AWS_DEFAULT_REGION=$REGION \
+# Cluster/region are passed as flags (they override the script's env defaults),
+# so only AWS_PROFILE needs to be exported into the child's environment.
+AWS_PROFILE="$AWS_PROFILE" \
   bash "$SCRIPT_DIR/cleanup-burst-nodes.sh" --cluster "$CLUSTER" --region "$REGION"
 
 # -----------------------------------------------------------------------------
