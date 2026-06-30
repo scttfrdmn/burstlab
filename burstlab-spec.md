@@ -1,5 +1,17 @@
 # BurstLab
 
+> **⚠️ Historical design document.** This is the *original* project
+> specification, kept for context on the project's intent and rationale. It has
+> **not** been updated as the implementation evolved and is **stale in places**:
+> it describes Gen 1 as CentOS 8 (the shipped AMI is **Rocky 8**), `t3` instance
+> sizes (the build uses **`m7a.2xlarge`**), only **three** generations (the repo
+> ships **five**, adding an Ubuntu track), and a **TypeScript** CDK (the `cdk/`
+> implementation is **Go**, Gen 1 only).
+>
+> For the current state of the project, treat these as the source of truth:
+> [README.md](README.md) · [docs/generations.md](docs/generations.md) ·
+> [docs/architecture.md](docs/architecture.md) · [cdk/README.md](cdk/README.md).
+
 ## Project Specification
 
 ### Purpose
