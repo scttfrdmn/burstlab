@@ -1,0 +1,47 @@
+# =============================================================================
+#  Minimal single-shape ParallelCluster config
+# -----------------------------------------------------------------------------
+#  The smallest complete cluster: a head node plus ONE compute shape in ONE
+#  queue. No right-sizing yet — this is the baseline you grow from. Every node
+#  is dynamic (State=CLOUD): the compute fleet is zero instances until a job is
+#  submitted, then scales back to zero when idle.
+#
+#  Deploy:
+#    pcluster create-cluster --cluster-name demo \
+#      --cluster-configuration cluster-single-node.yaml --region us-east-1
+#
+#  Submit a job (one 8-core node comes up on demand, runs, then terminates):
+#    sbatch -p general -c 4 --mem=8G --wrap 'hostname; sleep 60'
+#
+#  Replace every REPLACE_ME_* value with real IDs from your account before
+#  deploying (subnet, key pair).
+# =============================================================================
+
+Region: us-east-1
+Image:
+  Os: rhel8                                  # or rocky8 / alinux2 / ubuntu2204
+
+HeadNode:
+  InstanceType: c6i.xlarge                   # small; runs slurmctld, not jobs
+  Networking:
+    SubnetId: REPLACE_ME_SUBNET_ID           # a subnet in your VPC
+  Ssh:
+    KeyName: REPLACE_ME_KEYPAIR              # EC2 key pair name
+  LocalStorage:
+    RootVolume:
+      Size: 50
+      VolumeType: gp3
+
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+    - Name: general                          # ← becomes Slurm partition "general"
+      ComputeResources:
+        - Name: c-2xl                         # one shape: compute-optimized, small
+          Instances:
+            - InstanceType: c8i.2xlarge       # 8 vCPU, 16 GB
+          MinCount: 0                         # 0 → nothing runs when idle ($0)
+          MaxCount: 10                        # up to 10 of this shape at once
+      Networking:
+        SubnetIds:
+          - REPLACE_ME_SUBNET_ID

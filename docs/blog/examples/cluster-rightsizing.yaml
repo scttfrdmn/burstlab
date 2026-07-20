@@ -1,0 +1,163 @@
+# =============================================================================
+#  Right-sizing ParallelCluster config — the full example from the post
+# -----------------------------------------------------------------------------
+#  ONE user-facing partition ("general") backed by a catalog of instance shapes:
+#  three families (c/m/r = 2/4/8 GB per core) at two sizes (2xlarge/8xlarge).
+#  Users submit with -c / --mem; Slurm launches the cheapest node whose cores
+#  AND memory both fit.
+#
+#  "Cheapest" = lowest Slurm node Weight. Weight is set per compute resource via
+#  DynamicNodePriority (below) — NOT by hand-editing NodeName lines in an include
+#  file (Slurm rejects a duplicate NodeName as a fatal error and slurmctld won't
+#  start). DynamicNodePriority maps directly to Slurm's node Weight.
+#
+#  CapacityType is a QUEUE-level setting, so Spot and On-Demand can't share one
+#  queue: cpu-od + cpu-spot are two queues. slurm-overlay.conf then unions their
+#  nodes into the single "general" partition users submit to.
+#
+#  GPU / EFA-MPI hardware is deliberately NOT in this pool — put it in its own
+#  access-gated partition (see the commented "gpu" queue at the bottom).
+#
+#  VERIFIED on ParallelCluster 3.15.1 (Slurm 25.05), us-east-1, 2026-07.
+#
+#  Deploy:
+#    aws s3 cp slurm-overlay.conf s3://REPLACE_ME_BUCKET/slurm-overlay.conf
+#    pcluster create-cluster --cluster-name demo \
+#      --cluster-configuration cluster-rightsizing.yaml --region us-east-1
+#
+#  Replace every REPLACE_ME_* value before deploying.
+# =============================================================================
+
+Region: us-east-1
+Image:
+  Os: rhel8
+
+HeadNode:
+  # >=16 GB RAM once the node catalog is large: pcluster's own validator will
+  # reject a small head node when total potential nodes is high.
+  InstanceType: c6i.2xlarge
+  Networking:
+    SubnetId: REPLACE_ME_SUBNET_ID
+  Ssh:
+    KeyName: REPLACE_ME_KEYPAIR
+  LocalStorage:
+    RootVolume:
+      Size: 50
+      VolumeType: gp3
+  Iam:
+    # REQUIRED so the head node can download the overlay from your bucket.
+    # Without this, cluster creation FAILS with a 403 (HeadObject Forbidden) on
+    # the S3 GetObject for CustomSlurmSettingsIncludeFile. (Verified failure.)
+    S3Access:
+      - BucketName: REPLACE_ME_BUCKET
+        EnableWriteAccess: false
+
+Scheduling:
+  Scheduler: slurm
+
+  SlurmSettings:
+    # The policy overlay: composes the unified "general" partition + wall-times +
+    # the partition-wide node cap. (Weights are NOT here — see DynamicNodePriority.)
+    CustomSlurmSettingsIncludeFile: s3://REPLACE_ME_BUCKET/slurm-overlay.conf
+
+  SlurmQueues:
+    # ---- On-Demand catalog: six shapes, one queue -------------------------
+    #  Named "cpu-od" (not "general") because ParallelCluster auto-generates a
+    #  partition per queue. The user-facing "general" partition is composed in
+    #  slurm-overlay.conf from this queue's nodes plus the Spot queue's.
+    #
+    #  DynamicNodePriority = Slurm node Weight (~ hourly price x 100 here).
+    #  Default is 1000; lower wins. Requires ParallelCluster >= 3.7.0.
+    - Name: cpu-od
+      CapacityType: ONDEMAND
+      AllocationStrategy: lowest-price
+      ComputeResources:
+        - Name: c-2xl                          # compute, small — 8c / 16G
+          Instances: [ { InstanceType: c8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 37
+        - Name: m-2xl                          # general, small — 8c / 32G
+          Instances: [ { InstanceType: m8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 46
+        - Name: r-2xl                          # memory, small — 8c / 64G
+          Instances: [ { InstanceType: r8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 59
+        - Name: c-8xl                          # compute, large — 32c / 64G
+          Instances: [ { InstanceType: c8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 148
+        - Name: m-8xl                          # general, large — 32c / 128G
+          Instances: [ { InstanceType: m8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 184
+        - Name: r-8xl                          # memory, large — 32c / 256G
+          Instances: [ { InstanceType: r8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 236
+      Networking:
+        SubnetIds:
+          - REPLACE_ME_SUBNET_ID
+
+    # ---- Spot catalog: same six shapes, bought on Spot --------------------
+    #  Separate queue because CapacityType is per-queue. Spot weights sit BELOW
+    #  their On-Demand twins, so Slurm prefers Spot when capacity exists and
+    #  falls back to the On-Demand shape when it doesn't. (Fallback verified.)
+    - Name: cpu-spot
+      CapacityType: SPOT
+      AllocationStrategy: lowest-price
+      ComputeResources:
+        - Name: c-2xl
+          Instances: [ { InstanceType: c8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 11
+        - Name: m-2xl
+          Instances: [ { InstanceType: m8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 14
+        - Name: r-2xl
+          Instances: [ { InstanceType: r8i.2xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 18
+        - Name: c-8xl
+          Instances: [ { InstanceType: c8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 44
+        - Name: m-8xl
+          Instances: [ { InstanceType: m8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 55
+        - Name: r-8xl
+          Instances: [ { InstanceType: r8i.8xlarge } ]
+          MinCount: 0
+          MaxCount: 50
+          DynamicNodePriority: 71
+      Networking:
+        SubnetIds:
+          - REPLACE_ME_SUBNET_ID
+
+    # ---- Access-gated specialty partition (example; uncomment to use) -----
+    #  GPUs stay OUT of the general pool so the cheapest-fit rule can't grab
+    #  them by accident. Access is restricted via AllowAccounts in the overlay.
+    # - Name: gpu
+    #   CapacityType: ONDEMAND
+    #   ComputeResources:
+    #     - Name: gpu-l4
+    #       Instances: [ { InstanceType: g6.8xlarge } ]   # 1x NVIDIA L4
+    #       MinCount: 0
+    #       MaxCount: 8
+    #   Networking:
+    #     SubnetIds:
+    #       - REPLACE_ME_SUBNET_ID

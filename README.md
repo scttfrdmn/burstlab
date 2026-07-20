@@ -268,6 +268,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [workloads/scenario3-ephemeral-efs.md](docs/workloads/scenario3-ephemeral-efs.md) | SAs | Ephemeral EFS: chain, wrapper, prolog/epilog |
 | [workloads/scenario4-ephemeral-fsx.md](docs/workloads/scenario4-ephemeral-fsx.md) | SAs | Ephemeral FSx Lustre + S3: chain, wrapper, prolog/epilog, burst buffer |
 | [workloads/transparent-lifecycle.md](docs/workloads/transparent-lifecycle.md) | SAs | Approach comparison: chain vs wrapper vs prolog/epilog vs burst buffer |
+| [blog/multi-instance-partitions.md](docs/blog/multi-instance-partitions.md) | SAs, HPC admins | Blog: right-sizing Slurm nodes — one partition backed by a c/m/r instance catalog, cheapest-fit via Weight; ParallelCluster + PCS examples in [blog/examples/](docs/blog/examples/) |
 
 ---
 
