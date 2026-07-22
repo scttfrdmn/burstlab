@@ -1,5 +1,12 @@
 # Using Scratch Storage on This Cluster
 
+> **Prerequisite:** the `fsx-sbatch` / `efs-sbatch` commands described here exist only
+> after a cluster administrator has deployed the relevant workload overlay (Scenario 3
+> for EFS, Scenario 4 for FSx) and enabled a lifecycle integration. If these commands
+> are not found on your cluster, ask your administrator whether the overlay is
+> installed — see [transparent-lifecycle.md](transparent-lifecycle.md) and the
+> [support matrix](../support-matrix.md).
+
 You have access to on-demand scratch storage that is created when your job starts
 and destroyed when it finishes. No tickets, no waiting for the storage team. You
 submit a job, storage appears, your job runs, results are saved, storage disappears.

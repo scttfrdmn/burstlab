@@ -6,6 +6,17 @@ from most explicit to most transparent.
 
 For the cluster user's perspective, see [user-guide.md](user-guide.md).
 
+## Contents
+
+- [Testing Status](#testing-status)
+- [The Four Approaches](#the-four-approaches)
+- [Approach 0 — Chain](#approach-0--chain-submit-chainsh)
+- [Approach A — Wrapper](#approach-a--wrapper)
+- [Approach B — Prolog/Epilog](#approach-b--prologepilog)
+- [Approach C — Burst Buffer Lua](#approach-c--burst-buffer-lua-fsx-only)
+- [Choosing an Approach](#choosing-an-approach)
+- [Side-by-Side Demo](#side-by-side-demo)
+
 ### Testing Status
 
 > The authoritative capability status across all five generations lives in the
@@ -24,7 +35,8 @@ The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
 injection, `scontrol update`, combined dispatcher), not in the AWS API calls.
 
 Gen 2 (Slurm 23.11, Rocky 9) is fully validated for Approach B. Gen 3 (Slurm 24.05,
-Rocky 10) is validated for EFS only — FSx Lustre is blocked (see Gen 3 notes below).
+Rocky 10) is validated for EFS; its FSx client is now auto-installed via burstlab-lustre
+but the FSx workload has not yet been re-validated (see Gen 3 notes below).
 
 **Gen 2 operational notes (Slurm 23.11.10, Rocky 9, AMI `ami-069e41e072fedcf8e`):**
 - `scontrol update Environment=` is NOT supported in 23.11.10 (returns "Update of

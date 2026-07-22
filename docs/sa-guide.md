@@ -44,8 +44,11 @@ All five generations are fully built and tested. Match the customer's environmen
 | Not sure / first contact (Ubuntu) | **Gen 4** | Covers largest Ubuntu installed base |
 | CentOS 7 or older RHEL | **Gen 1** as reference | Note OS differences; Slurm/Plugin config identical |
 
-**Note:** FSx Lustre is blocked on Gen 3 (Rocky 10), Gen 4 (Ubuntu 22.04), and Gen 5 (Ubuntu 24.04)
-due to missing Lustre client packages. EFS workloads work on all generations.
+**Note:** AWS provides no Lustre client packages for Gen 3–5 (Rocky 10, Ubuntu), so those
+generations install a client from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)
+automatically at boot. The full FSx (Scenario 4) workload has been validated end-to-end
+only on Gen 1 so far. EFS workloads work on all generations. See the
+[support matrix](support-matrix.md) for authoritative status.
 
 See [generations.md](generations.md) for detailed comparison and [README-ubuntu.md](../README-ubuntu.md)
 for Ubuntu-specific notes.

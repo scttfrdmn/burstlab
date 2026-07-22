@@ -27,6 +27,13 @@ The head node is the cluster's NAT gateway — on-prem compute and burst nodes r
 
 ## What's in This Repo
 
+New here? Start with the **[documentation landing page](docs/README.md)** for a guided
+path, or jump to [Getting Started](#getting-started) below. The full repository tree is
+collapsed so it doesn't interrupt onboarding:
+
+<details>
+<summary>Full repository layout</summary>
+
 ```
 burstlab/
 ├── README.md                        # This file
@@ -112,6 +119,8 @@ burstlab/
 │
 └── cdk/                             # Experimental CDK (Go), Gen 1 only — see cdk/README.md
 ```
+
+</details>
 
 ---
 

@@ -4,6 +4,19 @@ The AWS Plugin for Slurm v2 is five Python scripts and two JSON configuration fi
 
 This guide walks through the plugin as if you are setting it up manually. In BurstLab, Terraform handles all of this automatically, but understanding the manual steps is what makes you effective with a customer.
 
+## Contents
+
+- [What the Plugin Actually Is](#what-the-plugin-actually-is)
+- [Directory Layout](#directory-layout)
+- [config.json Walkthrough](#configjson-walkthrough)
+- [partitions.json Walkthrough](#partitionsjson-walkthrough)
+- [Running generate_conf.py](#running-generate_confpy)
+- [The change_state.py Cron](#the-change_statepy-cron)
+- [The Launch Template: InstanceMetadataTags=enabled](#the-launch-template-instancemetadatatagsenabled)
+- [IAM Deep Dive](#iam-deep-dive)
+- [Debugging Common Failures](#debugging-common-failures)
+- [Cross-References](#cross-references)
+
 ---
 
 ## What the Plugin Actually Is

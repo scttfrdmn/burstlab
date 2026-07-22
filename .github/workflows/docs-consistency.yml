@@ -1,0 +1,64 @@
+name: docs-consistency
+
+# Guards against the class of documentation drift found in the July 2026 review:
+# broken relative doc links, stale burst-node counts, stale "FSx blocked" language,
+# and the wrong validation-script path. The support matrix (docs/support-matrix.md)
+# is the single source of truth; these checks keep prose from contradicting it.
+
+on:
+  push:
+    paths: ['**/*.md']
+  pull_request:
+    paths: ['**/*.md']
+
+jobs:
+  docs-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Relative Markdown links resolve
+        run: |
+          fail=0
+          # For every [text](path.md) or [text](path.md#anchor) link, check the file exists.
+          while IFS= read -r line; do
+            f="${line%%:*}"; rest="${line#*:}"
+            # extract each (target) that ends in .md or .md#...
+            echo "$rest" | grep -oE '\]\(([^)]+\.md)(#[^)]*)?\)' | sed -E 's/^\]\(//; s/\)$//; s/#.*//' | while read -r tgt; do
+              case "$tgt" in
+                http*|"") continue ;;
+              esac
+              dir="$(dirname "$f")"
+              [ -f "$dir/$tgt" ] || { echo "::error file=$f::broken doc link -> $tgt"; echo BROKEN; }
+            done
+          done < <(grep -rn --include='*.md' -E '\]\([^)]+\.md' . ) | grep -q BROKEN && fail=1
+          [ "$fail" -eq 0 ] && echo "OK: all relative .md links resolve"
+          exit "$fail"
+
+      - name: No stale burst-node counts (must be 10, not 8)
+        run: |
+          # max_burst_nodes default is 10 across all generations. Flag "8 burst" prose.
+          if grep -rniE '(up to|max(imum)?|all) (8|eight) burst' --include='*.md' .; then
+            echo "::error::Found stale '8 burst nodes' text — the default is 10. Update to match docs/support-matrix.md."
+            exit 1
+          fi
+          echo "OK: no stale burst-node counts"
+
+      - name: No stale 'FSx blocked' language
+        run: |
+          # FSx on Gen 3-5 is now client-available via burstlab-lustre. "FSx blocked" is stale.
+          if grep -rniE 'fsx.{0,20}(blocked|is blocked)' --include='*.md' . \
+               | grep -viE 'support-matrix|was blocked|previously blocked'; then
+            echo "::error::Found stale 'FSx blocked' language. See docs/support-matrix.md for current status."
+            exit 1
+          fi
+          echo "OK: no stale FSx-blocked language"
+
+      - name: Validation scripts referenced at correct path (/opt/slurm/etc)
+        run: |
+          # validate-cluster.sh / demo-burst.sh are deployed to /opt/slurm/etc, not /bin.
+          if grep -rnE '/opt/slurm/bin/(validate-cluster|demo-burst)\.sh' --include='*.md' .; then
+            echo "::error::Wrong path: these scripts live in /opt/slurm/etc, not /opt/slurm/bin."
+            exit 1
+          fi
+          echo "OK: validation-script paths correct"
