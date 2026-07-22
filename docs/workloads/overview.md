@@ -56,8 +56,9 @@ if they already understand burst mechanics and want to see cloud-native data man
 
 ### Lifecycle Approaches (Scenarios 3 and 4)
 
-Both ephemeral storage scenarios support four ways to trigger the storage lifecycle,
-from most explicit to most transparent:
+Both scenarios support Chain (0), Wrapper (A), and Prolog/Epilog (B) integration, from
+most explicit to most transparent. Scenario 4 additionally supports the FSx-specific
+Burst Buffer approach (C):
 
 | Approach | Deployment | How to submit | Best for |
 |----------|-----------|--------------|----------|

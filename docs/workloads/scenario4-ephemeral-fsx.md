@@ -40,7 +40,8 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # if not alre
 
 cd "$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit: gen_state_path, cluster_name
+# Edit — deployment-coupled: gen_state_path (always) + aws_profile, aws_region,
+#        cluster_name if you left the Gen 1 / aws / us-west-2 defaults behind.
 # Optional: create_fsx_service_linked_role = false (if already exists in account)
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
@@ -71,7 +72,7 @@ cat > /tmp/scenario4.env <<EOF
 export CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw cloud_subnet_a_id)
 export FSX_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw fsx_sg_id)
 export S3_DATA_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw s3_data_bucket)
-export AWS_REGION=us-west-2
+export AWS_REGION=$AWS_REGION
 EOF
 
 scp -i "$SSH_KEY" /tmp/scenario4.env alice@"$HEAD_IP":~/scenario4.env

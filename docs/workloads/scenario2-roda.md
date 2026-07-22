@@ -42,8 +42,12 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply
 # Scenario 2
 cd "$BURSTLAB_ROOT/terraform/workloads/scenario2-roda/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit: roda_bucket = "noaa-goes16"   (or any RODA bucket)
-#       results_bucket_name = "burstlab-roda-results-<suffix>"
+# Edit — scenario-specific:
+#   roda_bucket = "noaa-goes16"   (or any RODA bucket)
+#   results_bucket_name = "burstlab-roda-results-<suffix>"
+# Edit — deployment-coupled (only if you left the Gen 1 / aws / us-west-2 defaults):
+#   gen_state_path, aws_profile, aws_region, cluster_name
+# NOTE: for the us-east-1 same-region story above, aws_region here must be us-east-1.
 terraform init && terraform apply
 # Creates results bucket + adds S3 read policy to burst node role
 ```

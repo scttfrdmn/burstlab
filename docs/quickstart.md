@@ -102,7 +102,7 @@ packer version
 
 Install: https://developer.hashicorp.com/packer/install
 
-### 4. An EC2 key pair in us-west-2
+### 4. An EC2 key pair in your target region
 
 This is the SSH key you will use to connect to the cluster.
 

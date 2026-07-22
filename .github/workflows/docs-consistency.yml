@@ -213,3 +213,30 @@ jobs:
             exit 1
           fi
           echo "OK: key-pair creation requests ed25519"
+
+      - name: Workload env files must not hardcode a runtime region
+        run: |
+          # Generated scenario env files and head-node job commands should carry the
+          # deployment's $AWS_REGION, not a literal us-west-2, or CLI ops on the head
+          # node target the wrong region when deployed elsewhere.
+          if grep -rnE 'AWS_REGION=us-west-2' --include='*.md' docs/workloads/; then
+            echo "::error::Hardcoded AWS_REGION=us-west-2 in a workload doc; use \$AWS_REGION."
+            exit 1
+          fi
+          echo "OK: workload docs carry \$AWS_REGION, not a literal region"
+
+      - name: Scenario overlay applies are preceded by tfvars config
+        run: |
+          # A 'terraform ... <scenario-dir> apply' in a deploy doc must be accompanied by
+          # a 'cp terraform.tfvars.example' for that scenario in the same file, so readers
+          # configure gen_state_path/profile/region/cluster_name before applying.
+          fail=0
+          for f in README.md docs/workloads/overview.md; do
+            if grep -qE 'workloads/scenario[0-9][^ ]*" (init|apply)|chdir="[^"]*scenario[0-9]' "$f" \
+               && ! grep -q 'cp terraform.tfvars.example' "$f"; then
+              echo "::error file=$f::scenario apply without a 'cp terraform.tfvars.example' config step"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "OK: scenario applies include tfvars config"
+          exit "$fail"

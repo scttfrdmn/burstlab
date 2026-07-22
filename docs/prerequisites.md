@@ -187,7 +187,7 @@ Example output when everything is fine:
   Profile: aws
 
   [PASS] On-Demand Standard vCPUs:  quota=192  in-use=8    needed-base=40  needed-full=120
-  [PASS] VPCs per region:           quota=5    in-use=1    needed=1
+  [PASS] VPCs per region:           quota=5    in-use=1    available=4  (can run 4 generations in parallel; 5 total exist)
   [PASS] Elastic IP addresses:      quota=5    in-use=1    needed=1
   [INFO] EC2 key pairs:             burstlab-key
 

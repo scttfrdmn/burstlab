@@ -8,12 +8,15 @@ This is not a canned demo. It is a transferable architecture. An SA can stand up
 
 ## Architecture
 
+AZs shown are for a default `us-west-2` deployment; they are derived from your chosen
+region at deploy time (see [region portability](docs/support-matrix.md)).
+
 ```
 VPC 10.0.0.0/16
-├── management subnet  10.0.0.0/24  (us-west-2a) — head node, EIP, SSH entry
-├── on-prem subnet     10.0.1.0/24  (us-west-2a) — static compute nodes (no public IPs)
-├── cloud subnet A     10.0.2.0/24  (us-west-2a) — burst nodes
-└── cloud subnet B     10.0.3.0/24  (us-west-2b) — burst nodes (multi-AZ)
+├── management subnet  10.0.0.0/24  (AZ 1) — head node, EIP, SSH entry
+├── on-prem subnet     10.0.1.0/24  (AZ 1) — static compute nodes (no public IPs)
+├── cloud subnet A     10.0.2.0/24  (AZ 1) — burst nodes
+└── cloud subnet B     10.0.3.0/24  (AZ 2) — burst nodes (multi-AZ)
 
 Head node  (m7a.2xlarge):     slurmctld + slurmdbd + munge + NAT (iptables masquerade)
 Compute nodes (m7a.2xlarge × 4):  slurmd, private only, internet via head node NAT
@@ -258,12 +261,15 @@ cp terraform.tfvars.example terraform.tfvars
 #       (if you deviated from the Gen 1 / aws / us-west-2 defaults)
 terraform init && terraform apply
 
-# Deploy a scenario
-terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
-terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
+# Deploy a scenario — it has its own tfvars (gen_state_path, and aws_profile/
+# aws_region/cluster_name if you left the Gen 1 / aws / us-west-2 defaults behind).
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx"
+cp terraform.tfvars.example terraform.tfvars
+# Edit: gen_state_path (+ aws_profile, aws_region, cluster_name if non-default)
+terraform init && terraform apply
 
 # Run it — on the head node as alice
-ssh -i ~/.ssh/burstlab-key.pem alice@<head_node_ip>
+ssh -i "$SSH_KEY" alice@<head_node_ip>
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 ```
 

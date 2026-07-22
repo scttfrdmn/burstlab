@@ -35,7 +35,8 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # if not alre
 
 cd "$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit: gen_state_path, cluster_name (must match the generation cluster)
+# Edit — deployment-coupled: gen_state_path (always) + aws_profile, aws_region,
+#        cluster_name if you left the Gen 1 / aws / us-west-2 defaults behind.
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" apply
 # Grants EFS lifecycle permissions to burst + head node IAM roles
@@ -63,7 +64,7 @@ HEAD_IP="<head node public IP>"
 cat > /tmp/scenario3.env <<EOF
 export CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw cloud_subnet_a_id)
 export EFS_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw efs_sg_id)
-export AWS_REGION=us-west-2
+export AWS_REGION=$AWS_REGION
 EOF
 
 scp -i "$SSH_KEY" /tmp/scenario3.env alice@"$HEAD_IP":~/scenario3.env
@@ -122,8 +123,9 @@ bash submit-chain.sh --granularity per-campaign --campaign-name protein-sweep
 GRANULARITY=per-campaign CAMPAIGN_NAME=protein-sweep \
   sbatch jobs/scenario3/job2-run-workload.sh
 
-# End campaign (submit destroy manually)
-CAMPAIGN_NAME=protein-sweep AWS_REGION=us-west-2 EFS_SG_ID=$EFS_SG_ID \
+# End campaign (submit destroy manually). AWS_REGION/EFS_SG_ID come from the sourced
+# ~/scenario3.env, so they already match your deployment — no need to hardcode them.
+CAMPAIGN_NAME=protein-sweep \
   sbatch jobs/scenario3/job3-destroy-efs.sh
 ```
 
