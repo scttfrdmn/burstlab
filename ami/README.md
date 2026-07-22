@@ -27,12 +27,14 @@ Packer needs permissions to:
 - `ec2:CreateTags`, `ec2:DescribeInstances`, `ec2:StopInstances`
 - `ec2:CreateSnapshot`, `ec2:DescribeSnapshots`
 
-The build uses the `aws` CLI profile by default. Override with `-var aws_profile=myprofile`.
+The build uses the `aws` CLI profile by default. Override with `-var aws_profile=myprofile`
+(and pass the same to the deploy — see the [quickstart](../docs/quickstart.md) note on
+profile handling).
 
 Verify your credentials before building:
 
 ```bash
-aws --profile aws sts get-caller-identity
+aws sts get-caller-identity          # honors $AWS_PROFILE, or add --profile <name>
 ```
 
 ### VPC / Subnet
@@ -115,32 +117,30 @@ us-west-2: ami-0xxxxxxxxxxxxxxxx
 
 ### 1. Record the AMI ID
 
-Add it to your Terraform variables file:
+Copy the printed AMI ID — you set it as `head_node_ami` in `terraform.tfvars` during
+deployment. You can also look it up later:
 
 ```bash
-# terraform/terraform.tfvars
-echo 'base_ami_id = "ami-0xxxxxxxxxxxxxxxx"' >> ../terraform/terraform.tfvars
+aws ec2 describe-images --owners self \
+  --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
+  --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
 ```
-
-Or set it directly in `terraform/variables.tf` as the default for `base_ami_id`.
 
 ### 2. Verify the AMI (optional)
 
 ```bash
 aws ec2 describe-images \
-  --image-ids ami-0xxxxxxxxxxxxxxxx \
+  --image-ids <AMI_ID> \
   --query 'Images[0].{Name:Name,State:State,Tags:Tags}' \
   --output table
 ```
 
-### 3. Proceed with Terraform
+### 3. Deploy
 
-```bash
-cd ../terraform
-terraform init
-terraform plan
-terraform apply
-```
+Deploying the cluster from this AMI is covered by the canonical
+**[quickstart](../docs/quickstart.md)** (Step 2 onward — set `head_node_ami` to the ID
+above, plus `aws_profile`, `aws_region`, and `key_name`). This README is intentionally
+scoped to building the AMI; it does not duplicate the deploy steps.
 
 ---
 

@@ -229,42 +229,26 @@ Slurm 24.05 ignores them with a warning if present on v2 systems.
 
 ## Building and Deploying Gen 3
 
-```bash
-# Assumes the quickstart.md setup (BURSTLAB_ROOT, AWS_PROFILE, AWS_REGION, SSH_KEY
-# exported from a clean checkout).
+Deploy exactly as the canonical [quickstart](quickstart.md) (build AMI → configure all
+four `terraform.tfvars` values → apply → validate → demo), substituting the Gen 3
+specifics:
 
-# 1. Verify Rocky 10 AMI is available in your region
+| | Gen 3 value |
+|---|---|
+| Packer template | `ami/rocky10-slurm2405.pkr.hcl` |
+| Terraform dir | `terraform/generations/gen3-slurm2405-rocky10` |
+| AMI name filter | `burstlab-gen3-*` |
+| SSH user | `rocky` |
+
+Two Gen-3-specific notes:
+
+```bash
+# Before building: confirm a Rocky 10 source AMI exists in your region
 aws ec2 describe-images --owners 792107900819 \
   --filters 'Name=name,Values=Rocky-10*' \
-  --query 'Images[*].{Name:Name,ID:ImageId,Date:CreationDate}' \
-  --output table
+  --query 'Images[*].{Name:Name,ID:ImageId,Date:CreationDate}' --output table
 
-# 2. Build the Gen 3 AMI (~20 minutes)
-packer init "$BURSTLAB_ROOT/ami"
-packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky10-slurm2405.pkr.hcl"
-
-# 3. Find the AMI ID
-aws ec2 describe-images --owners self \
-  --filters 'Name=name,Values=burstlab-gen3-*' \
-  --query 'sort_by(Images, &CreationDate)[-1].{ID:ImageId,Name:Name}' \
-  --output table
-
-# 4. Deploy (see quickstart.md Step 2 for the full tfvars walkthrough)
-cd "$BURSTLAB_ROOT/terraform/generations/gen3-slurm2405-rocky10"
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set aws_profile, aws_region, key_name, head_node_ami
-terraform init
-terraform apply
-
-# 5. Connect and validate
-ssh -i "$SSH_KEY" rocky@$(terraform output -raw head_node_public_ip)
-bash /opt/slurm/etc/validate-cluster.sh
-
-# 6. Demo
-su - alice
-bash /opt/slurm/etc/demo-burst.sh
-
-# 7. Observe cloud_reg_addrs in action after a burst job runs:
+# After a burst job runs: watch cloud_reg_addrs update NodeAddr with the real EC2 IP
 scontrol show node aws-burst-0 | grep NodeAddr
 ```
 
