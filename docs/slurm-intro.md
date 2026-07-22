@@ -122,7 +122,6 @@ The `*` in `sinfo` output marks the default partition (where jobs go if you don'
 | `drain` | Being taken offline (jobs finish, no new ones start) |
 | `idle~` | Powered off (cloud node, no EC2 instance) |
 | `alloc~` | Powering on — job assigned, instance launching |
-| `idle~` | Powered-off cloud node (same as first `idle~` row — CLOUD-state alias) |
 
 The `~` suffix means the node is in power-saving mode (no EC2 instance running).
 

@@ -31,11 +31,16 @@ that HPC applications can read without moving data into on-prem storage first.
 
 ## Terraform Deploy
 
-```bash
-cd terraform/workloads/base/
-terraform init && terraform apply   # if not already done
+Run on your **local workstation** (paths are from `$BURSTLAB_ROOT` — see the
+[quickstart](../quickstart.md#before-you-start) for the setup that exports it):
 
-cd terraform/workloads/scenario2-roda/
+```bash
+# Base overlay (once per cluster, if not already applied)
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply
+
+# Scenario 2
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario2-roda/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit: roda_bucket = "noaa-goes16"   (or any RODA bucket)
 #       results_bucket_name = "burstlab-roda-results-<suffix>"
@@ -46,15 +51,34 @@ terraform init && terraform apply
 The burst node role gains S3 read access to the RODA bucket and write access
 to the results bucket. No other permissions change.
 
+> **Region note:** `noaa-goes16` lives in `us-east-1`. Reading it from a cluster in a
+> different region (e.g. the `us-west-2` default) still works, but incurs cross-region
+> data-transfer cost and latency. For the free-egress, same-region story described
+> below, deploy this scenario's cluster in `us-east-1` (`export AWS_REGION=us-east-1`
+> before building). The commands are otherwise identical.
+
 ---
 
 ## Demo Steps
 
+**Step 1 — On your local workstation:** capture the results bucket name from Terraform
+output and open an SSH session to the head node, passing the value in:
+
 ```bash
-ssh alice@<head_node_ip>
+RESULTS_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario2-roda" \
+  output -raw results_bucket_name)
+
+ssh -i "$SSH_KEY" alice@<head_node_ip>
+```
+
+**Step 2 — On the BurstLab head node (as alice):** substitute the bucket name printed
+above. Terraform is **not** available here — that is why the value is passed in from the
+workstation rather than read from state:
+
+```bash
+RESULTS_BUCKET="<paste value from step 1>"
 
 # s5cmd: fastest parallel download
-RESULTS_BUCKET=$(cd terraform/workloads/scenario2-roda/ && terraform output -raw results_bucket_name)
 RESULTS_BUCKET=$RESULTS_BUCKET AWS_REGION=us-west-2 \
   sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-s5cmd.sh
 
@@ -72,6 +96,9 @@ watch -n 5 squeue
 # Results in S3
 aws s3 ls s3://${RESULTS_BUCKET}/ --recursive
 ```
+
+> If you deployed in `us-east-1` per the region note above, set `AWS_REGION=us-east-1`
+> in the `sbatch` lines to match.
 
 ---
 
@@ -137,9 +164,11 @@ and you want zero code changes. Files stream from S3 on first read.
 
 ## Teardown
 
+Run on your **local workstation**:
+
 ```bash
-cd terraform/workloads/scenario2-roda/
-terraform destroy   # removes results bucket (force_destroy=true), IAM policy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario2-roda" destroy
+# removes results bucket (force_destroy=true), IAM policy
 ```
 
 The RODA bucket is not affected — it's a public AWS-managed dataset.

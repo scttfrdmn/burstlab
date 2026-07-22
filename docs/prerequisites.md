@@ -121,8 +121,8 @@ A single BurstLab cluster (one generation deployed) uses:
 
 | Resource | Count | Notes |
 |---|---|---|
-| EC2 instances | 1 head + 4 compute + 0–8 burst | Burst nodes appear/disappear on demand |
-| On-Demand Standard vCPUs | 40 base (5 × m7a.2xlarge) | Up to 104 with all 8 burst nodes active |
+| EC2 instances | 1 head + 4 compute + 0–10 burst | Burst nodes appear/disappear on demand |
+| On-Demand Standard vCPUs | 40 base (5 × m7a.2xlarge) | Up to 120 with all 10 burst nodes active |
 | VPC | 1 | |
 | Elastic IP address | 1 | Head node EIP |
 | Internet Gateway | 1 | |
@@ -135,7 +135,7 @@ A single BurstLab cluster (one generation deployed) uses:
 
 | Quota | AWS Quota Code | Per Cluster | Default Limit | Risk |
 |---|---|---|---|---|
-| **Running On-Demand Standard (vCPU)** | `L-1216C47A` (ec2) | 40 base / 104 burst | 32–192 (varies by account age) | **HIGH — most common blocker** |
+| **Running On-Demand Standard (vCPU)** | `L-1216C47A` (ec2) | 40 base / 120 burst | 32–192 (varies by account age) | **HIGH — most common blocker** |
 | VPCs per region | `L-F678F1CE` (vpc) | 1 | 5 | Medium — see note below |
 | Elastic IPs per region | `L-0263D0A3` (ec2) | 1 | 5 | Low |
 | Internet Gateways per region | `L-A4707A72` (ec2) | 1 | 5 | Same as VPC limit |
@@ -147,8 +147,11 @@ you will hit the quota when trying to launch compute nodes (4 × m7a.2xlarge = 3
 before the head node (8 vCPUs) is even counted.
 
 **Recommendation for full burst testing:** request a quota of at least 192 vCPUs in
-your target region. This allows one cluster with all burst nodes active (104 vCPUs)
+your target region. This allows one cluster with all burst nodes active (120 vCPUs)
 plus headroom.
+
+See [support-matrix.md](support-matrix.md) for the authoritative per-generation node
+counts and capability status.
 
 ### VPC Limit: Running Multiple Generations
 

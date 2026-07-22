@@ -8,12 +8,16 @@ For the cluster user's perspective, see [user-guide.md](user-guide.md).
 
 ### Testing Status
 
+> The authoritative capability status across all five generations lives in the
+> [support matrix](../support-matrix.md). The table below is the workload-specific
+> detail behind it.
+
 | Approach | Gen 1 | Gen 2 | Gen 3 | Notes |
 |----------|-------|-------|-------|-------|
 | **0 — Chain** | Tested (FSx + EFS) | Not tested | Not tested | End-to-end on live Gen 1 cluster |
 | **A — Wrapper** | Tested (FSx + EFS) | Not tested | Not tested | fsx-sbatch + efs-sbatch end-to-end on Gen 1; fsx-restore + fsx-purge verified |
-| **B — Prolog/Epilog** | Tested (FSx + EFS) | Tested (FSx + EFS) | Tested (EFS only) | FSx blocked: no EL10 Lustre client in AWS repo. EFS works. `scontrol update Environment=` NOT supported in 22.05 or 23.11; state file path instead |
-| **C — Burst Buffer** | Cannot run | Not tested | Not tested | Requires `burst_buffer_lua.so` — not in current AMIs; needs `--with-lua` rebuild |
+| **B — Prolog/Epilog** | Tested (FSx + EFS) | Tested (FSx + EFS) | Tested (EFS only) | Gen 3 FSx client now auto-installed via burstlab-lustre but Scenario 4 not yet re-validated. `scontrol update Environment=` NOT supported in 22.05 or 23.11; state file path instead |
+| **C — Burst Buffer** | Rebuild AMI first | Rebuild AMI first | Rebuild AMI first | Requires `burst_buffer_lua.so`. `lua-devel`/`liblua5.4-dev` is now in the Packer recipes (issue #6), so rebuild the AMI to enable — already-built AMIs lack it |
 
 The wrapper and prolog/epilog approaches share the proven `fsx-lifecycle.sh` and
 `efs-lifecycle.sh` libraries. The primary risk is in the integration glue (env
@@ -36,10 +40,11 @@ Rocky 10) is validated for EFS only — FSx Lustre is blocked (see Gen 3 notes b
   `EFS_MOUNT_IP` to the state file; the job script uses `${EFS_MOUNT_IP:-${EFS_DNS}}`.
 
 **Gen 3 operational notes (Slurm 24.05.5, Rocky 10, AMI `ami-0e6d8478ca888e22d`):**
-- **FSx Lustre: blocked.** The AWS FSx Lustre client repo (`fsx-lustre-client-repo.s3.amazonaws.com`)
-  does not publish packages for `el/10`. `burst-node-init.sh.tpl` installs with
-  `skip_if_unavailable=1`, so the node boots cleanly but has no Lustre kernel module.
-  FSx workloads fail at `modprobe lustre`. EFS workloads are unaffected.
+- **FSx Lustre: client now auto-installed.** The AWS FSx Lustre client repo does not
+  publish `el/10` packages, so the node init scripts install a compatible client
+  (Lustre 2.17.0) from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)
+  at boot. The EFS-only validation above predates this integration; the full Scenario 4
+  FSx cycle has not yet been re-run on Gen 3. EFS workloads are unaffected either way.
 - **EFS:** Fully functional. IP-based mount workaround applies here too.
 - **Crypto policy:** DEFAULT (no LEGACY). `burstlab-key` is Ed25519 across all
   generations, which is not affected by RHEL 10's RSA-3072 minimum.

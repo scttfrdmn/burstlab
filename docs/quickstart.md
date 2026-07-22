@@ -12,17 +12,35 @@ quick start. See [generations.md](generations.md) to choose the right generation
 
 ---
 
+> ⚠️ **This creates billable AWS resources.** BurstLab is a disposable lab/reference
+> environment, not a production cluster. The idle base cluster runs ~$1.80/hour
+> (~$43/day) before burst nodes; the AMI build adds a short-lived instance cost. The
+> default config allows broad SSH (0.0.0.0/0). Always `terraform destroy` when done
+> (Step 6). See [prerequisites.md](prerequisites.md) and the
+> [support matrix](support-matrix.md).
+
 ## Before You Start
 
-Run the pre-flight quota check to catch AWS quota issues before they interrupt a deploy:
+Clone the repo and set the environment variables used throughout this guide. Every
+later command runs from the repository root (`$BURSTLAB_ROOT`) or uses Terraform's
+`-chdir`, so you never have to guess your working directory:
 
 ```bash
-bash scripts/check-quotas.sh --profile YOUR_PROFILE --region us-west-2
+git clone https://github.com/scttfrdmn/burstlab.git
+cd burstlab
+export BURSTLAB_ROOT="$PWD"
+export AWS_PROFILE="your-profile"   # aws configure list-profiles shows yours
+export AWS_REGION="us-west-2"
+export SSH_KEY="$HOME/.ssh/burstlab-key.pem"
 ```
 
-Replace `YOUR_PROFILE` with your AWS CLI profile name (`aws configure list-profiles` shows
-available profiles). BurstLab uses `aws` as its default profile name throughout — substitute
-yours wherever you see it.
+All `aws` commands below honor `$AWS_PROFILE`/`$AWS_REGION` from the environment, so no
+`--profile` flag is shown. Run the pre-flight quota check to catch AWS quota issues
+before they interrupt a deploy:
+
+```bash
+bash "$BURSTLAB_ROOT/scripts/check-quotas.sh" --profile "$AWS_PROFILE" --region "$AWS_REGION"
+```
 
 This takes about 10 seconds and will catch the most common blocker (On-Demand Standard
 vCPU quota too low). See [prerequisites.md](prerequisites.md) for the full requirements
@@ -59,10 +77,10 @@ You need four things before starting.
 
 ```bash
 # Install: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html
-aws --profile aws sts get-caller-identity
+aws sts get-caller-identity
 ```
 
-This should print your AWS account ID and user ARN. If it errors, run `aws configure --profile aws` first.
+This should print your AWS account ID and user ARN. If it errors, run `aws configure --profile "$AWS_PROFILE"` first.
 
 Your AWS account needs permission to create EC2 instances, VPCs, IAM roles, and EFS filesystems. An `AdministratorAccess` policy works. If you have a more restricted policy, see `terraform/modules/iam/main.tf` for the exact resources created.
 
@@ -91,8 +109,7 @@ This is the SSH key you will use to connect to the cluster.
 Check if you have one:
 
 ```bash
-aws --profile aws ec2 describe-key-pairs \
-  --region us-west-2 \
+aws ec2 describe-key-pairs \
   --query 'KeyPairs[].KeyName' \
   --output text
 ```
@@ -100,13 +117,12 @@ aws --profile aws ec2 describe-key-pairs \
 If you need to create one:
 
 ```bash
-aws --profile aws ec2 create-key-pair \
-  --region us-west-2 \
+aws ec2 create-key-pair \
   --key-name burstlab-key \
   --query 'KeyMaterial' \
-  --output text > ~/.ssh/burstlab-key.pem
+  --output text > "$SSH_KEY"
 
-chmod 400 ~/.ssh/burstlab-key.pem
+chmod 400 "$SSH_KEY"
 ```
 
 Write down the key pair name (e.g. `burstlab-key`) — you will need it in Step 3.
@@ -120,9 +136,8 @@ Write down the key pair name (e.g. `burstlab-key`) — you will need it in Step 
 The Packer build creates an AWS machine image (AMI) with Rocky Linux 8 and Slurm 22.05 pre-installed. Every cluster node boots from this image.
 
 ```bash
-cd ami/
-packer init .
-packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
+packer init "$BURSTLAB_ROOT/ami"
+packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 ```
 
 While this runs (~15-20 minutes), Packer will:
@@ -143,8 +158,8 @@ us-west-2: ami-0abc1234def56789a
 
 If you need to retrieve it later:
 ```bash
-aws --profile aws ec2 describe-images \
-  --region us-west-2 --owners self \
+aws ec2 describe-images \
+  --owners self \
   --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
   --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
   --output text
@@ -159,7 +174,7 @@ aws --profile aws ec2 describe-images \
 **Time: ~2 minutes**
 
 ```bash
-cd terraform/generations/gen1-slurm2205-rocky8/
+cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
 cp terraform.tfvars.example terraform.tfvars
 ```
 
@@ -372,11 +387,10 @@ bash /opt/slurm/etc/demo-burst.sh
 
 ## Step 8: Tear Down
 
-From your local machine:
+Run on your **local machine**:
 
 ```bash
-cd terraform/generations/gen1-slurm2205-rocky8/
-terraform destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8" destroy
 # Type 'yes' to confirm
 ```
 
@@ -385,17 +399,17 @@ This destroys all Terraform-managed resources. Any running burst nodes are also 
 **Also delete the AMI** when you no longer need it (Terraform does not manage the AMI):
 
 ```bash
-AMI_ID=$(aws --profile aws ec2 describe-images \
-  --region us-west-2 --owners self \
+AMI_ID=$(aws ec2 describe-images \
+  --owners self \
   --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
   --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
 
-SNAPSHOT_ID=$(aws --profile aws ec2 describe-images \
-  --region us-west-2 --image-ids "$AMI_ID" \
+SNAPSHOT_ID=$(aws ec2 describe-images \
+  --image-ids "$AMI_ID" \
   --query 'Images[0].BlockDeviceMappings[0].Ebs.SnapshotId' --output text)
 
-aws --profile aws ec2 deregister-image --region us-west-2 --image-id "$AMI_ID"
-aws --profile aws ec2 delete-snapshot --region us-west-2 --snapshot-id "$SNAPSHOT_ID"
+aws ec2 deregister-image --image-id "$AMI_ID"
+aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID"
 echo "AMI and snapshot deleted."
 ```
 

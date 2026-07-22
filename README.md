@@ -117,36 +117,56 @@ burstlab/
 
 ## Getting Started
 
+> ⚠️ **Lab / reference environment — not production.** BurstLab creates **billable AWS
+> resources** and is meant to be stood up, demonstrated, and torn down. The idle base
+> cluster costs roughly **$1.80/hour (~$43/day)** before any burst nodes; each active
+> burst node adds more. The default lab configuration **permits broad SSH access
+> (0.0.0.0/0)** for convenience — restrict the security group for any non-throwaway use.
+> Review your service quotas, and run `terraform destroy` when finished. See
+> [docs/prerequisites.md](docs/prerequisites.md) (cost, quota, security) and the
+> [support matrix](docs/support-matrix.md) (what works where).
+
 **Before deploying**, check your AWS quota headroom — a low vCPU quota is the most common
-reason a deploy fails partway through:
+reason a deploy fails partway through. First set your shell up from a clean checkout:
 
 ```bash
-bash scripts/check-quotas.sh --profile aws --region us-west-2
+git clone https://github.com/scttfrdmn/burstlab.git
+cd burstlab
+export BURSTLAB_ROOT="$PWD"
+export AWS_PROFILE="your-profile"      # e.g. aws
+export AWS_REGION="us-west-2"
+
+bash scripts/check-quotas.sh --profile "$AWS_PROFILE" --region "$AWS_REGION"
 ```
 
 See [docs/prerequisites.md](docs/prerequisites.md) for full requirements and how to request
 quota increases. See [docs/generations.md](docs/generations.md) to choose the right generation
-for your customer.
+for your customer, and [docs/support-matrix.md](docs/support-matrix.md) for the authoritative
+capability status of each generation.
 
 See [docs/quickstart.md](docs/quickstart.md) for the full step-by-step walkthrough with time estimates.
 
-Short version (Gen 1 — the recommended default):
+Short version (Gen 1 — the recommended default). All commands run from the repository
+root (`$BURSTLAB_ROOT`); the `-chdir` flag keeps Terraform pointed at the right module
+regardless of your current directory:
 
 ```bash
 # 1. Build the AMI (~15-20 minutes)
-cd ami/
-packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
+packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 
 # 2. Configure and deploy (~5 minutes)
-cd terraform/generations/gen1-slurm2205-rocky8/
+cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars: set key_name and head_node_ami
 terraform init && terraform apply
 
 # 3. Wait for cluster init (~10-15 minutes), then connect
-ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
+ssh -i ~/.ssh/burstlab-key.pem rocky@<head_node_public_ip>
 sudo tail -f /var/log/burstlab-init.log   # watch init progress
 sinfo                                      # should show local + cloud partitions
+
+# 4. When done — always tear down to stop billing
+terraform destroy
 ```
 
 ---
@@ -205,15 +225,24 @@ Scenarios 3 and 4 each support three ways to trigger storage lifecycle — from 
 | **B — Prolog/Epilog** | `sbatch --comment=fsx:1200 myjob.sh` | One job ID; storage created silently |
 | **C — Burst Buffer** | `sbatch myjob.sh` (with `#BB` directive) | BF → R → CG state transitions |
 
-```bash
-# Deploy the base overlay (once per cluster)
-cd terraform/workloads/base/
-terraform init && terraform apply
+> **Approach C (Burst Buffer)** needs `burst_buffer_lua.so`, which requires the AMI to
+> be built with Lua headers present. The Packer recipes now include this dependency
+> (issue #6), but **already-built AMIs must be rebuilt** to enable it — until then use
+> Approach B. See the [support matrix](docs/support-matrix.md) for current per-generation
+> status of every approach.
 
-# Deploy a scenario and run it
-cd terraform/workloads/scenario4-ephemeral-fsx/
-terraform init && terraform apply
-ssh alice@<head_node_ip>
+```bash
+# Deploy the base overlay (once per cluster). -chdir keeps Terraform pointed at the
+# right module no matter your current directory (all paths are from $BURSTLAB_ROOT).
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply
+
+# Deploy a scenario
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
+
+# Run it — on the head node as alice
+ssh -i ~/.ssh/burstlab-key.pem alice@<head_node_ip>
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 ```
 
@@ -264,10 +293,12 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 
 | Doc | Audience | Contents |
 |---|---|---|
+| [support-matrix.md](docs/support-matrix.md) | Everyone | **Single source of truth** — per-generation node counts, EFS/FSx, lifecycle, status |
 | [prerequisites.md](docs/prerequisites.md) | Everyone | AWS quota requirements and pre-flight check |
 | [quickstart.md](docs/quickstart.md) | Everyone | Step-by-step deploy with time estimates (Gen 1) |
 | [generations.md](docs/generations.md) | Everyone | Why five generations exist; which to choose |
 | [README-ubuntu.md](README-ubuntu.md) | Ubuntu users | Ubuntu-specific quick start (Gen 4 & 5) |
+| [roadmap.md](docs/roadmap.md) | Everyone | Planned work and project direction |
 | [slurm-intro.md](docs/slurm-intro.md) | Everyone | Slurm concepts and commands from zero |
 | [architecture.md](docs/architecture.md) | SAs, technical customers | Network, EFS, NAT, IAM deep dive |
 | [slurm-gen1-deep-dive.md](docs/slurm-gen1-deep-dive.md) | SAs, HPC admins | Every slurm.conf directive for Gen 1 |

@@ -207,6 +207,12 @@ build {
       "sudo dnf install -y pam-devel readline-devel perl",
       "sudo dnf install -y rpm-build rpmlint",  # needed even for source builds (rpmbuild used in some configure checks)
 
+      # lua-devel: enables Slurm's job_submit/lua and burst_buffer/lua plugins.
+      # configure auto-detects Lua and builds job_submit_lua.so + burst_buffer_lua.so.
+      # Without it, JobSubmitPlugins=lua fatals at controller start and the
+      # burst_buffer/lua lifecycle approach (workloads Scenario 4-C) cannot run. See issue #6.
+      "sudo dnf install -y lua-devel",
+
       # MariaDB — required on head node for slurmdbd accounting database.
       # Installed on ALL nodes so the AMI is universal; slurmdbd only runs
       # on the head node (controlled by systemd unit enable/disable at boot).

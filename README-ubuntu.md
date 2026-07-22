@@ -32,14 +32,16 @@ These generations are functionally identical to the corresponding Rocky generati
 - **SSH user**: `ubuntu` (not `rocky`)
 - Connect with: `ssh -i ~/.ssh/burstlab-key.pem ubuntu@<head_node_public_ip>`
 
-### FSx Lustre Limitation
-**FSx Lustre is BLOCKED on both Ubuntu generations** — the AWS FSx Lustre client
-repository has no Ubuntu packages (same limitation as Gen 3/Rocky 10).
+### FSx Lustre
+AWS does not publish Lustre client packages for Ubuntu LTS, so the node init scripts
+**automatically install** a compatible client (Lustre 2.17.53) from
+[burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) at boot on both Ubuntu
+generations.
 
 - **EFS workloads**: ✅ Fully functional
-- **FSx workloads**: ❌ Blocked (no Lustre kernel module available)
+- **FSx workloads**: 🧪 Client auto-installed; full Scenario 4 not yet re-validated on Ubuntu
 
-Lustre client compilation from source is deferred as a future side project.
+See the [support matrix](docs/support-matrix.md) for the authoritative status.
 
 ## Build and Deploy
 
@@ -103,8 +105,8 @@ The same validation and demo scripts work on all five generations:
 
 ```bash
 # On head node (as ubuntu):
-/opt/slurm/bin/validate-cluster.sh
-/opt/slurm/bin/demo-burst.sh
+bash /opt/slurm/etc/validate-cluster.sh
+bash /opt/slurm/etc/demo-burst.sh
 ```
 
 ## When to Use Ubuntu Generations

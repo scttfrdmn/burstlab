@@ -199,6 +199,12 @@ build {
       # and no Makefile is created, causing the entire Slurm build to fail.
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libhttp-parser-dev libjson-c-dev",
 
+      # liblua5.4-dev: enables Slurm's job_submit/lua and burst_buffer/lua plugins.
+      # configure auto-detects Lua and builds job_submit_lua.so + burst_buffer_lua.so.
+      # Without it, JobSubmitPlugins=lua fatals at controller start and the
+      # burst_buffer/lua lifecycle approach (workloads Scenario 4-C) cannot run. See issue #6.
+      "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y liblua5.4-dev",
+
       # cgroup/v2 plugin build dependencies:
       #   libdbus-1-dev: D-Bus IPC library headers for systemd cgroup v2 management
       #   linux-headers-generic: provides include/linux/bpf.h for eBPF device constraints
