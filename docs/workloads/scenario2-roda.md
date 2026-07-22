@@ -73,26 +73,26 @@ HEAD_IP="<head node public IP>"
 RESULTS_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario2-roda" \
   output -raw results_bucket_name)
 
-# Open an interactive session with RESULTS_BUCKET already exported in it:
+# Open a session with RESULTS_BUCKET and AWS_REGION already exported in it.
+# $AWS_REGION carries whatever region you deployed in (us-west-2 default, or us-east-1
+# per the region note above) — no need to hardcode it in the job commands.
 ssh -i "$SSH_KEY" alice@"$HEAD_IP" \
-  "export RESULTS_BUCKET='$RESULTS_BUCKET'; exec bash -l"
+  "export RESULTS_BUCKET='$RESULTS_BUCKET' AWS_REGION='$AWS_REGION'; exec bash -l"
 ```
 
-**Step 2 — On the BurstLab head node (as alice):** `RESULTS_BUCKET` is already set in the
-session opened above (confirm with `echo "$RESULTS_BUCKET"`). Submit the jobs:
+**Step 2 — On the BurstLab head node (as alice):** `RESULTS_BUCKET` and `AWS_REGION` are
+already set in the session opened above (confirm with `echo "$RESULTS_BUCKET $AWS_REGION"`).
+Submit the jobs:
 
 ```bash
 # s5cmd: fastest parallel download
-RESULTS_BUCKET=$RESULTS_BUCKET AWS_REGION=us-west-2 \
-  sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-s5cmd.sh
+sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-s5cmd.sh
 
 # rclone: checksummed download
-RESULTS_BUCKET=$RESULTS_BUCKET AWS_REGION=us-west-2 \
-  sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-rclone.sh
+sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-rclone.sh
 
 # Mountpoint: POSIX access (no download)
-RESULTS_BUCKET=$RESULTS_BUCKET AWS_REGION=us-west-2 \
-  sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-mountpoint.sh
+sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-mountpoint.sh
 
 # Watch jobs
 watch -n 5 squeue
@@ -100,9 +100,6 @@ watch -n 5 squeue
 # Results in S3
 aws s3 ls s3://${RESULTS_BUCKET}/ --recursive
 ```
-
-> If you deployed in `us-east-1` per the region note above, set `AWS_REGION=us-east-1`
-> in the `sbatch` lines to match.
 
 ---
 

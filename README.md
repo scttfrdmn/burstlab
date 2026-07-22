@@ -155,22 +155,26 @@ capability status of each generation.
 
 See [docs/quickstart.md](docs/quickstart.md) for the full step-by-step walkthrough with time estimates.
 
-Short version (Gen 1 — the recommended default). All commands run from the repository
-root (`$BURSTLAB_ROOT`); the `-chdir` flag keeps Terraform pointed at the right module
-regardless of your current directory:
+Short version (Gen 1 — the recommended default). This is an at-a-glance outline; the
+[quickstart](docs/quickstart.md) is the authoritative version with every step, expected
+output, and caveats. Assumes you have exported `BURSTLAB_ROOT`, `AWS_PROFILE`,
+`AWS_REGION`, and `SSH_KEY` as shown above.
 
 ```bash
 # 1. Build the AMI (~15-20 minutes)
+packer init "$BURSTLAB_ROOT/ami"
 packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 
 # 2. Configure and deploy (~5 minutes)
 cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set key_name and head_node_ami
+# Edit terraform.tfvars: set aws_profile, aws_region, key_name, head_node_ami.
+# aws_profile/aws_region are Terraform variables — exporting the shell vars does NOT
+# override them (see quickstart Step 2).
 terraform init && terraform apply
 
 # 3. Wait for cluster init (~10-15 minutes), then connect
-ssh -i ~/.ssh/burstlab-key.pem rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
 sudo tail -f /var/log/burstlab-init.log   # watch init progress
 sinfo                                      # should show local + cloud partitions
 

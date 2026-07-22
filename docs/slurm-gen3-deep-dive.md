@@ -230,30 +230,34 @@ Slurm 24.05 ignores them with a warning if present on v2 systems.
 ## Building and Deploying Gen 3
 
 ```bash
+# Assumes the quickstart.md setup (BURSTLAB_ROOT, AWS_PROFILE, AWS_REGION, SSH_KEY
+# exported from a clean checkout).
+
 # 1. Verify Rocky 10 AMI is available in your region
-AWS_PROFILE=aws aws ec2 describe-images --owners 792107900819 \
+aws ec2 describe-images --owners 792107900819 \
   --filters 'Name=name,Values=Rocky-10*' \
   --query 'Images[*].{Name:Name,ID:ImageId,Date:CreationDate}' \
   --output table
 
 # 2. Build the Gen 3 AMI (~20 minutes)
-AWS_PROFILE=aws packer build ami/rocky10-slurm2405.pkr.hcl
+packer init "$BURSTLAB_ROOT/ami"
+packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky10-slurm2405.pkr.hcl"
 
 # 3. Find the AMI ID
-AWS_PROFILE=aws aws ec2 describe-images --owners self \
+aws ec2 describe-images --owners self \
   --filters 'Name=name,Values=burstlab-gen3-*' \
   --query 'sort_by(Images, &CreationDate)[-1].{ID:ImageId,Name:Name}' \
   --output table
 
-# 4. Deploy
+# 4. Deploy (see quickstart.md Step 2 for the full tfvars walkthrough)
 cd "$BURSTLAB_ROOT/terraform/generations/gen3-slurm2405-rocky10"
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set key_name and head_node_ami
+# Edit terraform.tfvars: set aws_profile, aws_region, key_name, head_node_ami
 terraform init
 terraform apply
 
 # 5. Connect and validate
-ssh -i ~/.ssh/<key>.pem rocky@$(terraform output -raw head_node_public_ip)
+ssh -i "$SSH_KEY" rocky@$(terraform output -raw head_node_public_ip)
 bash /opt/slurm/etc/validate-cluster.sh
 
 # 6. Demo

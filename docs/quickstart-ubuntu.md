@@ -67,7 +67,8 @@ AMI_ID=$(aws ec2 describe-images --owners self \
 # 3. Configure and deploy
 cd "$BURSTLAB_ROOT/terraform/generations/gen5-slurm2405-ubuntu2404/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set key_name and head_node_ami="$AMI_ID"
+# Edit terraform.tfvars: set aws_profile, aws_region, key_name, head_node_ami="$AMI_ID"
+# (aws_profile/aws_region are Terraform vars — exporting the shell vars won't override them)
 terraform init && terraform apply
 
 # 4. Connect (ubuntu user)

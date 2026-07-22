@@ -191,25 +191,26 @@ logs a warning if they diverge. Gen 2 corrects this: config.json and slurm.conf 
 ## Building and Deploying Gen 2
 
 ```bash
-# 1. Build the AMI (takes ~20 minutes)
-cd /path/to/burstlab
-AWS_PROFILE=aws packer build ami/rocky9-slurm2311.pkr.hcl
+# 1. Build the AMI (takes ~20 minutes). Assumes the quickstart.md setup
+#    (BURSTLAB_ROOT, AWS_PROFILE, AWS_REGION, SSH_KEY exported from a clean checkout).
+packer init "$BURSTLAB_ROOT/ami"
+packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky9-slurm2311.pkr.hcl"
 
 # 2. Find the AMI ID
-AWS_PROFILE=aws aws ec2 describe-images --owners self \
+aws ec2 describe-images --owners self \
   --filters 'Name=name,Values=burstlab-gen2-*' \
   --query 'sort_by(Images, &CreationDate)[-1].{ID:ImageId,Name:Name}' \
   --output table
 
-# 3. Deploy
+# 3. Deploy (see quickstart.md Step 2 for the full tfvars walkthrough)
 cd "$BURSTLAB_ROOT/terraform/generations/gen2-slurm2311-rocky9"
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set key_name and head_node_ami
+# Edit terraform.tfvars: set aws_profile, aws_region, key_name, head_node_ami
 terraform init
 terraform apply
 
 # 4. SSH to head node
-ssh -i ~/.ssh/<key>.pem rocky@$(terraform output -raw head_node_public_ip)
+ssh -i "$SSH_KEY" rocky@$(terraform output -raw head_node_public_ip)
 
 # 5. Validate
 bash /opt/slurm/etc/validate-cluster.sh

@@ -306,23 +306,24 @@ fsx-purge <RUN_ID>       # removes S3 data; EFS results (~/results/) are preserv
 
 **Using the raw chain scripts (chain approach):**
 
-On your **local workstation**, capture the results bucket name from Terraform output.
-Terraform is **not** available on the head node, so collect the value here and pass it in:
+On your **local workstation**, capture the results bucket name from Terraform output and
+open an SSH session that carries it into the remote shell (Terraform is not available on
+the head node, so the value must originate here):
 
 ```bash
+HEAD_IP="<head node public IP>"
 RESULTS_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw s3_results_bucket)
 
-ssh -i "$SSH_KEY" alice@<head_node_ip>
+ssh -i "$SSH_KEY" alice@"$HEAD_IP" \
+  "export RESULTS_BUCKET='$RESULTS_BUCKET'; exec bash -l"
 ```
 
-On the **BurstLab head node (as alice)**, substitute the bucket name printed above:
+On the **BurstLab head node (as alice)**, `RESULTS_BUCKET` is already set in this session
+(confirm with `echo "$RESULTS_BUCKET"`):
 
 ```bash
-RESULTS_BUCKET="<paste value from previous step>"
-
 # Phase 1 — Write chain
-RESULTS_BUCKET=$RESULTS_BUCKET \
-  bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
 # Phase 2 — Restore chain
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain-restore.sh \

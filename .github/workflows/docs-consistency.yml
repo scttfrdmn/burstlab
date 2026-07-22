@@ -105,3 +105,33 @@ jobs:
             exit 1
           fi
           echo "OK: no overstated validation claim"
+
+      - name: Abbreviated tfvars edits list all four required values
+        run: |
+          # Any "Edit terraform.tfvars: set ..." instruction must name all four required
+          # values, so abbreviated deploy paths can't drift from quickstart Step 2.
+          bad="$(grep -rn 'Edit terraform.tfvars: set' --include='*.md' . || true)"
+          fail=0
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            for v in aws_profile aws_region key_name head_node_ami; do
+              echo "$line" | grep -q "$v" || { echo "::error::$line -- missing $v"; fail=1; }
+            done
+          done <<< "$bad"
+          [ "$fail" -eq 0 ] && echo "OK: tfvars edit instructions are complete"
+          exit "$fail"
+
+      - name: Runnable 'packer build' lines are paired with 'packer init'
+        run: |
+          # A clean checkout needs 'packer init' before 'packer build'. Only consider
+          # runnable command lines (packer build at start of line, allowing leading
+          # whitespace or a shell var assignment) — not prose that merely mentions it.
+          fail=0
+          for f in $(grep -rlE '^[[:space:]]*([A-Z_]+=[^ ]+[[:space:]]+)?packer build' --include='*.md' .); do
+            if ! grep -q 'packer init' "$f"; then
+              echo "::error file=$f::runnable 'packer build' without 'packer init' in the same doc"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "OK: runnable packer build lines are paired with packer init"
+          exit "$fail"
