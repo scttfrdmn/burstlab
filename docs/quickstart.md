@@ -185,7 +185,20 @@ key_name      = "burstlab-key"            # your EC2 key pair name from the prer
 head_node_ami = "ami-0abc1234def56789a"   # AMI ID from Step 1
 ```
 
-Everything else has reasonable defaults. Leave them as-is.
+The other `terraform.tfvars` variables have defaults you can leave as-is, but two of
+them directly affect cost — know what they do before deploying:
+
+- `max_burst_nodes` (default **10**) — the ceiling on simultaneous burst instances.
+  Each is an `m7a.2xlarge` (8 vCPU) that bills while running. Lower it to cap spend.
+- `compute_node_count` (default **4**) — always-on compute nodes. These run 24/7 and
+  are the bulk of the idle cost (~$1.80/hr for the base cluster).
+
+**Security:** the head node security group allows SSH (port 22) from `0.0.0.0/0` — a
+lab convenience, not a variable. For anything beyond a throwaway demo, restrict it to
+your own IP by editing the ingress rule in `terraform/modules/vpc/main.tf` (search for
+`from_port = 22`) before `terraform apply`.
+
+See [prerequisites.md](prerequisites.md) and the [support matrix](support-matrix.md).
 
 > **Deploying Gen 2 or Gen 3?** The workflow is identical — just use the corresponding
 > directory: `terraform/generations/gen2-slurm2311-rocky9/` or
