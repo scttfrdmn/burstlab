@@ -3,8 +3,11 @@ aws_profile    = "aws"
 aws_region     = "us-west-2"
 cluster_name   = "burstlab-gen1"
 
-# Set to false if AWSServiceRoleForAmazonFSx already exists in your AWS account
-create_fsx_service_linked_role = false
+# Service-linked roles are account-scoped and only need to be created once. These
+# default to `true` so a first-time deployment creates them (the documented path).
+# Returning users whose account already has these roles should switch them to `false`
+# to avoid an "already exists" error.
+create_fsx_service_linked_role = true
 
-# Set to false if s3.data-source.lustre.fsx.amazonaws.com SLR already exists in your account
-create_fsx_s3_service_linked_role = false
+# s3.data-source.lustre.fsx.amazonaws.com SLR (required for FSx S3 data repositories)
+create_fsx_s3_service_linked_role = true

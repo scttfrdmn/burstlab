@@ -42,7 +42,8 @@ cd "$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit — deployment-coupled: gen_state_path (always) + aws_profile, aws_region,
 #        cluster_name if you left the Gen 1 / aws / us-west-2 defaults behind.
-# Optional: create_fsx_service_linked_role = false (if already exists in account)
+# Optional: the create_fsx_*_service_linked_role flags default to true (first-run
+#   creates the roles). Set them to false only if those roles already exist in your account.
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
 # Creates S3 data bucket, grants FSx + S3 permissions, creates service-linked role
@@ -409,8 +410,9 @@ destroys FSx automatically."
 ### Approach C — Burst Buffer Lua
 
 Deploy with `terraform/workloads/scenario4-burst-buffer/`. Requires `burst_buffer/lua`
-compiled into the Slurm build (Gen 1 AMI does not include it by default — the Terraform
-module checks and fails fast with rebuild instructions).
+compiled into the Slurm build. Current Packer builds include the required Lua dependency
+(issue #6); older AMIs built before that was added may lack `burst_buffer_lua.so`. The
+Terraform module checks and fails fast with rebuild instructions if it's missing.
 
 ```bash
 # Job script uses #BB directive — industry standard from DataWarp/Cray:
@@ -438,7 +440,9 @@ buffers can run here with minimal changes."
 
 ```bash
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" destroy
-# Removes: IAM policies, S3 data bucket (force_destroy=true), FSx service-linked role
+# Removes: IAM policies, S3 data bucket (force_destroy=true), and the FSx service-linked
+#   roles ONLY if this module created them (create_fsx_*_service_linked_role = true).
+#   If you set those to false (role pre-existed), destroy leaves them in place.
 # Does NOT destroy: the FSx filesystem (job3 handles that)
 ```
 

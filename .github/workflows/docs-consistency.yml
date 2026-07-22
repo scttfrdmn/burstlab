@@ -7,9 +7,9 @@ name: docs-consistency
 
 on:
   push:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/*.tf']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example']
   pull_request:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/*.tf']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example']
 
 jobs:
   docs-consistency:
@@ -240,3 +240,14 @@ jobs:
           done
           [ "$fail" -eq 0 ] && echo "OK: scenario applies include tfvars config"
           exit "$fail"
+
+      - name: tfvars.example service-linked-role flags match the first-run default
+        run: |
+          # The variable default is true (first apply creates the role, per the docs).
+          # A tfvars.example that ships these as false silently overrides that path.
+          if grep -rnE 'create_fsx(_s3)?_service_linked_role[[:space:]]*=[[:space:]]*false' \
+               terraform/workloads/*/terraform.tfvars.example 2>/dev/null; then
+            echo "::error::tfvars.example sets a service-linked-role flag to false; the first-run default is true."
+            exit 1
+          fi
+          echo "OK: SLR flags in tfvars.example match the true first-run default"
