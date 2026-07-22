@@ -5,7 +5,7 @@ This guide walks you through building and deploying a complete **Gen 1** BurstLa
 RHEL/Rocky customers — it matches the environment most HPC teams are actually running today.
 
 **All generations follow the identical workflow** with different AMIs and `terraform/generations/`
-paths. For Ubuntu clusters, see [README-ubuntu.md](../README-ubuntu.md) for Gen 4/5-specific
+paths. For Ubuntu clusters, see [quickstart-ubuntu.md](quickstart-ubuntu.md) for Gen 4/5-specific
 quick start. See [generations.md](generations.md) to choose the right generation for your customer.
 
 **Total time: about 30-40 minutes** (most of that is waiting, not working).

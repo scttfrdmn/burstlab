@@ -207,7 +207,7 @@ Rocky 8 with Slurm 22.05.
 **FSx Lustre on Gen 3-5:** AWS doesn't provide Lustre packages for Rocky 10 or Ubuntu LTS versions. Install Lustre clients from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) to enable FSx support on Gen 3, Gen 4, and Gen 5 clusters. EFS workloads work on all generations without additional setup.
 
 See [docs/generations.md](docs/generations.md) for detailed comparison, decision tables, and
-architectural differences between generations. See [README-ubuntu.md](README-ubuntu.md) for
+architectural differences between generations. See [docs/quickstart-ubuntu.md](docs/quickstart-ubuntu.md) for
 Ubuntu-specific quick start.
 
 ---
@@ -306,7 +306,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [prerequisites.md](docs/prerequisites.md) | Everyone | AWS quota requirements and pre-flight check |
 | [quickstart.md](docs/quickstart.md) | Everyone | Step-by-step deploy with time estimates (Gen 1) |
 | [generations.md](docs/generations.md) | Everyone | Why five generations exist; which to choose |
-| [README-ubuntu.md](README-ubuntu.md) | Ubuntu users | Ubuntu-specific quick start (Gen 4 & 5) |
+| [quickstart-ubuntu.md](docs/quickstart-ubuntu.md) | Ubuntu users | Ubuntu-specific deltas from the canonical quickstart (Gen 4 & 5) |
 | [roadmap.md](docs/roadmap.md) | Everyone | Planned work and project direction |
 | [slurm-intro.md](docs/slurm-intro.md) | Everyone | Slurm concepts and commands from zero |
 | [architecture.md](docs/architecture.md) | SAs, technical customers | Network, EFS, NAT, IAM deep dive |

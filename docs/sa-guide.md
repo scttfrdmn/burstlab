@@ -53,7 +53,7 @@ automatically at boot. The full FSx (Scenario 4) workload has been validated end
 only on Gen 1 so far. EFS workloads work on all generations. See the
 [support matrix](support-matrix.md) for authoritative status.
 
-See [generations.md](generations.md) for detailed comparison and [README-ubuntu.md](../README-ubuntu.md)
+See [generations.md](generations.md) for detailed comparison and [quickstart-ubuntu.md](quickstart-ubuntu.md)
 for Ubuntu-specific notes.
 
 ### Have These Open in Separate Windows

@@ -13,7 +13,7 @@ If any capability claim in a specific doc disagrees with the
 | **Pick a Slurm generation** | [generations](generations.md) → [support matrix](support-matrix.md) |
 | **Add data-staging workloads** | [workloads/overview](workloads/overview.md) → the scenario you need → [transparent-lifecycle](workloads/transparent-lifecycle.md) |
 | **Understand cloud bursting** | [slurm-intro](slurm-intro.md) → [architecture](architecture.md) → [plugin-v2-setup](plugin-v2-setup.md) |
-| **Deploy on Ubuntu** | [README-ubuntu](../README-ubuntu.md) (only the deltas from the canonical flow) |
+| **Deploy on Ubuntu** | [quickstart-ubuntu](quickstart-ubuntu.md) (only the deltas from the canonical flow) |
 
 ## Reference
 
