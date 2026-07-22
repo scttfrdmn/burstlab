@@ -53,12 +53,13 @@ to the results bucket. No other permissions change.
 
 > **Region note:** `noaa-goes16` lives in `us-east-1`. Reading it from a cluster in a
 > different region (e.g. the `us-west-2` default) still works, but incurs cross-region
-> data-transfer cost and latency. For the free-egress, same-region story described
-> below, deploy this scenario's cluster in `us-east-1`. Region is set in **three**
-> places that must agree — exporting `AWS_REGION` alone is not enough, because Packer
-> and Terraform read their own variables: `export AWS_REGION=us-east-1` (CLI), pass
-> `-var aws_region=us-east-1` to `packer build`, and set `aws_region = "us-east-1"` in
-> `terraform.tfvars`. The commands are otherwise identical.
+> data-transfer cost and latency. For the free-egress, same-region story described below,
+> deploy this scenario's cluster in `us-east-1`. The generation modules derive their
+> availability zones from the chosen region (via `data.aws_availability_zones`), so no AZ
+> edits are needed — but region is set in **three** places that must agree, because Packer
+> and Terraform read their own variables, not just the shell: `export AWS_REGION=us-east-1`
+> (CLI), pass `-var aws_region=us-east-1` to `packer build`, and set
+> `aws_region = "us-east-1"` in `terraform.tfvars`. The commands are otherwise identical.
 
 ---
 

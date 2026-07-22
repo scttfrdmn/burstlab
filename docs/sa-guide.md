@@ -8,7 +8,7 @@ This guide is for AWS Solutions Architects using BurstLab in customer engagement
 
 ### Deploy the Cluster in Advance
 
-BurstLab takes 10-15 minutes to build the AMI and 5-10 minutes to deploy via Terraform. Do not start this during the meeting. Build the AMI ahead of time and keep the Packer-produced AMI available in your account. You can deploy the Terraform cluster in about 5 minutes the morning of the meeting.
+BurstLab takes ~15-20 minutes to build the AMI and ~5 minutes to deploy via Terraform (about 30-40 minutes total from a clean checkout, under 30 when the AMI already exists). Do not start this during the meeting. Build the AMI ahead of time and keep the Packer-produced AMI available in your account. You can deploy the Terraform cluster in about 5 minutes the morning of the meeting.
 
 Deploy using the canonical [quickstart](quickstart.md) — do not follow a separate set of
 commands here, so this guide can't drift from it. In short: follow quickstart **Steps 1–3**
@@ -37,7 +37,7 @@ customer's environment:
 | CentOS 8, Rocky 8, RHEL 8 — Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm, Python 3.6 boto3 shim |
 | Rocky 9, AlmaLinux 9, RHEL 9 — Slurm 23.x | **Gen 2** | Exact match — Python 3.9 native, cgroup v2 |
 | Rocky 10, RHEL 10 — Slurm 24.05+ | **Gen 3** | Exact match — `cloud_reg_addrs`, cgroup v2 only |
-| Ubuntu 22.04 — Slurm 23.x | **Gen 4** | Ubuntu match — apt/AppArmor, Python 3.10, EFS only |
+| Ubuntu 22.04 — Slurm 23.x | **Gen 4** | Ubuntu match — apt/AppArmor, Python 3.10; EFS validated, FSx client supported (Scenario 4 not yet validated) |
 | Ubuntu 24.04 — Slurm 24.05+ | **Gen 5** | Ubuntu match — apt/AppArmor, Python 3.12, `cloud_reg_addrs` |
 | Not sure / first contact (RHEL) | **Gen 1** | Covers largest RHEL installed base |
 | Not sure / first contact (Ubuntu) | **Gen 4** | Covers largest Ubuntu installed base |
@@ -68,7 +68,7 @@ Run through this in sequence. Each step has a talking point. Adjust the depth ba
 ### 1. Show the Cluster is Running
 
 ```bash
-ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
 ```
 
 **Talking point:** "We're SSH'd into the head node — this is where slurmctld runs, the Slurm controller daemon. Think of it as the scheduler brain."
@@ -167,7 +167,7 @@ watch -n 5 sinfo
 **T+0s** (immediately after submit):
 ```
 aws          up    4:00:00      1  alloc~   aws-burst-0
-aws          up    4:00:00      7  idle~    aws-burst-[1-7]
+aws          up    4:00:00      9  idle~    aws-burst-[1-9]
 ```
 
 "Slurm immediately called `resume.py` for `aws-burst-0`. The `~` suffix means the node is in a power-saving transition. Right now, EC2 CreateFleet is being called."

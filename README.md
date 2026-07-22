@@ -290,7 +290,7 @@ On-prem HPC environments share a common set of problems when attempting cloud bu
 - **Broken accounting**: slurmdbd not running or not configured, which Plugin v2 requires
 - **IAM gaps**: `iam:PassRole` missing, preventing EC2 Fleet from launching burst instances
 
-BurstLab eliminates the "can we even get it working" phase. The Terraform and config templates represent known-good configurations for each Slurm generation. An SA can deploy a matching cluster in under 30 minutes and demonstrate working cloud bursting before a customer engagement even begins.
+BurstLab eliminates the "can we even get it working" phase. The Terraform and config templates represent known-good configurations for each Slurm generation. Stand-up takes roughly 30–40 minutes from a clean checkout, or under 30 minutes when reusing a prebuilt AMI — so an SA can have a matching cluster demonstrating working cloud bursting before a customer engagement even begins.
 
 ---
 

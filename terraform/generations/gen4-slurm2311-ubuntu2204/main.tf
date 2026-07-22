@@ -45,6 +45,13 @@ provider "aws" {
   profile = var.aws_profile
 }
 
+# Availability zones for the chosen region. Derived at plan time so the cluster
+# is region-portable — no hardcoded us-west-2 AZs. We take the first two
+# generally-available zones for the two-AZ burst subnet layout.
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 # =============================================================================
 # RANDOM RESOURCES
 # =============================================================================
@@ -70,8 +77,8 @@ module "vpc" {
   onprem_subnet_cidr     = "10.0.1.0/24"
   cloud_subnet_a_cidr    = "10.0.2.0/24"
   cloud_subnet_b_cidr    = "10.0.3.0/24"
-  az_a                   = "us-west-2a"
-  az_b                   = "us-west-2b"
+  az_a                   = data.aws_availability_zones.available.names[0]
+  az_b                   = data.aws_availability_zones.available.names[1]
 }
 
 # =============================================================================

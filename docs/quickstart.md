@@ -258,7 +258,7 @@ Write down `head_node_public_ip` — that is your SSH address.
 The instances are running but still configuring themselves. SSH in and watch:
 
 ```bash
-ssh -i ~/.ssh/burstlab-key.pem rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
 ```
 
 > **Note:** SSH user is `rocky` for Gen 1-3 (RHEL/Rocky), `ubuntu` for Gen 4-5 (Ubuntu).
@@ -333,7 +333,7 @@ Alice is the demo HPC user. Her home directory is on shared EFS storage so her f
 
 ```bash
 # SSH directly as alice (uses the same EC2 key pair as rocky)
-ssh -i ~/.ssh/burstlab-key.pem alice@<head_node_public_ip>
+ssh -i "$SSH_KEY" alice@<head_node_public_ip>
 ```
 
 Verify your environment:
@@ -381,7 +381,7 @@ Over 2-3 minutes you will see the node transition:
 ```
 # Immediately after submit — Slurm calls resume.py → EC2 CreateFleet API
 aws     up  4:00:00   1  alloc~  aws-burst-0
-aws     up  4:00:00   7  idle~   aws-burst-[1-7]
+aws     up  4:00:00   9  idle~   aws-burst-[1-9]
 
 # ~2 minutes — EC2 instance running, slurmd registered
 aws     up  4:00:00   1  alloc   aws-burst-0
@@ -419,13 +419,17 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8" de
 
 This destroys all Terraform-managed resources. Any running burst nodes are also terminated.
 
-**Also delete the AMI** when you no longer need it (Terraform does not manage the AMI):
+**Also delete the AMI** when you no longer need it (Terraform does not manage the AMI).
+Use the **exact ID you deployed** — read it back from `terraform.tfvars` rather than
+guessing the newest match, so you don't deregister a different build in an account with
+several BurstLab AMIs:
 
 ```bash
-AMI_ID=$(aws ec2 describe-images \
-  --owners self \
-  --filters "Name=name,Values=burstlab-gen1-rocky8-*" \
-  --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+# The exact AMI this cluster used (from the value you set in Step 2)
+AMI_ID=$(grep -E '^\s*head_node_ami' \
+  "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/terraform.tfvars" \
+  | sed -E 's/.*"(ami-[0-9a-f]+)".*/\1/')
+echo "Deleting $AMI_ID"
 
 SNAPSHOT_ID=$(aws ec2 describe-images \
   --image-ids "$AMI_ID" \

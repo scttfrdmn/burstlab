@@ -7,9 +7,9 @@ name: docs-consistency
 
 on:
   push:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/variables.tf']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/*.tf']
   pull_request:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/variables.tf']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/*.tf']
 
 jobs:
   docs-consistency:
@@ -135,3 +135,23 @@ jobs:
           done
           [ "$fail" -eq 0 ] && echo "OK: runnable packer build lines are paired with packer init"
           exit "$fail"
+
+      - name: Generation modules must not hardcode region-specific AZs
+        run: |
+          # AZs are derived from data.aws_availability_zones so clusters are region-
+          # portable. A literal "<region>a"/"<region>b" AZ string reintroduces the
+          # us-west-2-only bug the docs used to hide.
+          if grep -rnE '"(us|eu|ap|sa|ca|me|af)-[a-z]+-[0-9][a-z]"' terraform/generations/*/main.tf; then
+            echo "::error::Hardcoded availability zone in a generation module. Use data.aws_availability_zones.available.names[N] instead."
+            exit 1
+          fi
+          echo "OK: no hardcoded AZs in generation modules"
+
+      - name: No stale burst node-range arithmetic (aws-burst-[1-7])
+        run: |
+          # With 10 burst nodes, one-allocated leaves aws-burst-[1-9], not [1-7].
+          if grep -rnE 'aws-burst-\[1-7\]' --include='*.md' .; then
+            echo "::error::Stale node-range example (aws-burst-[1-7]); with 10 nodes it is [1-9]."
+            exit 1
+          fi
+          echo "OK: no stale burst node-range arithmetic"
