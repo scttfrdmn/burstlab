@@ -70,7 +70,7 @@ and creates a `/usr/local/bin/python3` wrapper that the plugin scripts use. This
 exact workaround a customer's HPC admin would need to implement on their cluster.
 
 *Pre-enumerated burst nodes in slurm.conf.* Gen 1 uses the standard Plugin v2 model:
-`generate_conf.py` produces a `NodeName=aws-burst-[0-7]` stanza that is appended to
+`generate_conf.py` produces a `NodeName=aws-burst-[0-9]` stanza that is appended to
 `slurm.conf` at first boot. Every potential burst node must be listed by name. Slurm
 tracks them as CLOUD-state nodes that are powered off until needed.
 

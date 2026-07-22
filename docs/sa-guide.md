@@ -94,10 +94,10 @@ Expected output:
 ```
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-aws          up    4:00:00      8  idle~ aws-burst-[0-7]
+aws          up    4:00:00     10  idle~ aws-burst-[0-9]
 ```
 
-**Talking point:** "Two partitions. The `local` partition has four static compute nodes that are always running — these simulate your on-prem cluster. The `aws` partition has eight burst nodes in `idle~` state — powered off, ready to launch. The `*` on local means it is the default partition."
+**Talking point:** "Two partitions. The `local` partition has four static compute nodes that are always running — these simulate your on-prem cluster. The `aws` partition has ten burst nodes in `idle~` state — powered off, ready to launch. The `*` on local means it is the default partition."
 
 If the customer's sinfo looks different (nodes in DOWN, no cloud partition), this is actually a useful teaching moment — it means the current cluster has a configuration problem and BurstLab shows what the correct state looks like.
 
@@ -212,7 +212,7 @@ aws          up    4:00:00      1  idle     aws-burst-0
 aws          up    4:00:00      1  power_down  aws-burst-0
 
 # After termination completes:
-aws          up    4:00:00      8  idle~    aws-burst-[0-7]
+aws          up    4:00:00     10  idle~    aws-burst-[0-9]
 ```
 
 **Talking point:** "After `SuspendTime` seconds with no jobs (650 in our config), Slurm automatically calls `suspend.py`, which terminates the EC2 instance. The node goes back to `idle~` state, ready for the next burst."

@@ -281,7 +281,7 @@ Wait until you see:
 Cluster status:
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-aws          up    4:00:00      8  idle~ aws-burst-[0-7]
+aws          up    4:00:00     10  idle~ aws-burst-[0-9]
 ```
 
 Press `Ctrl+C` to stop tailing, then open a new shell for the next steps.
@@ -312,7 +312,7 @@ Expected output (all green):
 === Slurm Cluster State ===
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 local*       up   infinite      4   idle compute[01-04]
-aws          up    4:00:00      8  idle~ aws-burst-[0-7]
+aws          up    4:00:00     10  idle~ aws-burst-[0-9]
   [PASS] local partition is UP
   [PASS] burst partition 'aws' is UP
   [PASS] No compute nodes are DOWN
@@ -387,7 +387,7 @@ aws     up  4:00:00   7  idle~   aws-burst-[1-7]
 aws     up  4:00:00   1  alloc   aws-burst-0
 
 # Job finishes — node idles, then powers down after SuspendTime
-aws     up  4:00:00   8  idle~   aws-burst-[0-7]
+aws     up  4:00:00  10  idle~   aws-burst-[0-9]
 ```
 
 Check the result:
