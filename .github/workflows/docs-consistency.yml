@@ -155,3 +155,61 @@ jobs:
             exit 1
           fi
           echo "OK: no stale burst node-range arithmetic"
+
+      - name: Canonical deploy docs pass aws_region to packer build
+        run: |
+          # aws_region is a Packer variable defaulting to us-west-2; exporting the shell
+          # var does not reach Packer, so an alternate-region build silently targets
+          # us-west-2. The canonical deploy paths must pass -var aws_region. (ami/README
+          # is excluded: it demonstrates single -var overrides one at a time on purpose.)
+          bad="$(grep -nE '^[[:space:]]*packer build' \
+            README.md docs/quickstart.md docs/quickstart-ubuntu.md 2>/dev/null \
+            | grep -v 'aws_region' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::canonical 'packer build' without -var aws_region:"; echo "$bad"
+            exit 1
+          fi
+          echo "OK: canonical deploy docs pass aws_region"
+
+      - name: README defines every env var it uses
+        run: |
+          # SSH_KEY / BURSTLAB_ROOT / AWS_PROFILE / AWS_REGION are used throughout the
+          # README; each must be exported in the setup block or a reader hits an unset var.
+          fail=0
+          for v in BURSTLAB_ROOT AWS_PROFILE AWS_REGION SSH_KEY; do
+            if grep -q "\$$v\|\${$v}\|\"\$$v\"" README.md && ! grep -qE "export $v=" README.md; then
+              echo "::error::README uses \$$v but never 'export $v='"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "OK: README exports every env var it uses"
+          exit "$fail"
+
+      - name: No stale 'all 3 generations' (five exist)
+        run: |
+          if grep -rniE 'all (3|three) generations' --include='*.md' --include='*.sh' .; then
+            echo "::error::Stale 'all 3 generations' — BurstLab has five. Report available count or say five."
+            exit 1
+          fi
+          echo "OK: no stale 3-generation claim"
+
+      - name: Scenario 4 lifecycle count is four, not three
+        run: |
+          # Scenario 3 has three approaches (0/A/B); Scenario 4 has four (adds Burst
+          # Buffer C). Flag any "Ephemeral FSx ... three lifecycle" drift.
+          if grep -rniE 'Ephemeral FSx.*three lifecycle' --include='*.md' .; then
+            echo "::error::Scenario 4 (FSx) has FOUR lifecycle approaches (0/A/B/C), not three."
+            exit 1
+          fi
+          echo "OK: Scenario 4 lifecycle count correct"
+
+      - name: Ed25519 requested in key-pair creation commands
+        run: |
+          # Rocky 10's crypto policy rejects RSA-2048, so create-key-pair must request
+          # ed25519 explicitly. Flag any create-key-pair that omits --key-type ed25519.
+          bad="$(grep -rn 'create-key-pair' --include='*.md' --include='*.sh' . | grep 'key-name burstlab-key' | grep -v 'ed25519' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::create-key-pair without --key-type ed25519:"; echo "$bad"
+            exit 1
+          fi
+          echo "OK: key-pair creation requests ed25519"

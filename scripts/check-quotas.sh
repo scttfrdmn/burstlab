@@ -194,8 +194,11 @@ if [[ "$VPC_QUOTA" -eq 0 ]]; then
   _warn "VPCs per region:           could not retrieve quota (check IAM permissions)"
 else
   VPC_AVAILABLE=$((VPC_QUOTA - VPC_COUNT))
-  if [[ "$VPC_AVAILABLE" -ge 3 ]]; then
-    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run all 3 generations in parallel)"
+  # BurstLab has 5 generations, each using 1 VPC. Report how many can run at once.
+  if [[ "$VPC_AVAILABLE" -ge 5 ]]; then
+    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run all 5 generations in parallel)"
+  elif [[ "$VPC_AVAILABLE" -ge 3 ]]; then
+    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run $VPC_AVAILABLE generations in parallel; 5 total exist)"
   elif [[ "$VPC_AVAILABLE" -ge 1 ]]; then
     _warn "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE"
     _note "Can deploy $VPC_AVAILABLE generation(s) at a time. Deploy sequentially (destroy before next)."
@@ -246,7 +249,7 @@ KEY_PAIRS=$(
 
 if [[ -z "$KEY_PAIRS" ]]; then
   _warn "EC2 key pairs:             none found in $REGION"
-  _note "Create one: aws --profile $PROFILE ec2 create-key-pair --region $REGION --key-name burstlab-key --query KeyMaterial --output text > ~/.ssh/burstlab-key.pem && chmod 400 ~/.ssh/burstlab-key.pem"
+  _note "Create one: aws --profile $PROFILE ec2 create-key-pair --region $REGION --key-name burstlab-key --key-type ed25519 --key-format pem --query KeyMaterial --output text > ~/.ssh/burstlab-key.pem && chmod 400 ~/.ssh/burstlab-key.pem"
 else
   # Format as comma-separated for display
   KEY_LIST=$(echo "$KEY_PAIRS" | tr '\t' ', ')

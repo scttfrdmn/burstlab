@@ -91,21 +91,26 @@ aws --profile aws ec2 describe-key-pairs \
   --output text
 ```
 
-If you need to create one:
+If you need to create one — request an **Ed25519** key explicitly so it works on all
+generations (see the crypto-policy note below):
 ```bash
 aws --profile aws ec2 create-key-pair \
   --region us-west-2 \
   --key-name burstlab-key \
+  --key-type ed25519 \
+  --key-format pem \
   --query 'KeyMaterial' \
   --output text > ~/.ssh/burstlab-key.pem
 
 chmod 400 ~/.ssh/burstlab-key.pem
 ```
 
-> **Rocky 10 / Gen 3-5 note:** RHEL 10's default crypto policy blocks RSA-2048 SSH keys.
-> BurstLab's `burstlab-key` is Ed25519, which is not affected by this RSA size restriction.
-> No crypto policy change is needed. Ubuntu generations (Gen 4-5) also support Ed25519 natively.
-> If you bring your own RSA-2048 key, see [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md)
+> **Rocky 10 / Gen 3-5 note:** RHEL 10's default (`DEFAULT`) crypto policy sets a
+> minimum RSA key size of 3072 bits, which rejects the 2048-bit RSA keys EC2 generates
+> by default — observed during BurstLab Gen 3 testing on Rocky 10.1. Creating the key as
+> **Ed25519** (above) sidesteps the RSA size restriction entirely, so no crypto-policy
+> change is needed; Ubuntu generations (Gen 4-5) support Ed25519 natively too. If you
+> bring your own RSA-2048 key, see [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md)
 > for details on the RHEL 10 restriction.
 
 ---

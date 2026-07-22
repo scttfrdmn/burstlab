@@ -57,7 +57,7 @@ Assumes the [canonical setup](quickstart.md#before-you-start) — repo cloned an
 ```bash
 # 1. Build the AMI (~15-20 min)
 packer init "$BURSTLAB_ROOT/ami"
-packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/ubuntu2404-slurm2405.pkr.hcl"
+packer build -var "aws_profile=$AWS_PROFILE" -var "aws_region=$AWS_REGION" "$BURSTLAB_ROOT/ami/ubuntu2404-slurm2405.pkr.hcl"
 
 # 2. Look up the AMI ID it produced
 AMI_ID=$(aws ec2 describe-images --owners self \

@@ -119,11 +119,16 @@ If you need to create one:
 ```bash
 aws ec2 create-key-pair \
   --key-name burstlab-key \
+  --key-type ed25519 \
+  --key-format pem \
   --query 'KeyMaterial' \
   --output text > "$SSH_KEY"
 
 chmod 400 "$SSH_KEY"
 ```
+
+> Ed25519 is requested explicitly so the key works on Rocky 10 (Gen 3), whose default
+> crypto policy rejects RSA-2048. See [prerequisites.md](prerequisites.md#ec2-key-pair).
 
 Write down the key pair name (e.g. `burstlab-key`) — you will need it in Step 3.
 
@@ -137,7 +142,7 @@ The Packer build creates an AWS machine image (AMI) with Rocky Linux 8 and Slurm
 
 ```bash
 packer init "$BURSTLAB_ROOT/ami"
-packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
+packer build -var "aws_profile=$AWS_PROFILE" -var "aws_region=$AWS_REGION" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 ```
 
 While this runs (~15-20 minutes), Packer will:

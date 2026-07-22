@@ -144,6 +144,7 @@ cd burstlab
 export BURSTLAB_ROOT="$PWD"
 export AWS_PROFILE="your-profile"      # e.g. aws
 export AWS_REGION="us-west-2"
+export SSH_KEY="$HOME/.ssh/burstlab-key.pem"
 
 bash scripts/check-quotas.sh --profile "$AWS_PROFILE" --region "$AWS_REGION"
 ```
@@ -163,7 +164,7 @@ output, and caveats. Assumes you have exported `BURSTLAB_ROOT`, `AWS_PROFILE`,
 ```bash
 # 1. Build the AMI (~15-20 minutes)
 packer init "$BURSTLAB_ROOT/ami"
-packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
+packer build -var "aws_profile=$AWS_PROFILE" -var "aws_region=$AWS_REGION" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 
 # 2. Configure and deploy (~5 minutes)
 cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
@@ -228,10 +229,11 @@ patches `slurm.conf` — as additive overlays, not base-generation changes.)
 |----------|-------|---------|
 | **1 — Compute** | GROMACS + Spack, no data staging | EFS only |
 | **2 — RODA** | Read public AWS datasets (NOAA GOES-16) | S3 read-only |
-| **3 — Ephemeral EFS** | Job-scoped NFS scratch with three lifecycle approaches | EFS ephemeral |
-| **4 — Ephemeral FSx** | Job-scoped Lustre scratch linked to S3 with three lifecycle approaches | FSx + S3 |
+| **3 — Ephemeral EFS** | Job-scoped NFS scratch, three lifecycle approaches (0/A/B) | EFS ephemeral |
+| **4 — Ephemeral FSx** | Job-scoped Lustre scratch linked to S3, four lifecycle approaches (0/A/B/C) | FSx + S3 |
 
-Scenarios 3 and 4 each support three ways to trigger storage lifecycle — from explicit to transparent:
+Scenarios 3 and 4 trigger storage lifecycle through a set of approaches, from explicit to
+transparent — Scenario 3 offers 0/A/B, and Scenario 4 adds the FSx-only Burst Buffer (C):
 
 | Approach | How to submit | User sees |
 |----------|--------------|-----------|
@@ -247,10 +249,14 @@ Scenarios 3 and 4 each support three ways to trigger storage lifecycle — from 
 > status of every approach.
 
 ```bash
-# Deploy the base overlay (once per cluster). -chdir keeps Terraform pointed at the
-# right module no matter your current directory (all paths are from $BURSTLAB_ROOT).
-terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
-terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply
+# Deploy the base overlay (once per cluster). Configure its tfvars first — the example
+# defaults to Gen 1 / profile "aws" / us-west-2, so if you deployed a different
+# generation, profile, region, or cluster_name you must set those too.
+cd "$BURSTLAB_ROOT/terraform/workloads/base"
+cp terraform.tfvars.example terraform.tfvars
+# Edit: gen_state_path, key_path (always) + aws_profile, aws_region, cluster_name
+#       (if you deviated from the Gen 1 / aws / us-west-2 defaults)
+terraform init && terraform apply
 
 # Deploy a scenario
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init

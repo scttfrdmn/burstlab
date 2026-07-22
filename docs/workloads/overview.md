@@ -14,7 +14,9 @@ cluster, not changes to the base generation's Terraform.)
 # 1. Deploy the base workloads layer (once per cluster)
 cd "$BURSTLAB_ROOT/terraform/workloads/base/"
 cp terraform.tfvars.example terraform.tfvars
-# Edit: gen_state_path, key_path
+# Edit: gen_state_path, key_path (always). Also set aws_profile, aws_region, and
+# cluster_name if you deviated from the Gen 1 / "aws" / us-west-2 defaults — the
+# example file points at gen1-slurm2205-rocky8 and cluster_name "burstlab-gen1".
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # ~10 min (installs transfer tools)
 
@@ -46,8 +48,8 @@ terraform destroy   # in scenario dir (and transparent approach dirs if applied)
 |----------|-------|-----------|---------|
 | [1 — Compute](scenario1-compute.md) | HPC application with no data staging | Spack, GROMACS, Lmod | EFS only |
 | [2 — RODA](scenario2-roda.md) | Read public cloud datasets | s5cmd, rclone, Mountpoint | S3 read |
-| [3 — Ephemeral EFS](scenario3-ephemeral-efs.md) | Job-scoped NFS scratch with three lifecycle approaches | AWS EFS API | EFS ephemeral |
-| [4 — Ephemeral FSx](scenario4-ephemeral-fsx.md) | Job-scoped Lustre scratch linked to S3 with three lifecycle approaches | AWS FSx API | FSx + S3 |
+| [3 — Ephemeral EFS](scenario3-ephemeral-efs.md) | Job-scoped NFS scratch, three lifecycle approaches (0/A/B) | AWS EFS API | EFS ephemeral |
+| [4 — Ephemeral FSx](scenario4-ephemeral-fsx.md) | Job-scoped Lustre scratch linked to S3, four lifecycle approaches (0/A/B/C) | AWS FSx API | FSx + S3 |
 
 Start with **Scenario 1** if the audience is new to cloud HPC. Go to **Scenario 3 or 4**
 if they already understand burst mechanics and want to see cloud-native data management.
