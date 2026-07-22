@@ -35,35 +35,49 @@ BeeGFS) who want to understand how cloud-native HPC storage works.
 ## Terraform Deploy
 
 ```bash
-cd terraform/workloads/base/
-terraform init && terraform apply   # if not already done
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # if not already done
 
-cd terraform/workloads/scenario4-ephemeral-fsx/
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit: gen_state_path, cluster_name
 # Optional: create_fsx_service_linked_role = false (if already exists in account)
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
 # Creates S3 data bucket, grants FSx + S3 permissions, creates service-linked role
 ```
 
 Get the required variables for the submit script:
 
 ```bash
-terraform output cloud_subnet_a_id
-terraform output fsx_sg_id
-terraform output s3_data_bucket
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output cloud_subnet_a_id
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output fsx_sg_id
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output s3_data_bucket
 ```
 
 ---
 
 ## Demo Steps
 
-```bash
-ssh alice@<head_node_ip>
+**Step 1 — On your local workstation:** capture the subnet, security group, and bucket
+values from Terraform output and open an SSH session to the head node, passing them in:
 
-CLOUD_SUBNET_A_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx/ && terraform output -raw cloud_subnet_a_id)
-FSX_SG_ID=$(cd terraform/workloads/scenario4-ephemeral-fsx/ && terraform output -raw fsx_sg_id)
-S3_DATA_BUCKET=$(cd terraform/workloads/scenario4-ephemeral-fsx/ && terraform output -raw s3_data_bucket)
+```bash
+CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw cloud_subnet_a_id)
+FSX_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw fsx_sg_id)
+S3_DATA_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw s3_data_bucket)
+
+ssh -i "$SSH_KEY" alice@<head_node_ip>
+```
+
+**Step 2 — On the BurstLab head node (as alice):** substitute the values printed above.
+Terraform is **not** available here — that is why the values are passed in from the
+workstation rather than read from state:
+
+```bash
+CLOUD_SUBNET_A_ID="<paste value from step 1>"
+FSX_SG_ID="<paste value from step 1>"
+S3_DATA_BUCKET="<paste value from step 1>"
 
 CLOUD_SUBNET_A_ID=$CLOUD_SUBNET_A_ID \
 FSX_SG_ID=$FSX_SG_ID \
@@ -236,10 +250,9 @@ paths. This is critical to understand for the restore workflow.
 If you see `Unable to assume role AWSServiceRoleForAmazonFSx`:
 
 ```bash
-cd terraform/workloads/scenario4-ephemeral-fsx/
-# The role may already exist from a prior run; set:
+# The role may already exist from a prior run; edit terraform.tfvars and set:
 # create_fsx_service_linked_role = false
-terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply
 ```
 
 This is a **common blocker on the second run** of Terraform in a fresh AWS account.
@@ -292,9 +305,22 @@ fsx-purge <RUN_ID>       # removes S3 data; EFS results (~/results/) are preserv
 
 **Using the raw chain scripts (chain approach):**
 
+On your **local workstation**, capture the results bucket name from Terraform output.
+Terraform is **not** available on the head node, so collect the value here and pass it in:
+
 ```bash
+RESULTS_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw s3_results_bucket)
+
+ssh -i "$SSH_KEY" alice@<head_node_ip>
+```
+
+On the **BurstLab head node (as alice)**, substitute the bucket name printed above:
+
+```bash
+RESULTS_BUCKET="<paste value from previous step>"
+
 # Phase 1 — Write chain
-RESULTS_BUCKET=$(terraform output -raw s3_results_bucket) \
+RESULTS_BUCKET=$RESULTS_BUCKET \
   bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
 # Phase 2 — Restore chain
@@ -408,8 +434,7 @@ buffers can run here with minimal changes."
 ## Teardown
 
 ```bash
-cd terraform/workloads/scenario4-ephemeral-fsx/
-terraform destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" destroy
 # Removes: IAM policies, S3 data bucket (force_destroy=true), FSx service-linked role
 # Does NOT destroy: the FSx filesystem (job3 handles that)
 ```
@@ -417,10 +442,10 @@ terraform destroy
 If wrapper, prolog/epilog, or burst-buffer modules were also applied, destroy them first:
 
 ```bash
-cd terraform/workloads/scenario4-burst-buffer/  && terraform destroy
-cd terraform/workloads/scenario4-prolog-epilog/ && terraform destroy
-cd terraform/workloads/scenario4-wrapper/       && terraform destroy
-cd terraform/workloads/scenario4-ephemeral-fsx/ && terraform destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer" destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog" destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" destroy
 ```
 
 If the FSx filesystem is still running (job3 didn't complete), destroy it manually:

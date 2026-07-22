@@ -8,23 +8,25 @@ generation cluster — the core cluster is never modified.
 
 ```bash
 # 1. Deploy the base workloads layer (once per cluster)
-cd terraform/workloads/base/
+cd "$BURSTLAB_ROOT/terraform/workloads/base/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit: gen_state_path, key_path
-terraform init && terraform apply   # ~10 min (installs transfer tools)
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # ~10 min (installs transfer tools)
 
 # 2. Deploy the scenario you want to demo (example: Scenario 4 chain)
-cd terraform/workloads/scenario4-ephemeral-fsx/
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx/"
 cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply   # ~30 sec (IAM + S3 bucket)
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" apply   # ~30 sec (IAM + S3 bucket)
 
 # 3. SSH as alice and run the demo
-ssh -i ~/.ssh/burstlab-key.pem alice@<head_node_public_ip>
+ssh -i "$SSH_KEY" alice@<head_node_public_ip>
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
 # 4. Optional: deploy a transparent lifecycle approach on top
-cd terraform/workloads/scenario4-wrapper/
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" apply
 # Then: fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh
 
 # 5. Teardown

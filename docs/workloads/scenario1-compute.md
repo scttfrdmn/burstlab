@@ -29,16 +29,18 @@ before adding the complexity of cloud storage.
 ## Terraform Deploy
 
 ```bash
-cd terraform/workloads/base/
+cd "$BURSTLAB_ROOT/terraform/workloads/base/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit: gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
 #       key_path = "~/.ssh/burstlab"
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply
 # Installs Spack to /opt/slurm/spack/ on EFS (~5-10 min)
 
-cd terraform/workloads/scenario1-compute/
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario1-compute/"
 cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario1-compute" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario1-compute" apply
 # Installs GROMACS via Spack binary cache (~5-10 min)
 ```
 
@@ -51,7 +53,7 @@ if the sentinel files exist.
 ## Demo Steps
 
 ```bash
-ssh alice@<head_node_ip>
+ssh -i "$SSH_KEY" alice@<head_node_ip>
 
 # Verify Spack and GROMACS are available
 source /opt/slurm/spack/share/spack/setup-env.sh
@@ -107,11 +109,9 @@ N OpenMP threads) — optimal for single-node MPI on GROMACS.
 ## Teardown
 
 ```bash
-cd terraform/workloads/scenario1-compute/
-terraform destroy   # removes null_resource state; does NOT remove Spack from EFS
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario1-compute" destroy   # removes null_resource state; does NOT remove Spack from EFS
 
-cd terraform/workloads/base/
-terraform destroy   # removes S3 bucket, IAM policies, null_resource state
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" destroy   # removes S3 bucket, IAM policies, null_resource state
 ```
 
 Spack and GROMACS remain on EFS after teardown (they're files, not Terraform

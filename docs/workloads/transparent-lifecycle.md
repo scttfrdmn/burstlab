@@ -132,8 +132,8 @@ Jobs without the comment pass through to real `sbatch` unchanged.
 
 **Deploy:**
 ```bash
-cd terraform/workloads/scenario4-wrapper/
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" apply
 # Writes /etc/sysconfig/burstlab-workloads, installs fsx-sbatch to /opt/slurm/bin/
 ```
 
@@ -184,8 +184,8 @@ Jobs without the trigger comment run without any overhead.
 
 **Deploy:**
 ```bash
-cd terraform/workloads/scenario4-prolog-epilog/
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog" apply
 # Deploys scripts to /opt/slurm/etc/scripts/
 # Idempotently patches slurm.conf:
 #   PrologSlurmctld=/opt/slurm/etc/scripts/storage-slurmctld-prolog.sh
@@ -276,8 +276,8 @@ the AMI with `--with-lua` in the `./configure` step.
 
 **Deploy:**
 ```bash
-cd terraform/workloads/scenario4-burst-buffer/
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer" apply
 # Checks burst_buffer_lua.so is present (fails fast if not)
 # Installs lua via dnf if needed
 # Deploys fsx-bb.lua to /opt/slurm/etc/

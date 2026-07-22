@@ -30,33 +30,45 @@ Isilon) who want a minimal-change path to cloud-native storage.
 ## Terraform Deploy
 
 ```bash
-cd terraform/workloads/base/
-terraform init && terraform apply   # if not already done
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/base" apply   # if not already done
 
-cd terraform/workloads/scenario3-ephemeral-efs/
+cd "$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs/"
 cp terraform.tfvars.example terraform.tfvars
 # Edit: gen_state_path, cluster_name (must match the generation cluster)
-terraform init && terraform apply
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" init
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" apply
 # Grants EFS lifecycle permissions to burst + head node IAM roles
 ```
 
 After apply, get the subnet and security group IDs needed by the submit script:
 
 ```bash
-terraform output cloud_subnet_a_id
-terraform output efs_sg_id
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output cloud_subnet_a_id
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output efs_sg_id
 ```
 
 ---
 
 ## Demo Steps
 
-```bash
-ssh alice@<head_node_ip>
+**Step 1 — On your local workstation:** capture the subnet and security group IDs from
+Terraform output and open an SSH session to the head node, passing the values in:
 
-# Get required variables from Terraform output
-CLOUD_SUBNET_A_ID=$(cd terraform/workloads/scenario3-ephemeral-efs/ && terraform output -raw cloud_subnet_a_id)
-EFS_SG_ID=$(cd terraform/workloads/scenario3-ephemeral-efs/ && terraform output -raw efs_sg_id)
+```bash
+CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output -raw cloud_subnet_a_id)
+EFS_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output -raw efs_sg_id)
+
+ssh -i "$SSH_KEY" alice@<head_node_ip>
+```
+
+**Step 2 — On the BurstLab head node (as alice):** substitute the values printed above.
+Terraform is **not** available here — that is why the values are passed in from the
+workstation rather than read from state:
+
+```bash
+CLOUD_SUBNET_A_ID="<paste value from step 1>"
+EFS_SG_ID="<paste value from step 1>"
 
 # Submit the three-job chain
 CLOUD_SUBNET_A_ID=$CLOUD_SUBNET_A_ID \
@@ -248,16 +260,15 @@ so no EC2 instances are needed for create/destroy."
 ## Teardown
 
 ```bash
-cd terraform/workloads/scenario3-ephemeral-efs/
-terraform destroy   # removes IAM policies from burst + head roles
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" destroy   # removes IAM policies from burst + head roles
 ```
 
 If wrapper or prolog/epilog modules were also applied, destroy them first:
 
 ```bash
-cd terraform/workloads/scenario3-prolog-epilog/ && terraform destroy
-cd terraform/workloads/scenario3-wrapper/       && terraform destroy
-cd terraform/workloads/scenario3-ephemeral-efs/ && terraform destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-prolog-epilog" destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-wrapper" destroy
+terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" destroy
 ```
 
 The core cluster, permanent cluster EFS, and all burst nodes are untouched.

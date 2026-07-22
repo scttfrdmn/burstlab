@@ -10,20 +10,23 @@ This guide is for AWS Solutions Architects using BurstLab in customer engagement
 
 BurstLab takes 10-15 minutes to build the AMI and 5-10 minutes to deploy via Terraform. Do not start this during the meeting. Build the AMI ahead of time and keep the Packer-produced AMI available in your account. You can deploy the Terraform cluster in about 5 minutes the morning of the meeting.
 
+Assumes the [quickstart setup](quickstart.md#before-you-start) (`BURSTLAB_ROOT`,
+`AWS_PROFILE`, `SSH_KEY` exported from a clean checkout).
+
 ```bash
 # Build AMI (one-time, ~15 min)
-cd ami/
-packer build -var "aws_profile=aws" rocky8-slurm2205.pkr.hcl
+packer build -var "aws_profile=$AWS_PROFILE" "$BURSTLAB_ROOT/ami/rocky8-slurm2205.pkr.hcl"
 
 # Deploy cluster (~5 min, morning of)
-cd terraform/generations/gen1-slurm2205-rocky8/
-terraform apply -auto-approve
+cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
+cp terraform.tfvars.example terraform.tfvars   # set key_name + head_node_ami
+terraform init && terraform apply -auto-approve
 ```
 
 After deploy, run the validation script to confirm everything is healthy before the call:
 
 ```bash
-ssh -i ~/.ssh/your-key.pem rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
 bash /opt/slurm/etc/validate-cluster.sh
 ```
 

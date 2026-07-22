@@ -202,7 +202,7 @@ AWS_PROFILE=aws aws ec2 describe-images --owners self \
   --output table
 
 # 3. Deploy
-cd terraform/generations/gen2-slurm2311-rocky9
+cd "$BURSTLAB_ROOT/terraform/generations/gen2-slurm2311-rocky9"
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars: set key_name and head_node_ami
 terraform init
