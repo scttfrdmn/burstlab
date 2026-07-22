@@ -181,7 +181,7 @@ Example output when everything is fine:
   Region:  us-west-2
   Profile: aws
 
-  [PASS] On-Demand Standard vCPUs:  quota=192  in-use=8    needed-base=40  needed-full=104
+  [PASS] On-Demand Standard vCPUs:  quota=192  in-use=8    needed-base=40  needed-full=120
   [PASS] VPCs per region:           quota=5    in-use=1    needed=1
   [PASS] Elastic IP addresses:      quota=5    in-use=1    needed=1
   [INFO] EC2 key pairs:             burstlab-key
@@ -191,7 +191,7 @@ All quota checks passed. Safe to deploy.
 
 Example output when vCPU quota is too low:
 ```
-  [FAIL] On-Demand Standard vCPUs:  quota=32   in-use=16   needed-base=40  needed-full=104
+  [FAIL] On-Demand Standard vCPUs:  quota=32   in-use=16   needed-base=40  needed-full=120
          Not enough vCPU quota for even one BurstLab cluster.
          Request an increase at: https://console.aws.amazon.com/servicequotas/home/services/ec2/quotas/L-1216C47A
 

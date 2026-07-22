@@ -54,30 +54,34 @@ to the results bucket. No other permissions change.
 > **Region note:** `noaa-goes16` lives in `us-east-1`. Reading it from a cluster in a
 > different region (e.g. the `us-west-2` default) still works, but incurs cross-region
 > data-transfer cost and latency. For the free-egress, same-region story described
-> below, deploy this scenario's cluster in `us-east-1` (`export AWS_REGION=us-east-1`
-> before building). The commands are otherwise identical.
+> below, deploy this scenario's cluster in `us-east-1`. Region is set in **three**
+> places that must agree — exporting `AWS_REGION` alone is not enough, because Packer
+> and Terraform read their own variables: `export AWS_REGION=us-east-1` (CLI), pass
+> `-var aws_region=us-east-1` to `packer build`, and set `aws_region = "us-east-1"` in
+> `terraform.tfvars`. The commands are otherwise identical.
 
 ---
 
 ## Demo Steps
 
 **Step 1 — On your local workstation:** capture the results bucket name from Terraform
-output and open an SSH session to the head node, passing the value in:
+output and open an SSH session that carries the value into the remote shell. Terraform
+is not available on the head node, so the value must come from here:
 
 ```bash
+HEAD_IP="<head node public IP>"
 RESULTS_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario2-roda" \
   output -raw results_bucket_name)
 
-ssh -i "$SSH_KEY" alice@<head_node_ip>
+# Open an interactive session with RESULTS_BUCKET already exported in it:
+ssh -i "$SSH_KEY" alice@"$HEAD_IP" \
+  "export RESULTS_BUCKET='$RESULTS_BUCKET'; exec bash -l"
 ```
 
-**Step 2 — On the BurstLab head node (as alice):** substitute the bucket name printed
-above. Terraform is **not** available here — that is why the value is passed in from the
-workstation rather than read from state:
+**Step 2 — On the BurstLab head node (as alice):** `RESULTS_BUCKET` is already set in the
+session opened above (confirm with `echo "$RESULTS_BUCKET"`). Submit the jobs:
 
 ```bash
-RESULTS_BUCKET="<paste value from step 1>"
-
 # s5cmd: fastest parallel download
 RESULTS_BUCKET=$RESULTS_BUCKET AWS_REGION=us-west-2 \
   sbatch /opt/slurm/etc/workloads/jobs/scenario2/roda-s5cmd.sh

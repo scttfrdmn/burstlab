@@ -156,9 +156,10 @@ command prefix."
   resolve on nodes in the wrong AZ.
 - EFS DNS propagation takes up to 90s after a mount target enters `available` state. The
   wrapper waits 90s before submitting the workload job.
-- Compute nodes (`EpoxyChronicleInstanceRole`) require `elasticfilesystem:*` and
-  `fsx:DescribeFileSystems` IAM permissions for the destroy jobs to work. Add inline policy
-  `burstlab-workloads-efs-lifecycle` to the compute node role.
+- Destroy jobs require `elasticfilesystem:*` and `fsx:DescribeFileSystems`. The scenario
+  overlays attach the `burstlab-workloads-{efs,fsx}-lifecycle` policy to the head and
+  burst node roles automatically (`aws_iam_role_policy` in the overlay `main.tf`); no
+  manual IAM step is needed. Compute nodes run under the head node instance profile.
 
 ---
 

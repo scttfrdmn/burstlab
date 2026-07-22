@@ -216,7 +216,9 @@ Ubuntu-specific quick start.
 
 The workloads overlay demonstrates how HPC applications consume and produce data
 in a cloud bursting environment. It builds on top of any deployed generation cluster
-without modifying the core infrastructure.
+without modifying the core Terraform state or base infrastructure. (Some approaches do
+add to the running cluster — e.g. the wrapper installs to shared EFS and prolog/epilog
+patches `slurm.conf` — as additive overlays, not base-generation changes.)
 
 | Scenario | Story | Storage |
 |----------|-------|---------|
@@ -291,7 +293,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 ## Design Principles
 
 1. **Correctness over cleverness.** Every config file should be something an HPC sysadmin can read and understand. No magic.
-2. **Ephemeral by default.** `terraform destroy` cleans up everything. No orphaned resources.
+2. **Ephemeral by default.** `terraform destroy` cleans up all Terraform-managed ephemeral infrastructure. A few things are intentionally *not* Terraform-managed and need explicit cleanup: Packer-built AMIs and their snapshots (see quickstart Step 8), durable results buckets created by Scenario 4, and any FSx filesystem left behind when a destroy job fails.
 3. **Match reality.** Rocky Linux 8 with the same repo and package constraints customers face — not some idealized image.
 4. **Configs are the product.** The IaC is scaffolding. The real value is the known-good `slurm.conf`, `partitions.json`, IAM policies, and security groups for each generation.
 5. **Document the why.** Every directive, every AWS resource, every design choice has an explanation. The code is the documentation.

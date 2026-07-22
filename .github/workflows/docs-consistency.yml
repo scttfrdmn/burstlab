@@ -7,9 +7,9 @@ name: docs-consistency
 
 on:
   push:
-    paths: ['**/*.md']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/variables.tf']
   pull_request:
-    paths: ['**/*.md']
+    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/generations/**/variables.tf']
 
 jobs:
   docs-consistency:
@@ -62,3 +62,46 @@ jobs:
             exit 1
           fi
           echo "OK: validation-script paths correct"
+
+      - name: No stale 8-burst example output (aws-burst-[0-7])
+        run: |
+          # Sample sinfo output must reflect the 10-node default, not the old 8.
+          if grep -rnE 'aws-burst-\[0-7\]' --include='*.md' .; then
+            echo "::error::Stale 8-node example (aws-burst-[0-7]). Default is 10 -> aws-burst-[0-9]."
+            exit 1
+          fi
+          echo "OK: no stale 8-node burst examples"
+
+      - name: check-quotas.sh burst count matches max_burst_nodes default
+        run: |
+          # The quota script's MAX_BURST_NODES must equal the Terraform default so it
+          # never reports "sufficient capacity" for less than the documented maximum.
+          tf_default="$(grep -hA4 'variable "max_burst_nodes"' \
+            terraform/generations/*/variables.tf | grep -oE 'default *= *[0-9]+' \
+            | grep -oE '[0-9]+' | sort -u)"
+          script_val="$(grep -oE 'MAX_BURST_NODES=[0-9]+' scripts/check-quotas.sh \
+            | grep -oE '[0-9]+')"
+          echo "terraform default(s): $tf_default ; check-quotas.sh: $script_val"
+          if [ "$(echo "$tf_default" | wc -l)" -ne 1 ]; then
+            echo "::error::max_burst_nodes default differs across generations: $tf_default"
+            exit 1
+          fi
+          if [ "$tf_default" != "$script_val" ]; then
+            echo "::error::check-quotas.sh MAX_BURST_NODES=$script_val != terraform default $tf_default"
+            exit 1
+          fi
+          # And no hardcoded stale 104-vCPU full requirement anywhere.
+          if grep -rnE 'needed-full=104|NEEDED_FULL=104' . \
+               --include='*.md' --include='*.sh'; then
+            echo "::error::Stale 104-vCPU full-burst requirement (should be 120 for 10 nodes)."
+            exit 1
+          fi
+          echo "OK: quota script burst count matches Terraform default"
+
+      - name: No overstated 'all five generations fully tested' claim
+        run: |
+          if grep -rniE 'all five generations are fully (built and )?tested' --include='*.md' .; then
+            echo "::error::Overstated validation claim. Say 'validated for cloud bursting; workload validation varies — see support matrix'."
+            exit 1
+          fi
+          echo "OK: no overstated validation claim"

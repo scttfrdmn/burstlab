@@ -78,13 +78,17 @@ Prolog/Epilog approach uses a deterministic state-file path on those versions. S
 
 ## Last validated
 
-| Generation | Last validated | AMI |
-|------------|----------------|-----|
-| Gen 1 (Rocky 8 / Slurm 22.05) | Core + bursting + Scenario 1–4, Lifecycle 0/A/B | — |
-| Gen 2 (Rocky 9 / Slurm 23.11) | Core + bursting + Lifecycle B (FSx + EFS) | `ami-069e41e072fedcf8e` |
-| Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | `ami-0e6d8478ca888e22d` |
-| Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | `ami-0b0c1d1a248632a4e` |
-| Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting + `cloud_reg_addrs` | `ami-072b0d10402ab6d51` |
+| Generation | Validated capabilities | Date | Commit / AMI |
+|------------|------------------------|------|--------------|
+| Gen 1 (Rocky 8 / Slurm 22.05) | Core + bursting + Scenario 1–4, Lifecycle 0/A/B | 2026-06 | AMI not recorded |
+| Gen 2 (Rocky 9 / Slurm 23.11) | Core + bursting + Lifecycle B (FSx + EFS) | 2026-06 | `ami-069e41e072fedcf8e` |
+| Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | 2026-06 | `ami-0e6d8478ca888e22d` |
+| Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | 2026-05 | `ami-0b0c1d1a248632a4e` |
+| Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting + `cloud_reg_addrs` | 2026-05 | `ami-072b0d10402ab6d51` |
 
-Values here come from live test results. When you validate a new capability on a
-generation, update this table in the same change.
+Dates are the month the capability was last exercised on a live cluster; where an exact
+validation commit was not recorded, the AMI ID identifies the tested image. **When you
+validate a new capability, update this row with the capability, the date, and the commit
+or AMI in the same change** — an AMI ID alone does not identify the source revision.
+The FSx-client auto-install integration (burstlab-lustre) on Gen 3–5 postdates the
+validation dates above and has not yet been re-validated end-to-end.

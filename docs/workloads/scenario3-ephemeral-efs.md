@@ -52,29 +52,31 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" ou
 
 ## Demo Steps
 
-**Step 1 — On your local workstation:** capture the subnet and security group IDs from
-Terraform output and open an SSH session to the head node, passing the values in:
+**Step 1 — On your local workstation:** capture the two Terraform outputs, write them to
+a small env file, and copy it to the head node with `scp`. Terraform is not available on
+the head node, so the values must originate here:
 
 ```bash
-CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output -raw cloud_subnet_a_id)
-EFS_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario3-ephemeral-efs" output -raw efs_sg_id)
+TF=terraform/workloads/scenario3-ephemeral-efs
+HEAD_IP="<head node public IP>"
 
-ssh -i "$SSH_KEY" alice@<head_node_ip>
+cat > /tmp/scenario3.env <<EOF
+export CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw cloud_subnet_a_id)
+export EFS_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw efs_sg_id)
+export AWS_REGION=us-west-2
+EOF
+
+scp -i "$SSH_KEY" /tmp/scenario3.env alice@"$HEAD_IP":~/scenario3.env
+ssh -i "$SSH_KEY" alice@"$HEAD_IP"
 ```
 
-**Step 2 — On the BurstLab head node (as alice):** substitute the values printed above.
-Terraform is **not** available here — that is why the values are passed in from the
-workstation rather than read from state:
+**Step 2 — On the BurstLab head node (as alice):** source the env file (it holds the
+values copied from your workstation), then submit the three-job chain:
 
 ```bash
-CLOUD_SUBNET_A_ID="<paste value from step 1>"
-EFS_SG_ID="<paste value from step 1>"
+source ~/scenario3.env
 
-# Submit the three-job chain
-CLOUD_SUBNET_A_ID=$CLOUD_SUBNET_A_ID \
-EFS_SG_ID=$EFS_SG_ID \
-AWS_REGION=us-west-2 \
-  bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
+bash /opt/slurm/etc/workloads/jobs/scenario3/submit-chain.sh
 
 # Watch all three jobs + the EFS lifecycle
 watch -n 5 'squeue && echo && aws efs describe-file-systems \
@@ -226,11 +228,12 @@ workload with `EFS_STATE_FILE` injected into the environment, and queues the des
 with `--dependency=afterok`. The user sees one job ID. The destroy job appears in `squeue`
 as `(Dependency)` but can be ignored.
 
-> **IAM prerequisite (manual step):** Compute nodes (`EpoxyChronicleInstanceRole`) need
-> `elasticfilesystem:*` permission to run the destroy job. Terraform deploys an
-> `aws_iam_policy` but does **not** automatically attach it to the compute role. Attach
-> the `burstlab-workloads-efs-lifecycle` inline policy to `EpoxyChronicleInstanceRole`
-> in the IAM console, or the destroy job will fail with an AccessDenied error.
+> **IAM (handled automatically):** the destroy job needs `elasticfilesystem:*`. The
+> Scenario 3 overlay attaches the `burstlab-workloads-efs-lifecycle` policy to **both**
+> the head node and burst node roles for you (see `aws_iam_role_policy` in
+> `terraform/workloads/scenario3-ephemeral-efs/main.tf`) — no manual IAM console step is
+> required. (Compute nodes run destroy jobs under the head node instance profile; there
+> is no separate compute-node role to attach to.)
 
 **SA talking point:** "One command, one job ID. The EFS lifecycle — create, inject,
 destroy — is completely hidden. If the cluster already has a similar wrapper for other

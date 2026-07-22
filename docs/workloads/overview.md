@@ -2,7 +2,11 @@
 
 The workloads overlay demonstrates how HPC applications consume and produce data
 in a cloud bursting environment. It builds on top of any existing BurstLab
-generation cluster — the core cluster is never modified.
+generation cluster without touching the **core Terraform state or base
+infrastructure**. (Some approaches do add to the running cluster — the wrapper
+installs commands onto shared EFS, and prolog/epilog patches `slurm.conf` and
+reconfigures Slurm — but these are additive overlays layered on the deployed
+cluster, not changes to the base generation's Terraform.)
 
 ## Quick Start
 

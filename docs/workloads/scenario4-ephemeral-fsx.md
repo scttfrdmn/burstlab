@@ -59,31 +59,32 @@ terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" ou
 
 ## Demo Steps
 
-**Step 1 — On your local workstation:** capture the subnet, security group, and bucket
-values from Terraform output and open an SSH session to the head node, passing them in:
+**Step 1 — On your local workstation:** capture the three Terraform outputs, write them
+to a small env file, and copy it to the head node with `scp`. Terraform is not available
+on the head node, so the values must originate here:
 
 ```bash
-CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw cloud_subnet_a_id)
-FSX_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw fsx_sg_id)
-S3_DATA_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-ephemeral-fsx" output -raw s3_data_bucket)
+TF=terraform/workloads/scenario4-ephemeral-fsx
+HEAD_IP="<head node public IP>"
 
-ssh -i "$SSH_KEY" alice@<head_node_ip>
+cat > /tmp/scenario4.env <<EOF
+export CLOUD_SUBNET_A_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw cloud_subnet_a_id)
+export FSX_SG_ID=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw fsx_sg_id)
+export S3_DATA_BUCKET=$(terraform -chdir="$BURSTLAB_ROOT/$TF" output -raw s3_data_bucket)
+export AWS_REGION=us-west-2
+EOF
+
+scp -i "$SSH_KEY" /tmp/scenario4.env alice@"$HEAD_IP":~/scenario4.env
+ssh -i "$SSH_KEY" alice@"$HEAD_IP"
 ```
 
-**Step 2 — On the BurstLab head node (as alice):** substitute the values printed above.
-Terraform is **not** available here — that is why the values are passed in from the
-workstation rather than read from state:
+**Step 2 — On the BurstLab head node (as alice):** source the env file (it holds the
+values copied from your workstation), then submit:
 
 ```bash
-CLOUD_SUBNET_A_ID="<paste value from step 1>"
-FSX_SG_ID="<paste value from step 1>"
-S3_DATA_BUCKET="<paste value from step 1>"
+source ~/scenario4.env
 
-CLOUD_SUBNET_A_ID=$CLOUD_SUBNET_A_ID \
-FSX_SG_ID=$FSX_SG_ID \
-S3_DATA_BUCKET=$S3_DATA_BUCKET \
-AWS_REGION=us-west-2 \
-  bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
+bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
 # Watch jobs and FSx lifecycle (FSx takes 5-10 min to provision)
 watch -n 10 'squeue && echo && aws fsx describe-file-systems \

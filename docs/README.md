@@ -19,7 +19,7 @@ If any capability claim in a specific doc disagrees with the
 
 - [**support-matrix.md**](support-matrix.md) — **single source of truth**: node counts, EFS/FSx, lifecycle, status per generation
 - [prerequisites.md](prerequisites.md) — AWS quota, cost, security, pre-flight check
-- [quickstart.md](quickstart.md) — canonical seven-step deploy (Gen 1)
+- [quickstart.md](quickstart.md) — canonical eight-step deploy (Gen 1)
 - [generations.md](generations.md) — why five generations exist; how to choose
 - [architecture.md](architecture.md) — network, EFS, NAT, IAM design
 - [plugin-v2-setup.md](plugin-v2-setup.md) — the AWS Plugin for Slurm v2, file by file

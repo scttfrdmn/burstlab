@@ -89,10 +89,17 @@ VCPU_MAP["t3a.xlarge"]=4
 VCPU_MAP["t3a.2xlarge"]=8
 
 # --- BurstLab requirements ---------------------------------------------------
-# 1 head (m7a.2xlarge = 8) + 4 compute (4x8=32) = 40 vCPUs base
-# + up to 8 burst nodes (8x8=64) = 104 vCPUs full
-NEEDED_BASE=40
-NEEDED_FULL=104
+# Derived from the per-generation Terraform defaults. Keep these in sync with
+# compute_node_count (default 4) and max_burst_nodes (default 10) in
+# terraform/generations/*/variables.tf. The docs-consistency CI compares these
+# constants against those defaults.
+VCPUS_PER_NODE=8          # m7a.2xlarge (all node roles default to this)
+HEAD_NODES=1
+COMPUTE_NODES=4           # compute_node_count default
+MAX_BURST_NODES=10        # max_burst_nodes default
+# 1 head + 4 compute = 40 vCPUs base; + 10 burst = 120 vCPUs full
+NEEDED_BASE=$(( (HEAD_NODES + COMPUTE_NODES) * VCPUS_PER_NODE ))
+NEEDED_FULL=$(( (HEAD_NODES + COMPUTE_NODES + MAX_BURST_NODES) * VCPUS_PER_NODE ))
 
 # --- Helpers -----------------------------------------------------------------
 WARN=0

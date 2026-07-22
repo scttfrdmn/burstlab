@@ -16,7 +16,7 @@ quick start. See [generations.md](generations.md) to choose the right generation
 > environment, not a production cluster. The idle base cluster runs ~$1.80/hour
 > (~$43/day) before burst nodes; the AMI build adds a short-lived instance cost. The
 > default config allows broad SSH (0.0.0.0/0). Always `terraform destroy` when done
-> (Step 6). See [prerequisites.md](prerequisites.md) and the
+> (Step 8). See [prerequisites.md](prerequisites.md) and the
 > [support matrix](support-matrix.md).
 
 ## Before You Start
@@ -178,12 +178,22 @@ cd "$BURSTLAB_ROOT/terraform/generations/gen1-slurm2205-rocky8/"
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Open `terraform.tfvars` in a text editor. Fill in two values:
+Open `terraform.tfvars` in a text editor and set these four values:
 
 ```hcl
+aws_profile   = "your-profile"            # MUST match $AWS_PROFILE — see note below
+aws_region    = "us-west-2"               # MUST match $AWS_REGION
 key_name      = "burstlab-key"            # your EC2 key pair name from the prerequisite step
 head_node_ami = "ami-0abc1234def56789a"   # AMI ID from Step 1
 ```
+
+> ⚠️ **`aws_profile` / `aws_region` are Terraform variables, not just shell exports.**
+> The `terraform.tfvars.example` you copied ships with `aws_profile = "aws"` and
+> `aws_region = "us-west-2"` hardcoded, and the AWS provider reads
+> `profile = var.aws_profile`. Exporting `AWS_PROFILE`/`AWS_REGION` configures the AWS
+> CLI and Packer, but **does not** override these Terraform values — so if your profile
+> isn't named `aws`, the CLI/Packer steps succeed but `terraform apply` fails or targets
+> the wrong account. Set both here to match your exported values.
 
 The other `terraform.tfvars` variables have defaults you can leave as-is, but two of
 them directly affect cost — know what they do before deploying:

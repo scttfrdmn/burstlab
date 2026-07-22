@@ -34,7 +34,10 @@ You should see all PASSes. Fix any failures before the meeting. A non-functional
 
 ### Choose the Right Generation
 
-All five generations are fully built and tested. Match the customer's environment:
+All five core cluster generations are built and validated for cloud bursting. Workload
+and storage-lifecycle validation varies by generation — consult the
+[support matrix](support-matrix.md) before promising a specific scenario. Match the
+customer's environment:
 
 | Customer Environment | Use | Why |
 |---|---|---|
