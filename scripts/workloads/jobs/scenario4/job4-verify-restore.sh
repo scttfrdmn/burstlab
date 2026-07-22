@@ -156,7 +156,8 @@ echo "Reading files to trigger S3 hydration..."
 START=$(date +%s)
 
 CHECKSUMS_FILE=$(mktemp)
-trap "rm -f '${CHECKSUMS_FILE}'" EXIT
+# Single-quote the trap so ${CHECKSUMS_FILE} expands when the trap fires (SC2064).
+trap 'rm -f "${CHECKSUMS_FILE}"' EXIT
 for f in "${OUTPUT_DIR}"/*/*; do
   [ -f "$f" ] || continue
   FNAME=$(echo "$f" | sed "s|${OUTPUT_DIR}/||")

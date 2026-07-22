@@ -72,4 +72,3 @@ func contextString(app awscdk.App, key, defaultVal string) string {
 	}
 	return defaultVal
 }
-

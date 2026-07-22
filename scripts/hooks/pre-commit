@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# BurstLab pre-commit hook — blocks Terraform state, real tfvars, and private
+# keys from being committed. Install with: bash scripts/hooks/install.sh
+#
+# .gitignore already lists these, but it only protects *untracked* files. This
+# hook also catches `git add -f` and files staged before an ignore rule existed.
+# See issue #1.
+set -euo pipefail
+
+# Only inspect what is actually staged for this commit.
+staged="$(git diff --cached --name-only --diff-filter=AM)"
+
+# terraform.tfvars.example is the safe template and is allowed.
+violations="$(printf '%s\n' "$staged" \
+  | grep -E '(\.tfstate(\.backup)?$|/terraform\.tfvars$|\.pem$|\.key$|(^|/)id_rsa$|(^|/)id_ed25519$)' \
+  || true)"
+
+if [ -n "$violations" ]; then
+  echo "✖ pre-commit: refusing to commit secret-bearing files:" >&2
+  printf '%s\n' "$violations" | sed 's/^/    /' >&2
+  echo "" >&2
+  echo "  Terraform state holds the munge key and DB password in plaintext." >&2
+  echo "  Unstage with: git restore --staged <file>" >&2
+  echo "  To override (NOT recommended): git commit --no-verify" >&2
+  exit 1
+fi

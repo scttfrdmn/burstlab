@@ -29,6 +29,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -120,15 +121,12 @@ type BurstlabHeadNode struct {
 
 	// PublicIp is the Elastic IP address associated with the head node.
 	PublicIp *string
-
-	// PrimaryEniId is the ID of the primary network interface.
-	PrimaryEniId *string
 }
 
 // NewBurstlabHeadNode creates the head node EC2 instance, EIP, and NAT routes.
 func NewBurstlabHeadNode(scope constructs.Construct, id string, props *BurstlabHeadNodeProps) *BurstlabHeadNode {
 	this := &BurstlabHeadNode{}
-	constructs.NewConstruct_Override(this, scope, id)
+	constructs.NewConstruct_Override(this, scope, jsii.String(id))
 
 	if props.InstanceType == "" {
 		props.InstanceType = "m7a.large"
@@ -172,7 +170,7 @@ func NewBurstlabHeadNode(scope constructs.Construct, id string, props *BurstlabH
 		SourceDestCheck:    jsii.Bool(false), // CRITICAL: required for NAT/forwarding
 		PrivateIpAddress:   privateIpPtr,
 		UserData:           jsii.String(base64.StdEncoding.EncodeToString([]byte(userData))),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-headnode", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -182,7 +180,6 @@ func NewBurstlabHeadNode(scope constructs.Construct, id string, props *BurstlabH
 	})
 	this.InstanceId = instance.Ref()
 	this.PrivateIp = instance.AttrPrivateIp()
-	this.PrimaryEniId = instance.AttrNetworkInterfaceId()
 
 	// -------------------------------------------------------------------------
 	// Elastic IP + Association
@@ -191,7 +188,7 @@ func NewBurstlabHeadNode(scope constructs.Construct, id string, props *BurstlabH
 	// -------------------------------------------------------------------------
 	eip := awsec2.NewCfnEIP(this, jsii.String("Eip"), &awsec2.CfnEIPProps{
 		Domain: jsii.String("vpc"),
-		Tags: &[]*awsec2.CfnTag{
+		Tags: &[]*awscdk.CfnTag{
 			{Key: jsii.String("Name"), Value: jsii.String(fmt.Sprintf("%s-headnode-eip", cn))},
 			{Key: jsii.String("Project"), Value: jsii.String("burstlab")},
 			{Key: jsii.String("Generation"), Value: jsii.String("gen1")},
@@ -208,23 +205,25 @@ func NewBurstlabHeadNode(scope constructs.Construct, id string, props *BurstlabH
 	// -------------------------------------------------------------------------
 	// NAT Routes
 	//
-	// Add default routes (0.0.0.0/0 → head node ENI) to the on-prem and cloud
+	// Add default routes (0.0.0.0/0 → head node) to the on-prem and cloud
 	// route tables. These routes make private subnets reach the internet through
 	// the head node's iptables masquerade rules.
 	//
-	// CloudFormation requires NetworkInterfaceId for instance-based routes.
-	// AttrNetworkInterfaceId() returns the primary ENI ID.
+	// We set InstanceId (not NetworkInterfaceId): AWS::EC2::Route resolves the
+	// instance's primary ENI itself, so we don't need an ENI attribute that the
+	// CfnInstance L1 construct doesn't expose. This matches the Terraform
+	// head-node module, which routes via the primary network interface.
 	// -------------------------------------------------------------------------
 	awsec2.NewCfnRoute(this, jsii.String("OnpremNatRoute"), &awsec2.CfnRouteProps{
 		RouteTableId:         props.OnpremRouteTableId,
 		DestinationCidrBlock: jsii.String("0.0.0.0/0"),
-		NetworkInterfaceId:   instance.AttrNetworkInterfaceId(),
+		InstanceId:           instance.Ref(),
 	})
 
 	awsec2.NewCfnRoute(this, jsii.String("CloudNatRoute"), &awsec2.CfnRouteProps{
 		RouteTableId:         props.CloudRouteTableId,
 		DestinationCidrBlock: jsii.String("0.0.0.0/0"),
-		NetworkInterfaceId:   instance.AttrNetworkInterfaceId(),
+		InstanceId:           instance.Ref(),
 	})
 
 	return this

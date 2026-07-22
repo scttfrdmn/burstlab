@@ -82,7 +82,7 @@ _rebuild_slurm_conf() {
   local SLURM_CONF_PATH=/opt/slurm/etc/slurm.conf
   local SLURM_CONF_AWS="$PLUGIN_DIR/slurm.conf.aws"
 
-  cd "$PLUGIN_DIR"
+  cd "$PLUGIN_DIR" || _die "cannot cd to plugin dir: $PLUGIN_DIR"
   echo "Running generate_conf.py..."
   $PYTHON3 generate_conf.py || _die "generate_conf.py failed"
 
@@ -214,7 +214,7 @@ print('yes' if '$PARTITION' in names else 'no')
   [ "$EXISTING" = "no" ] || _die "Partition '$PARTITION' already exists. Remove it first."
 
   # Read launch template and subnets from first existing partition (reuse infra)
-  read LT_ID SUBNET_A SUBNET_B REGION <<< $($PYTHON3 -c "
+  read -r LT_ID SUBNET_A SUBNET_B REGION <<< "$($PYTHON3 -c "
 import json
 data = json.load(open('$PLUGIN_DIR/partitions.json'))
 ng = data['Partitions'][0]['NodeGroups'][0]
@@ -222,7 +222,7 @@ lt = ng['LaunchTemplateSpecification']['LaunchTemplateId']
 subnets = ng['SubnetIds']
 region = ng['Region']
 print(lt, subnets[0], subnets[1] if len(subnets) > 1 else subnets[0], region)
-")
+")"
 
   echo "Adding partition '$PARTITION' (nodegroup '$NODEGROUP'):"
   echo "  Instance type:    $INSTANCE_TYPE"
