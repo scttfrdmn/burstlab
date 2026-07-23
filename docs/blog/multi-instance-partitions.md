@@ -350,6 +350,24 @@ cluster, resizing a fleet, or forecasting demand. The bill follows the jobs beca
 hardware does, and the whole catalog costs nothing on the nights and weekends it sits
 idle. That's the thing a fixed pile of identical boxes structurally can't do.
 
+### Better, not perfect
+
+Worth being honest about what "fits" means: the catalog finds the *closest* shape, not
+an exact one. Almost no job's core-to-memory ratio lands exactly on 2, 4, or 8 GB/core —
+which is the same reason clusters grow a "high-memory" partition for the extreme case.
+So right-sizing doesn't eliminate stranding; it *quantizes* it — you strand against the
+nearest catalog ratio instead of against one fixed ratio.
+
+Take a job needing 8 cores and 40 GB — a 5 GB/core ratio that sits between the `m`
+(4 GB/core) and `r` (8 GB/core) shapes. The `m8i.2xlarge` (8c/32G) can't hold 40 GB, so
+it lands on `r8i.2xlarge` (8c/64G): cores fit exactly, but ~24 GB of memory is stranded.
+That residual is real — but *bounded*, and smaller than the alternatives. A single
+4 GB/core cluster couldn't run the job on one node at all; a fat-memory node sized for
+the worst case strands memory on every small job that touches it. Add more catalog points
+and the residual shrinks — it's a knob (tighter fit, more shapes to manage), not a law.
+The honest claim is "closest available fit, stranding bounded by catalog granularity" —
+not "perfect fit."
+
 ## Does this apply to AWS PCS?
 
 ParallelCluster is one way to run Slurm on AWS; the newer **AWS Parallel Computing

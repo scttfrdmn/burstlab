@@ -1,5 +1,7 @@
 # BurstLab
 
+> **Learn to configure the AWS Plugin for Slurm v2 by deploying a disposable, version-matched mock on-prem HPC cluster on AWS.** The plugin is the lesson; the cluster is the working laboratory.
+
 BurstLab provisions disposable "mock on-prem" HPC clusters on AWS that replicate what real HPC environments actually run, with the AWS Plugin for Slurm v2 pre-configured for cloud bursting. It is a **learning platform** — every config, every design decision, and every AWS resource is documented so an SA or customer can understand exactly what was done and why.
 
 This is not a canned demo. It is a transferable architecture. An SA can stand up a BurstLab cluster that matches a customer's Slurm version and OS, walk through the bursting configuration live, and hand over the IaC when the meeting ends.
