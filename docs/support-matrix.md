@@ -57,11 +57,22 @@ see [prerequisites.md](prerequisites.md).
 | Lifecycle B — Prolog/Epilog | ✅ | ✅ | ✅ (EFS) | — | — | — |
 | Lifecycle C — Burst Buffer | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 | 📝 |
 
-📝 = **authored, not yet built or deployed.** Gen 6's Packer template, Terraform
-config, and Slurm templates exist and pass offline validation (`terraform validate`,
-`packer validate`), but no AMI has been built and no cluster deployed, so nothing is
-confirmed on live AWS yet. It reuses the Gen 3/5 recipe, so behavior is *expected* to
-match — but "expected" is not "validated."
+📝 = **partially validated live; blocked on a Slurm 25.11 config change.** Gen 6's AMI
+now builds on Amazon Linux 2023 (`ami-041df8b89a4bb7c7a`) and the cluster deploys — head
+node, 4 compute nodes, EFS, munge/slurmctld/slurmdbd all come up, `sinfo` shows both
+partitions, and a burst job *does* launch an EC2 node (`resume.py` fires, `aws-burst-0`
+reaches `mix#`). Live validation shook out five AL2023 fixes (now in the AMI/init:
+kernel-headers, curl-minimal, cronie, git, and the `ec2-user` SSH user) **plus one
+blocker**:
+
+> **Slurm 25.11 removed `cloud_reg_addrs`.** slurmctld logs
+> `error: The SlurmctldParameters option "cloud_reg_addrs" is defunct`. Gen 6's
+> `slurm.conf` was copied from Gen 3 (Slurm 24.05), where that parameter is valid; in
+> 25.11 it's gone (cloud node address registration changed). Jobs currently fail
+> (`WTERMSIG`) with power-save degraded. **Fixing this needs research into the 25.11
+> replacement, not a blind edit** — tracked as follow-up before Gen 6 is "validated."
+
+So the OS/AMI/infra axis is proven on live AWS; the Slurm-25.11 config axis is not yet.
 
 ### Notes
 
@@ -99,7 +110,7 @@ Prolog/Epilog approach uses a deterministic state-file path on those versions. S
 | Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | 2026-06 | `ami-0e6d8478ca888e22d` |
 | Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | 2026-05 | `ami-0b0c1d1a248632a4e` |
 | Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting + `cloud_reg_addrs` | 2026-05 | `ami-072b0d10402ab6d51` |
-| Gen 6 (AL2023 / Slurm 25.11) | Not yet validated — authored only (issue #7) | — | AMI not built |
+| Gen 6 (AL2023 / Slurm 25.11) | AMI + infra validated live; **blocked on Slurm 25.11 config** (see note) | 2026-07 | `ami-041df8b89a4bb7c7a` |
 
 Dates are the month the capability was last exercised on a live cluster; where an exact
 validation commit was not recorded, the AMI ID identifies the tested image. **When you
