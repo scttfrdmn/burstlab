@@ -196,12 +196,26 @@ build {
 
       # cgroup/v2 plugin build dependencies:
       #   dbus-devel: D-Bus IPC headers for systemd cgroup v2 management
-      #   kernel-headers: include/linux/bpf.h for eBPF device constraints
       # AL2023 is cgroup v2 only, so cgroup_v2.so must be built or slurmd fails
       # at startup. Same requirement as Gen 3/5.
-      "sudo dnf install -y dbus-devel kernel-headers",
+      "sudo dnf install -y dbus-devel",
+      #
+      # Kernel UAPI headers for the cgroup/v2 eBPF device constraints
+      # (<linux/bpf.h>): on AL2023 these ship in the base `kernel-headers` package,
+      # which is ALREADY installed (glibc-headers depends on it) and provides the
+      # sanitized UAPI headers under /usr/include/linux. We deliberately do NOT
+      # `dnf install kernel-headers` or `kernel6.12-headers`: the bare metapackage
+      # resolves to the newest kernel line and conflicts with the running kernel's
+      # headers (the AL2023 base AMI floats between 6.1 and 6.12 kernels), and the
+      # per-kernel *-headers packages are out-of-tree module build headers we don't
+      # need. Just verify the UAPI header Slurm's configure looks for is present.
+      "test -f /usr/include/linux/bpf.h && echo 'UAPI bpf.h present' || (echo 'ERROR: /usr/include/linux/bpf.h missing' && sudo dnf install -y kernel-headers && test -f /usr/include/linux/bpf.h)",
 
-      "sudo dnf install -y git curl wget jq rsync nfs-utils stunnel || true",
+      # NOTE (AL2023-specific): do NOT install `curl` — AL2023 ships `curl-minimal`,
+      # and `dnf install curl` fails with a file conflict against it. curl-minimal
+      # already provides the /usr/bin/curl the AWS CLI installer and init scripts use,
+      # so we simply omit curl here. (The `|| true` also keeps this non-fatal.)
+      "sudo dnf install -y git wget jq rsync nfs-utils stunnel || true",
 
       # AWS Systems Manager agent — SSM Session Manager fallback access.
       # AL2023 ships amazon-ssm-agent in its repos (no external RPM needed).
