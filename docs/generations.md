@@ -20,8 +20,8 @@ computing teams in a single week might encounter:
 - A cloud-native HPC startup running Ubuntu 24.04 with Slurm 24.05
 
 A demo that only works on one configuration is limited. If you show a customer running
-Slurm 22.05 a Gen 3 demo with `cloud_reg_addrs`, they cannot replicate it — the feature
-does not exist in their version. If you show a Rocky-based demo to an Ubuntu shop, they'll
+Slurm 22.05 a Gen 3 demo that leans on a Slurm 24.05 behavior or cgroup v2-only config,
+they cannot replicate it — those don't exist in their version. If you show a Rocky-based demo to an Ubuntu shop, they'll
 spend the entire meeting translating package names and paths instead of focusing on the
 bursting architecture.
 
@@ -149,17 +149,18 @@ released in May 2025 and major research computing centers are piloting it for ne
 
 **What changes from Gen 2:**
 
-*`cloud_reg_addrs` — the key architectural improvement.* This is the most important
-change from a bursting perspective. In Gen 1 and Gen 2, burst nodes have a specific
-IP address assigned in `slurm.conf` via `NodeAddr=`. When a node boots with a different
-IP (because EC2 assigned a different address from the subnet), slurmctld rejects its
-registration.
+*Burst node addressing — handled by the plugin, not a Slurm parameter.* Burst nodes
+have no `NodeAddr` in `slurm.conf` (and `aws-burst-N` doesn't resolve in DNS). The AWS
+plugin's `resume.py` fills that gap: when a job needs a burst node, it launches the EC2
+instance, reads the assigned private IP, and runs
+`scontrol update nodename=aws-burst-N nodeaddr=<ip> nodehostname=<h>` to tell the
+controller the address — the documented default cloud-registration path (see `cloud_dns`
+in `slurm.conf.5`). This is the same across Gen 1–6 and every Slurm version.
 
-`SlurmctldParameters=cloud_reg_addrs`, added in Slurm 24.05, changes this: when a burst
-node registers, slurmctld updates its `NodeAddr` with the actual IP the node is connecting
-from. No pre-configured `NodeAddr` is needed. The `generate_conf.py` output does not
-include `NodeAddr` lines for burst nodes. This eliminates an entire class of registration
-failures that Gen 1/2 customers encounter.
+> **Note:** earlier versions of this guide called out a `SlurmctldParameters=cloud_reg_addrs`
+> option as a Gen 3 improvement. That was incorrect — it's not a documented Slurm option,
+> it was a no-op on 24.05, and Slurm 25.11 rejects it as defunct. BurstLab no longer sets
+> it on any generation; `resume.py` does the address assignment.
 
 *cgroup v2 only — no v1.* Rocky 10 (RHEL 10) compiles the kernel without
 `CONFIG_CGROUP_V1=y`. The legacy cgroup v1 hierarchy does not exist. Only the unified
@@ -240,8 +241,9 @@ the current state-of-the-art for Ubuntu-based HPC clusters.
 
 **What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
 
-*Same Slurm version, different OS family.* Gen 5 uses the same Slurm 24.05 as Gen 3,
-including `cloud_reg_addrs` for dynamic burst node IP registration. The OS-level
+*Same Slurm version, different OS family.* Gen 5 uses the same Slurm 24.05 as Gen 3.
+Burst node IP registration is handled by the AWS plugin's `resume.py` (which runs
+`scontrol update nodeaddr=...` after launch), same as Gen 3. The OS-level
 differences mirror Gen 4: apt package manager, AppArmor, ufw firewall, ubuntu SSH user.
 
 *Python 3.12.* Ubuntu 24.04 ships Python 3.12 as the default python3 (same version as
@@ -255,7 +257,7 @@ cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd in
 **Relevant customer profiles:**
 - Running Ubuntu 24.04 (Noble Numbat) on head node or compute nodes
 - Slurm 24.05 compiled from source or installed via Ubuntu repos
-- Early adopters of `cloud_reg_addrs` on Ubuntu
+- Teams standardizing on Ubuntu 24.04 + Slurm 24.05
 - Cloud-native HPC teams standardizing on Ubuntu 24.04 LTS
 
 **Files:**
@@ -282,7 +284,7 @@ validating the obol budget-enforcement seam on a live ParallelCluster running Sl
 **What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
 
 *Same feature recipe, newer Slurm.* Gen 6 carries the Gen 3/5 configuration unchanged —
-`cloud_reg_addrs`, cgroup v2 only, `task/cgroup` — onto Slurm 25.11. Slurm 25.11 built
+cgroup v2 only, `task/cgroup` — onto Slurm 25.11. Slurm 25.11 built
 cleanly from source with the Gen 2/3 configure line during obol validation, so the build
 recipe is unchanged; the Slurm version is two minor releases past Gen 3/5's 24.05.
 
@@ -318,10 +320,10 @@ doesn't need it; the overlay concern is tracked in obol#137, not here.
 | CentOS 8 or Rocky 8, Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm version, same Python workaround |
 | Rocky 8, Slurm 23.x (upgraded) | **Gen 1 or Gen 2** | OS matches Gen 1; Slurm version closer to Gen 2. Start with Gen 1 and note the Slurm version differences. |
 | Rocky 9, AlmaLinux 9, RHEL 9, Slurm 23.x | **Gen 2** | Exact match |
-| Rocky 9, Slurm 24.x (early adopter) | **Gen 2 or Gen 3** | OS matches Gen 2; Slurm version matches Gen 3. Cloud_reg_addrs may not be available in their 24.05 build — verify. |
+| Rocky 9, Slurm 24.x (early adopter) | **Gen 2 or Gen 3** | OS matches Gen 2; Slurm version matches Gen 3. Confirm their cgroup mode and Slurm 24.05 behaviors match the Gen 3 recipe — verify. |
 | Rocky 10, RHEL 10, Slurm 24.05+ | **Gen 3** | Exact match |
 | Ubuntu 22.04, Slurm 23.x | **Gen 4** | Exact match — Ubuntu 22.04 + Slurm 23.11 |
-| Ubuntu 24.04, Slurm 24.05+ | **Gen 5** | Exact match — Ubuntu 24.04 + Slurm 24.05 with cloud_reg_addrs |
+| Ubuntu 24.04, Slurm 24.05+ | **Gen 5** | Exact match — Ubuntu 24.04 + Slurm 24.05, cgroup v2 |
 | Ubuntu (any version), Slurm 22.x or 24.x | **Gen 4 or Gen 5** | Match Slurm version first (Gen 4 for 22.x/23.x, Gen 5 for 24.x), note OS version differences |
 | Not sure / first contact | **Gen 1** | Covers the largest installed base. You can always show Gen 3 diffs once you know their environment. |
 
@@ -365,7 +367,7 @@ Gen 2 (Rocky 9, Slurm 23.11)
 Gen 3 (Rocky 10, Slurm 24.05)
   ├── Python 3.12 → boto3 installs directly
   ├── cgroup v2 only (v1 kernel support removed in RHEL 10)
-  ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
+  ├── burst node IP set by resume.py (scontrol update nodeaddr) — plugin, not slurm.conf
   ├── iptables-nft (iptables-services removed from RHEL 10)
   └── Ed25519 SSH key (avoids RSA-2048 restriction in RHEL 10 DEFAULT crypto policy)
 ```
@@ -387,7 +389,7 @@ Gen 4 (Ubuntu 22.04 LTS, Slurm 23.11)
 Gen 5 (Ubuntu 24.04 LTS, Slurm 24.05)
   ├── Python 3.12 → boto3 installs directly
   ├── cgroup v2 only
-  ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
+  ├── burst node IP set by resume.py (scontrol update nodeaddr) — plugin, not slurm.conf
   ├── apt package manager, AppArmor, ufw firewall
   ├── SSH user: ubuntu
   └── FSx Lustre: requires burstlab-lustre (Lustre 2.17.53)
@@ -406,4 +408,4 @@ the directive level:
 - [slurm-gen2-deep-dive.md](slurm-gen2-deep-dive.md) — Gen 2 deltas from Gen 1:
   Rocky 9 OS differences, Slurm 23.11 new directives.
 - [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md) — Gen 3 deltas from Gen 2:
-  `cloud_reg_addrs`, cgroup v2 only, Rocky 10 system-level changes.
+  burst-node addressing via resume.py, cgroup v2 only, Rocky 10 system-level changes.

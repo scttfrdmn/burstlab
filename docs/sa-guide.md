@@ -37,9 +37,9 @@ scenario. Match the customer's environment:
 |---|---|---|
 | CentOS 8, Rocky 8, RHEL 8 — Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm, Python 3.6 boto3 shim |
 | Rocky 9, AlmaLinux 9, RHEL 9 — Slurm 23.x | **Gen 2** | Exact match — Python 3.9 native, cgroup v2 |
-| Rocky 10, RHEL 10 — Slurm 24.05+ | **Gen 3** | Exact match — `cloud_reg_addrs`, cgroup v2 only |
+| Rocky 10, RHEL 10 — Slurm 24.05+ | **Gen 3** | Exact match — cgroup v2 only, iptables-nft |
 | Ubuntu 22.04 — Slurm 23.x | **Gen 4** | Ubuntu match — apt/AppArmor, Python 3.10; EFS validated, FSx client supported (Scenario 4 not yet validated) |
-| Ubuntu 24.04 — Slurm 24.05+ | **Gen 5** | Ubuntu match — apt/AppArmor, Python 3.12, `cloud_reg_addrs` |
+| Ubuntu 24.04 — Slurm 24.05+ | **Gen 5** | Ubuntu match — apt/AppArmor, Python 3.12, cgroup v2 |
 | Not sure / first contact (RHEL) | **Gen 1** | Covers largest RHEL installed base |
 | Not sure / first contact (Ubuntu) | **Gen 4** | Covers largest Ubuntu installed base |
 | CentOS 7 or older RHEL | **Gen 1** as reference | Note OS differences; Slurm/Plugin config identical |

@@ -31,7 +31,7 @@ Status legend:
 
 Gen 6 matches the OS + Slurm combination AWS ParallelCluster 3.15.x and AWS PCS
 actually ship (AL2023 + Slurm 25.11). It reuses the Gen 3/5 recipe (cgroup v2,
-`cloud_reg_addrs`); the new axis is AL2023 packaging (no EPEL/CRB) and Slurm 25.11.
+plugin-set burst addresses); the new axis is AL2023 packaging (no EPEL/CRB) and Slurm 25.11.
 Its AMI/config are authored but **not yet built or deployed** — see the status table
 below.
 
@@ -109,7 +109,7 @@ Prolog/Epilog approach uses a deterministic state-file path on those versions. S
 | Gen 2 (Rocky 9 / Slurm 23.11) | Core + bursting + Lifecycle B (FSx + EFS) | 2026-06 | `ami-069e41e072fedcf8e` |
 | Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | 2026-06 | `ami-0e6d8478ca888e22d` |
 | Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | 2026-05 | `ami-0b0c1d1a248632a4e` |
-| Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting + `cloud_reg_addrs` | 2026-05 | `ami-072b0d10402ab6d51` |
+| Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting | 2026-05 | `ami-072b0d10402ab6d51` |
 | Gen 6 (AL2023 / Slurm 25.11) | AMI + infra validated live; **blocked on Slurm 25.11 config** (see note) | 2026-07 | `ami-041df8b89a4bb7c7a` |
 
 Dates are the month the capability was last exercised on a live cluster; where an exact

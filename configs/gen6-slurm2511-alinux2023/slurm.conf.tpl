@@ -6,11 +6,15 @@
 # at deploy time via templatefile(). Written to /opt/slurm/etc/slurm.conf
 # on every node via EFS.
 #
-# Gen 6 carries the Slurm 24.05+ feature set (same as Gen 3/5) onto Slurm 25.11:
-#   - cloud_reg_addrs: burst nodes register with their actual EC2 IP address.
-#     slurmctld accepts any address from a CLOUD node without pre-configuration.
-#     This eliminates the "SLURM_NODENAME must match configured NodeAddr" failure
-#     mode when EC2 assigns a different private IP than expected.
+# Gen 6 notes (Slurm 25.11 on AL2023):
+#   - NO cloud_reg_addrs. Slurm 25.11 makes that SlurmctldParameters option a hard
+#     error ("defunct"). It was never a documented option (absent from slurm.conf.5
+#     through 24.05) and was always redundant here: the AWS plugin's resume.py pushes
+#     each burst node's address in explicitly via `scontrol update nodename=<n>
+#     nodeaddr=<ip> nodehostname=<h>` once the EC2 instance has an IP. That is exactly
+#     the default cloud-node registration path Slurm documents (see `cloud_dns`), so
+#     dropping the parameter changes nothing operationally — the plugin still sets the
+#     address. (gen3/gen5 carry it too but only warn on 24.05; 25.11 rejects it.)
 #   - TaskPlugin=task/cgroup: AL2023 uses cgroup v2 exclusively;
 #     task/affinity is removed (deprecated in 24.x for pure-cgroup configs).
 #   - cgroup.conf uses CgroupPlugin=cgroup/v2 (see separate file).
@@ -41,11 +45,10 @@ SelectTypeParameters=CR_Core_Memory
 
 # --- Controller Parameters ---------------------------------------------------
 # idle_on_node_suspend: powered-down cloud nodes show as IDLE (not IDLE~) in sinfo.
-# cloud_reg_addrs: cloud nodes register with their actual EC2 IP. slurmctld
-#   records the address at registration time and uses it for subsequent comms.
-#   This is the key Gen 6 improvement: burst nodes no longer need NodeAddr
-#   pre-configured or matching a specific IP.
-SlurmctldParameters=idle_on_node_suspend,cloud_reg_addrs
+#   (Still valid in Slurm 25.11.)
+# NOTE: cloud_reg_addrs is intentionally absent — it is defunct in Slurm 25.11 and
+#   redundant with the AWS plugin (resume.py pushes NodeAddr in). See header.
+SlurmctldParameters=idle_on_node_suspend
 
 # --- Accounting --------------------------------------------------------------
 AccountingStorageType=accounting_storage/slurmdbd

@@ -7,10 +7,9 @@
 # on every node via EFS.
 #
 # Gen 3 additions vs Gen 2 (23.11/Rocky 9):
-#   - cloud_reg_addrs: burst nodes register with their actual EC2 IP address.
-#     slurmctld accepts any address from a CLOUD node without pre-configuration.
-#     This eliminates the "SLURM_NODENAME must match configured NodeAddr" failure
-#     mode when EC2 assigns a different private IP than expected.
+#   - Burst node addresses are set by the AWS plugin's resume.py (scontrol update
+#     nodeaddr=...), not by a slurm.conf parameter. See the Controller Parameters
+#     note below on why cloud_reg_addrs is NOT used.
 #   - TaskPlugin=task/cgroup: Rocky 10 uses cgroup v2 exclusively;
 #     task/affinity is removed (deprecated in 24.x for pure-cgroup configs).
 #   - cgroup.conf uses CgroupPlugin=cgroup/v2 (see separate file).
@@ -41,11 +40,13 @@ SelectTypeParameters=CR_Core_Memory
 
 # --- Controller Parameters ---------------------------------------------------
 # idle_on_node_suspend: powered-down cloud nodes show as IDLE (not IDLE~) in sinfo.
-# cloud_reg_addrs: cloud nodes register with their actual EC2 IP. slurmctld
-#   records the address at registration time and uses it for subsequent comms.
-#   This is the key Gen 3 improvement: burst nodes no longer need NodeAddr
-#   pre-configured or matching a specific IP.
-SlurmctldParameters=idle_on_node_suspend,cloud_reg_addrs
+# NOTE: cloud_reg_addrs was removed. It is not a documented slurm.conf option (absent
+#   from slurm.conf.5 through 24.05) and is redundant here: burst node addresses are
+#   set by the AWS plugin's resume.py, which runs `scontrol update nodename=<n>
+#   nodeaddr=<ip> nodehostname=<h>` once the EC2 instance has an IP — the documented
+#   default cloud-registration path (see the `cloud_dns` option). On 24.05 the
+#   parameter only logged a warning; Slurm 25.11 rejects it as defunct.
+SlurmctldParameters=idle_on_node_suspend
 
 # --- Accounting --------------------------------------------------------------
 AccountingStorageType=accounting_storage/slurmdbd
