@@ -7,7 +7,7 @@ for SAs and customers who prefer a CDK / CloudFormation workflow.
 > **Status: experimental.** The CDK currently provisions **Gen 1 only**
 > (Rocky 8 + Slurm 22.05) and does **not** implement the workloads overlay
 > (Scenarios 1–4). Terraform remains the reference implementation and the only
-> one covering all five generations. See [Scope](#scope) below before using.
+> one covering every generation. See [Scope](#scope) below before using.
 
 ## Scope
 

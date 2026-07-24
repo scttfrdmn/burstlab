@@ -1,12 +1,13 @@
 # BurstLab Generations: The Why and the What
 
-BurstLab ships five complete, independently-deployable cluster configurations spanning
-two OS families (RHEL/Rocky and Ubuntu). This document explains why, what each one is
-for, and how to choose the right one.
+BurstLab ships six validated, independently-deployable cluster configurations spanning
+three OS families: RHEL/Rocky (8/9/10), Ubuntu (22.04/24.04), and Amazon Linux 2023
+(matching what AWS ParallelCluster/PCS run). This document explains why, what each one
+is for, and how to choose the right one.
 
 ---
 
-## Why Five Generations?
+## Why These Generations?
 
 HPC environments are not uniform. An SA engaging with five different research
 computing teams in a single week might encounter:
@@ -19,39 +20,41 @@ computing teams in a single week might encounter:
 - A cloud-native HPC startup running Ubuntu 24.04 with Slurm 24.05
 
 A demo that only works on one configuration is limited. If you show a customer running
-Slurm 22.05 a Gen 3 demo with `cloud_reg_addrs`, they cannot replicate it — the feature
-does not exist in their version. If you show a Rocky-based demo to an Ubuntu shop, they'll
+Slurm 22.05 a Gen 3 demo that leans on a Slurm 24.05 behavior or cgroup v2-only config,
+they cannot replicate it — those don't exist in their version. If you show a Rocky-based demo to an Ubuntu shop, they'll
 spend the entire meeting translating package names and paths instead of focusing on the
 bursting architecture.
 
-BurstLab models the five most common live environments an SA encounters today: three
-RHEL/Rocky generations (8, 9, 10) and two Ubuntu LTS generations (22.04, 24.04).
-Each generation is a complete, deployable cluster, not a variation of a single codebase.
-The goal is to deploy a cluster that matches what a customer is actually running, walk
-through the exact configuration they need, and hand over working IaC when the meeting ends.
+BurstLab models the most common live environments an SA encounters today: three
+RHEL/Rocky generations (8, 9, 10) and two Ubuntu LTS generations (22.04, 24.04), with a
+sixth (Amazon Linux 2023 + Slurm 25.11) added to mirror what AWS's own managed Slurm —
+ParallelCluster and PCS — actually run. Each generation is a complete, deployable cluster,
+not a variation of a single codebase. The goal is to deploy a cluster that matches what a
+customer is actually running, walk through the exact configuration they need, and hand
+over working IaC when the meeting ends.
 
 ---
 
-## What Is Identical Across All Five
+## What Is Identical Across All Generations
 
 Before covering what differs, it is worth being explicit about what is the same:
 
 - **Infrastructure**: the same six Terraform modules (VPC, IAM, EFS, head-node,
   compute-nodes, burst-config). The modules are not forked per generation — they are
   shared. Generation-specific differences are in config templates and Packer AMIs only.
-- **AWS Plugin for Slurm v2**: all five generations run the same plugin version with
+- **AWS Plugin for Slurm v2**: all generations run the same plugin version with
   the same `resume.py`, `suspend.py`, `change_state.py`, and `generate_conf.py` scripts.
   The plugin protocol has not changed between Slurm 22.05 and 24.05, and works identically
   on both RHEL/Rocky and Ubuntu.
 - **Scripts**: `validate-cluster.sh`, `demo-burst.sh`, and `check-quotas.sh` are
   generation-agnostic. The same 40-point validation and the same demo flow work on
-  all five generations.
+  all generations.
 - **Deploy workflow**: `packer build` → `terraform apply` → SSH in → validate → demo.
   The steps are identical; only the AMI name and tfvars directory change.
 - **Network architecture**: same four-subnet VPC, same EFS layout, same NAT setup,
   same security groups. An architecture diagram drawn for Gen 1 describes Gen 3 faithfully.
 - **Alice**: the demo HPC user with UID/GID 2000 and home directory at `/home/alice`
-  exists on all five generations.
+  exists on all generations.
 
 ---
 
@@ -146,17 +149,18 @@ released in May 2025 and major research computing centers are piloting it for ne
 
 **What changes from Gen 2:**
 
-*`cloud_reg_addrs` — the key architectural improvement.* This is the most important
-change from a bursting perspective. In Gen 1 and Gen 2, burst nodes have a specific
-IP address assigned in `slurm.conf` via `NodeAddr=`. When a node boots with a different
-IP (because EC2 assigned a different address from the subnet), slurmctld rejects its
-registration.
+*Burst node addressing — handled by the plugin, not a Slurm parameter.* Burst nodes
+have no `NodeAddr` in `slurm.conf` (and `aws-burst-N` doesn't resolve in DNS). The AWS
+plugin's `resume.py` fills that gap: when a job needs a burst node, it launches the EC2
+instance, reads the assigned private IP, and runs
+`scontrol update nodename=aws-burst-N nodeaddr=<ip> nodehostname=<h>` to tell the
+controller the address — the documented default cloud-registration path (see `cloud_dns`
+in `slurm.conf.5`). This is the same across Gen 1–6 and every Slurm version.
 
-`SlurmctldParameters=cloud_reg_addrs`, added in Slurm 24.05, changes this: when a burst
-node registers, slurmctld updates its `NodeAddr` with the actual IP the node is connecting
-from. No pre-configured `NodeAddr` is needed. The `generate_conf.py` output does not
-include `NodeAddr` lines for burst nodes. This eliminates an entire class of registration
-failures that Gen 1/2 customers encounter.
+> **Note:** earlier versions of this guide called out a `SlurmctldParameters=cloud_reg_addrs`
+> option as a Gen 3 improvement. That was incorrect — it's not a documented Slurm option,
+> it was a no-op on 24.05, and Slurm 25.11 rejects it as defunct. BurstLab no longer sets
+> it on any generation; `resume.py` does the address assignment.
 
 *cgroup v2 only — no v1.* Rocky 10 (RHEL 10) compiles the kernel without
 `CONFIG_CGROUP_V1=y`. The legacy cgroup v1 hierarchy does not exist. Only the unified
@@ -237,8 +241,9 @@ the current state-of-the-art for Ubuntu-based HPC clusters.
 
 **What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
 
-*Same Slurm version, different OS family.* Gen 5 uses the same Slurm 24.05 as Gen 3,
-including `cloud_reg_addrs` for dynamic burst node IP registration. The OS-level
+*Same Slurm version, different OS family.* Gen 5 uses the same Slurm 24.05 as Gen 3.
+Burst node IP registration is handled by the AWS plugin's `resume.py` (which runs
+`scontrol update nodeaddr=...` after launch), same as Gen 3. The OS-level
 differences mirror Gen 4: apt package manager, AppArmor, ufw firewall, ubuntu SSH user.
 
 *Python 3.12.* Ubuntu 24.04 ships Python 3.12 as the default python3 (same version as
@@ -252,13 +257,60 @@ cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd in
 **Relevant customer profiles:**
 - Running Ubuntu 24.04 (Noble Numbat) on head node or compute nodes
 - Slurm 24.05 compiled from source or installed via Ubuntu repos
-- Early adopters of `cloud_reg_addrs` on Ubuntu
+- Teams standardizing on Ubuntu 24.04 + Slurm 24.05
 - Cloud-native HPC teams standardizing on Ubuntu 24.04 LTS
 
 **Files:**
 - AMI: `ami/ubuntu2404-slurm2405.pkr.hcl`
 - Config: `configs/gen5-slurm2405-ubuntu2404/`
 - Terraform: `terraform/generations/gen5-slurm2405-ubuntu2404/`
+
+---
+
+## Generation 6 — Amazon Linux 2023 + Slurm 25.11
+
+> **Status: core cluster + bursting validated live** (2026-07). AMI builds on AL2023,
+> cluster deploys single-pass, and a burst job completed end-to-end on a launched EC2
+> node. EFS/FSx-workload and lifecycle scenarios not yet exercised on Gen 6 (see the
+> [support matrix](support-matrix.md)).
+
+**The target customer**: a team using AWS's own managed Slurm — **AWS ParallelCluster
+3.15.x** or **AWS PCS** — both of which ship **Slurm 25.11 on Amazon Linux 2023 / RHEL 9**.
+The five earlier generations don't cover that OS + Slurm combination; Gen 6 matches
+what those managed services actually run, so burstlab's AMIs, configs, and docs line up
+with the target a customer is most likely to migrate onto. (Provenance: this surfaced
+validating the obol budget-enforcement seam on a live ParallelCluster running Slurm
+25.11.4 — see issue #7.)
+
+**What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
+
+*Same feature recipe, newer Slurm.* Gen 6 carries the Gen 3/5 configuration unchanged —
+cgroup v2 only, `task/cgroup` — onto Slurm 25.11. Slurm 25.11 built
+cleanly from source with the Gen 2/3 configure line during obol validation, so the build
+recipe is unchanged; the Slurm version is two minor releases past Gen 3/5's 24.05.
+
+*Amazon Linux 2023, not Rocky.* AL2023 is RHEL-adjacent and `dnf`-based, but with real
+packaging differences: SSH user is `ec2-user`, the base AMI is Amazon's own (resolved via
+the `amazon` owner alias, available in every region), and — the notable one — **AL2023 has
+no EPEL and no CRB**. Every `-devel` package the build needs is in the AL2023 core repos,
+so no third-party repo is added; MariaDB is the versioned `mariadb105-*` package.
+
+*slurmrestd not built.* Same as Gen 3: `http-parser-devel` isn't available (it needs EPEL),
+and slurmrestd is optional and unused by the demo.
+
+*Workload-overlay caveat.* AL2023 has no `lua-socket` / luarocks by default, which the obol
+GATE shim needs on a minimal managed AMI. The base generation (AMI + Slurm + node roles)
+doesn't need it; the overlay concern is tracked in obol#137, not here.
+
+**Relevant customer profiles:**
+- Running (or migrating to) AWS ParallelCluster 3.15.x or AWS PCS
+- Standardizing on Amazon Linux 2023 with Slurm 25.11
+- Wanting a burstlab generation that mirrors the managed-AWS-Slurm target
+
+**Files:**
+- AMI: `ami/alinux2023-slurm2511.pkr.hcl`
+- Config: `configs/gen6-slurm2511-alinux2023/`
+- Terraform: `terraform/generations/gen6-slurm2511-alinux2023/`
 
 ---
 
@@ -269,10 +321,10 @@ cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd in
 | CentOS 8 or Rocky 8, Slurm 22.x | **Gen 1** | Exact match — same OS, same Slurm version, same Python workaround |
 | Rocky 8, Slurm 23.x (upgraded) | **Gen 1 or Gen 2** | OS matches Gen 1; Slurm version closer to Gen 2. Start with Gen 1 and note the Slurm version differences. |
 | Rocky 9, AlmaLinux 9, RHEL 9, Slurm 23.x | **Gen 2** | Exact match |
-| Rocky 9, Slurm 24.x (early adopter) | **Gen 2 or Gen 3** | OS matches Gen 2; Slurm version matches Gen 3. Cloud_reg_addrs may not be available in their 24.05 build — verify. |
+| Rocky 9, Slurm 24.x (early adopter) | **Gen 2 or Gen 3** | OS matches Gen 2; Slurm version matches Gen 3. Confirm their cgroup mode and Slurm 24.05 behaviors match the Gen 3 recipe — verify. |
 | Rocky 10, RHEL 10, Slurm 24.05+ | **Gen 3** | Exact match |
 | Ubuntu 22.04, Slurm 23.x | **Gen 4** | Exact match — Ubuntu 22.04 + Slurm 23.11 |
-| Ubuntu 24.04, Slurm 24.05+ | **Gen 5** | Exact match — Ubuntu 24.04 + Slurm 24.05 with cloud_reg_addrs |
+| Ubuntu 24.04, Slurm 24.05+ | **Gen 5** | Exact match — Ubuntu 24.04 + Slurm 24.05, cgroup v2 |
 | Ubuntu (any version), Slurm 22.x or 24.x | **Gen 4 or Gen 5** | Match Slurm version first (Gen 4 for 22.x/23.x, Gen 5 for 24.x), note OS version differences |
 | Not sure / first contact | **Gen 1** | Covers the largest installed base. You can always show Gen 3 diffs once you know their environment. |
 
@@ -316,7 +368,7 @@ Gen 2 (Rocky 9, Slurm 23.11)
 Gen 3 (Rocky 10, Slurm 24.05)
   ├── Python 3.12 → boto3 installs directly
   ├── cgroup v2 only (v1 kernel support removed in RHEL 10)
-  ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
+  ├── burst node IP set by resume.py (scontrol update nodeaddr) — plugin, not slurm.conf
   ├── iptables-nft (iptables-services removed from RHEL 10)
   └── Ed25519 SSH key (avoids RSA-2048 restriction in RHEL 10 DEFAULT crypto policy)
 ```
@@ -338,7 +390,7 @@ Gen 4 (Ubuntu 22.04 LTS, Slurm 23.11)
 Gen 5 (Ubuntu 24.04 LTS, Slurm 24.05)
   ├── Python 3.12 → boto3 installs directly
   ├── cgroup v2 only
-  ├── cloud_reg_addrs → burst nodes self-register with actual EC2 IP (KEY IMPROVEMENT)
+  ├── burst node IP set by resume.py (scontrol update nodeaddr) — plugin, not slurm.conf
   ├── apt package manager, AppArmor, ufw firewall
   ├── SSH user: ubuntu
   └── FSx Lustre: requires burstlab-lustre (Lustre 2.17.53)
@@ -357,4 +409,4 @@ the directive level:
 - [slurm-gen2-deep-dive.md](slurm-gen2-deep-dive.md) — Gen 2 deltas from Gen 1:
   Rocky 9 OS differences, Slurm 23.11 new directives.
 - [slurm-gen3-deep-dive.md](slurm-gen3-deep-dive.md) — Gen 3 deltas from Gen 2:
-  `cloud_reg_addrs`, cgroup v2 only, Rocky 10 system-level changes.
+  burst-node addressing via resume.py, cgroup v2 only, Rocky 10 system-level changes.

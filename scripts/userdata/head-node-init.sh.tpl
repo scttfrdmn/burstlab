@@ -215,9 +215,13 @@ echo "${efs_dns_name}:/home /home nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1
 # /opt/slurm — Slurm binaries, configs, and plugin shared across all nodes
 echo "${efs_dns_name}:/slurm /opt/slurm nfs4 _netdev,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,nofail,x-systemd.requires=network-online.target,x-systemd.after=network-online.target 0 0" >> /etc/fstab
 
-# Determine SSH user based on OS family (rocky for RHEL/Rocky, ubuntu for Ubuntu)
+# Determine SSH user by OS: ubuntu (Ubuntu), ec2-user (Amazon Linux 2023),
+# rocky (Rocky/RHEL). Amazon Linux has no 'rocky' user, so keying off OS_FAMILY
+# alone would try to chown a nonexistent user; use the OS ID.
 if [ "$OS_FAMILY" = "debian" ]; then
   SSH_USER="ubuntu"
+elif [ "$OS_ID" = "amzn" ]; then
+  SSH_USER="ec2-user"
 else
   SSH_USER="rocky"
 fi

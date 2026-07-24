@@ -161,8 +161,10 @@ counts and capability status.
 ### VPC Limit: Running Multiple Generations
 
 The default VPC limit is 5 per region. BurstLab uses 1 VPC per generation deployed.
-If you deploy all five generations simultaneously you need 5 VPCs — this matches the
-default limit exactly.
+Five generations fit exactly within the default limit; deploying a sixth generation
+simultaneously (e.g. Gen 6 alongside all five others) needs a VPC limit increase to 6+.
+In practice you rarely run more than one or two generations at once — deploy
+sequentially (destroy before the next) and the limit is a non-issue.
 
 If you already have VPCs in the region from other projects, you may hit the limit when
 deploying. Either:
@@ -187,7 +189,7 @@ Example output when everything is fine:
   Profile: aws
 
   [PASS] On-Demand Standard vCPUs:  quota=192  in-use=8    needed-base=40  needed-full=120
-  [PASS] VPCs per region:           quota=5    in-use=1    available=4  (can run 4 generations in parallel; 5 total exist)
+  [PASS] VPCs per region:           quota=5    in-use=1    available=4  (can run 4 generations in parallel; 6 total exist)
   [PASS] Elastic IP addresses:      quota=5    in-use=1    needed=1
   [INFO] EC2 key pairs:             burstlab-key
 

@@ -19,7 +19,7 @@ For the cluster user's perspective, see [user-guide.md](user-guide.md).
 
 ### Testing Status
 
-> The authoritative capability status across all five generations lives in the
+> The authoritative capability status across all generations lives in the
 > [support matrix](../support-matrix.md). The table below is the workload-specific
 > detail behind it.
 

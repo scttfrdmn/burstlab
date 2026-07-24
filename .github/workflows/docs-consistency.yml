@@ -185,13 +185,18 @@ jobs:
           [ "$fail" -eq 0 ] && echo "OK: README exports every env var it uses"
           exit "$fail"
 
-      - name: No stale 'all 3 generations' (five exist)
+      - name: No stale generation-count claim (six exist)
         run: |
-          if grep -rniE 'all (3|three) generations' --include='*.md' --include='*.sh' .; then
-            echo "::error::Stale 'all 3 generations' — BurstLab has five. Report available count or say five."
+          # BurstLab has six generations (five validated + gen6 authored). Flag prose
+          # that hardcodes an older total. 'all 5/five generations' is stale for the
+          # total; the validated-count sentences say "five ... validated" which is fine,
+          # so only flag the "all N generations [in parallel]" total-count phrasing.
+          if grep -rniE 'all (3|three|5|five) generations( in parallel)?' \
+               --include='*.md' --include='*.sh' . | grep -viE 'validated|built and'; then
+            echo "::error::Stale generation total — BurstLab has six (five validated + gen6 authored)."
             exit 1
           fi
-          echo "OK: no stale 3-generation claim"
+          echo "OK: no stale generation-count claim"
 
       - name: Scenario 4 lifecycle count is four, not three
         run: |

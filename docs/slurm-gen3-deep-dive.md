@@ -108,62 +108,49 @@ protection that RHEL 10 enforces strictly). No wrapper script is needed.
 
 ## What Changed: Slurm 23.11 → 24.05
 
-### `SlurmctldParameters=cloud_reg_addrs` — the key Gen 3 improvement
+### How burst nodes get their address — set by the plugin, not `cloud_reg_addrs`
 
-This is the most operationally significant change across the three BurstLab generations.
+> **Correction (from live Slurm 25.11 validation).** Earlier versions of this guide
+> credited a `SlurmctldParameters=cloud_reg_addrs` option as "the key Gen 3
+> improvement." That was wrong. `cloud_reg_addrs` is **not a documented `slurm.conf`
+> option** (it does not appear in `slurm.conf.5` for 23.11, 24.05, 25.05, or 25.11),
+> and Gen 3/5 clusters that carried it worked *despite* it, not because of it — Slurm
+> 24.05 silently warned and ignored it. Slurm 25.11 rejects it outright as defunct.
+> BurstLab no longer sets it (all generations). The real mechanism is below.
 
-**The problem in Gen 1 and Gen 2:**
+**How cloud node addresses actually work.** A burst node's `NodeName` (`aws-burst-0`)
+has no `NodeAddr` in `slurm.conf` and doesn't resolve in DNS — only its EC2 hostname
+(`ip-10-0-2-X…`) does. Slurm's documented model for this (see the `cloud_dns` option in
+`slurm.conf.5`) is that the node's address is *unknown until the instance is created*,
+and something must tell the controller the address after boot.
 
-When a burst node boots, its slurmd attempts to register with slurmctld. slurmctld looks up
-the node's `NodeAddr` (or `NodeHostname`) in `slurm.conf` to verify the registration. In
-Gen 1/2, the NodeName entries for cloud nodes look like:
+**That "something" is the AWS plugin's `resume.py`.** When a burst job is scheduled,
+slurmctld runs `resume.py` (the `ResumeProgram`). It calls EC2 to launch the instance,
+reads the assigned `PrivateIpAddress`, and pushes it into Slurm:
 
 ```
-NodeName=aws-burst-0 CPUs=8 RealMemory=31000 State=CLOUD
+scontrol update nodename=aws-burst-0 nodeaddr=10.0.2.47 nodehostname=ip-10-0-2-47
 ```
 
-No `NodeAddr` is specified. Slurm resolves the address by doing a DNS lookup on `aws-burst-0`
-(the NodeName). On a cloud instance, this name doesn't resolve — only the EC2 hostname
-(`ip-10-0-2-X.us-west-2.compute.internal`) resolves. slurmctld can refuse the registration
-if the connection comes from an IP that doesn't match what it expects.
+So the controller learns the address from the plugin, before the node's slurmd even
+registers — no `slurm.conf` parameter involved. This is why bursting works identically
+across Gen 1–6 and every Slurm version: the plugin owns address assignment.
 
-In practice on Gen 1/2, this usually works because AWS's cloud nodes connect from within the
-same VPC and slurmctld accepts connections from any IP in the burst subnet. But it's fragile:
-if security groups or network routing changes, registrations can silently fail.
-
-**The Gen 3 solution: `cloud_reg_addrs`**
-
-With `SlurmctldParameters=cloud_reg_addrs`, when a cloud node registers with slurmctld,
-slurmctld **records the actual source IP of the TCP connection** as the node's address, and
-stores it in the node table. Subsequent communications (job launch, health check) use that
-recorded IP directly.
-
-This means:
-1. No DNS resolution required for cloud node registration
-2. Works even if the node name doesn't resolve at all
-3. Each burst node's IP is captured at boot time and forgotten at termination
-4. Multiple deployments with different VPC CIDRs work without config changes
-
-**What this looks like in `sinfo -o "%N %T %A"` after a burst job:**
-```
-NODELIST    STATE       REASON
-aws-burst-0   allocated   None
-```
-
-And in `scontrol show node aws-burst-0`:
+**What this looks like in `scontrol show node aws-burst-0` after a burst job:**
 ```
 NodeName=aws-burst-0 Arch=x86_64 CoresPerSocket=4
    ...
-   NodeAddr=10.0.2.47 NodeHostName=aws-burst-0
+   NodeAddr=10.0.2.47 NodeHostName=ip-10-0-2-47
    ...
 ```
 
-The `NodeAddr` is populated at registration time — it wasn't in `slurm.conf`.
+The `NodeAddr` is populated at resume time by `resume.py` — it wasn't in `slurm.conf`.
 
 **Demo talking point:**
-*"In Gen 3, burst nodes don't need pre-configured IPs. When they boot, they just connect to
-the controller and say 'I'm aws-burst-0 and my IP is 10.0.2.47.' The controller records
-that and uses it. This is how production cloud-bursting should work."*
+*"Burst nodes don't need pre-configured IPs. When a job needs one, our resume script
+launches the EC2 instance, grabs its IP, and tells the controller 'aws-burst-0 lives at
+10.0.2.47.' The plugin owns that — no magic Slurm setting, which is why it's portable
+across Slurm versions."*
 
 ### `TaskPlugin=task/cgroup` — unchanged from Gen 2
 
@@ -187,7 +174,7 @@ systemctl start slurmrestd
 curl -s --unix-socket /var/spool/slurm/ctld/slurmrestd.socket \
   http://localhost/slurm/v0.0.40/jobs | python3 -m json.tool
 
-# Query nodes (shows cloud_reg_addrs in action — NodeAddr populated)
+# Query nodes (NodeAddr populated by resume.py at launch)
 curl -s --unix-socket /var/spool/slurm/ctld/slurmrestd.socket \
   http://localhost/slurm/v0.0.40/nodes | python3 -m json.tool
 ```
@@ -219,9 +206,9 @@ Slurm 24.05 ignores them with a warning if present on v2 systems.
 | cgroup | v1 | v2 (EC2 AMI — no v1) | v2 (required) |
 | iptables | iptables-services | iptables-services | iptables-nft |
 | crypto policy | DEFAULT | DEFAULT | DEFAULT (Ed25519 key; RSA-2048 blocked) |
-| `SlurmctldParameters` | *(none)* | idle_on_node_suspend | idle_on_node_suspend, cloud_reg_addrs |
+| `SlurmctldParameters` | *(none)* | idle_on_node_suspend | idle_on_node_suspend |
 | slurmrestd | not built | built, not started | **not built** (http-parser-devel not in EPEL 10) |
-| Cloud node IP | DNS/subnet match | DNS/subnet match | registered at connect |
+| Cloud node IP | set by resume.py | set by resume.py | set by resume.py |
 | sinfo cloud nodes | `idle~` | `idle~` | `idle~` |
 | Plugin v2 | same | same | same |
 
@@ -248,7 +235,7 @@ aws ec2 describe-images --owners 792107900819 \
   --filters 'Name=name,Values=Rocky-10*' \
   --query 'Images[*].{Name:Name,ID:ImageId,Date:CreationDate}' --output table
 
-# After a burst job runs: watch cloud_reg_addrs update NodeAddr with the real EC2 IP
+# After a burst job runs: resume.py has set NodeAddr to the real EC2 IP
 scontrol show node aws-burst-0 | grep NodeAddr
 ```
 
@@ -288,10 +275,14 @@ scontrol show node aws-burst-0 | grep NodeAddr
   systemctl restart burstlab-nat.service
   ```
 
-**Burst nodes not registering (`cloud_reg_addrs` not taking effect):**
-- Confirm `SlurmctldParameters=idle_on_node_suspend,cloud_reg_addrs` is in `slurm.conf`
-  (check the EFS copy: `grep SlurmctldParameters /opt/slurm/etc/slurm.conf`).
-- After adding it, `scontrol reconfigure` is required — or restart slurmctld.
+**Burst nodes not registering (no NodeAddr / can't reach the node):**
+- The address is set by `resume.py`, not a slurm.conf parameter. Check the plugin log
+  for the `scontrol update … nodeaddr=` call: `grep -i nodeaddr /var/log/slurm/*.log`
+  and `/var/log/slurm/change_state.log`.
+- Confirm `resume.py` ran and succeeded (EC2 launch + address push):
+  `scontrol show node aws-burst-0 | grep -E 'NodeAddr|State'`.
+- Do NOT add `cloud_reg_addrs` to fix this — it is defunct on Slurm 25.11 and a no-op
+  elsewhere (see "How burst nodes get their address" above).
 
 **Python 3.12 PEP 668 blocking pip:**
 - `sudo pip3 install boto3` may error: *"error: externally-managed-environment"*.
