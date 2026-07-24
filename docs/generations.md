@@ -1,12 +1,13 @@
 # BurstLab Generations: The Why and the What
 
-BurstLab ships five complete, independently-deployable cluster configurations spanning
-two OS families (RHEL/Rocky and Ubuntu). This document explains why, what each one is
-for, and how to choose the right one.
+BurstLab ships five validated, independently-deployable cluster configurations spanning
+two OS families (RHEL/Rocky and Ubuntu), plus a sixth (Amazon Linux 2023 + Slurm 25.11)
+that is authored but not yet built or deployed. This document explains why, what each one
+is for, and how to choose the right one.
 
 ---
 
-## Why Five Generations?
+## Why These Generations?
 
 HPC environments are not uniform. An SA engaging with five different research
 computing teams in a single week might encounter:
@@ -24,34 +25,36 @@ does not exist in their version. If you show a Rocky-based demo to an Ubuntu sho
 spend the entire meeting translating package names and paths instead of focusing on the
 bursting architecture.
 
-BurstLab models the five most common live environments an SA encounters today: three
-RHEL/Rocky generations (8, 9, 10) and two Ubuntu LTS generations (22.04, 24.04).
-Each generation is a complete, deployable cluster, not a variation of a single codebase.
-The goal is to deploy a cluster that matches what a customer is actually running, walk
-through the exact configuration they need, and hand over working IaC when the meeting ends.
+BurstLab models the most common live environments an SA encounters today: three
+RHEL/Rocky generations (8, 9, 10) and two Ubuntu LTS generations (22.04, 24.04), with a
+sixth (Amazon Linux 2023 + Slurm 25.11) added to mirror what AWS's own managed Slurm —
+ParallelCluster and PCS — actually run. Each generation is a complete, deployable cluster,
+not a variation of a single codebase. The goal is to deploy a cluster that matches what a
+customer is actually running, walk through the exact configuration they need, and hand
+over working IaC when the meeting ends.
 
 ---
 
-## What Is Identical Across All Five
+## What Is Identical Across All Generations
 
 Before covering what differs, it is worth being explicit about what is the same:
 
 - **Infrastructure**: the same six Terraform modules (VPC, IAM, EFS, head-node,
   compute-nodes, burst-config). The modules are not forked per generation — they are
   shared. Generation-specific differences are in config templates and Packer AMIs only.
-- **AWS Plugin for Slurm v2**: all five generations run the same plugin version with
+- **AWS Plugin for Slurm v2**: all generations run the same plugin version with
   the same `resume.py`, `suspend.py`, `change_state.py`, and `generate_conf.py` scripts.
   The plugin protocol has not changed between Slurm 22.05 and 24.05, and works identically
   on both RHEL/Rocky and Ubuntu.
 - **Scripts**: `validate-cluster.sh`, `demo-burst.sh`, and `check-quotas.sh` are
   generation-agnostic. The same 40-point validation and the same demo flow work on
-  all five generations.
+  all generations.
 - **Deploy workflow**: `packer build` → `terraform apply` → SSH in → validate → demo.
   The steps are identical; only the AMI name and tfvars directory change.
 - **Network architecture**: same four-subnet VPC, same EFS layout, same NAT setup,
   same security groups. An architecture diagram drawn for Gen 1 describes Gen 3 faithfully.
 - **Alice**: the demo HPC user with UID/GID 2000 and home directory at `/home/alice`
-  exists on all five generations.
+  exists on all generations.
 
 ---
 
@@ -259,6 +262,52 @@ cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd in
 - AMI: `ami/ubuntu2404-slurm2405.pkr.hcl`
 - Config: `configs/gen5-slurm2405-ubuntu2404/`
 - Terraform: `terraform/generations/gen5-slurm2405-ubuntu2404/`
+
+---
+
+## Generation 6 — Amazon Linux 2023 + Slurm 25.11
+
+> **Status: authored, not yet validated.** The files exist and pass offline
+> validation, but no AMI has been built and no cluster deployed. See the
+> [support matrix](support-matrix.md). Everything below is the *intended* design.
+
+**The target customer**: a team using AWS's own managed Slurm — **AWS ParallelCluster
+3.15.x** or **AWS PCS** — both of which ship **Slurm 25.11 on Amazon Linux 2023 / RHEL 9**.
+The five earlier generations don't cover that OS + Slurm combination; Gen 6 matches
+what those managed services actually run, so burstlab's AMIs, configs, and docs line up
+with the target a customer is most likely to migrate onto. (Provenance: this surfaced
+validating the obol budget-enforcement seam on a live ParallelCluster running Slurm
+25.11.4 — see issue #7.)
+
+**What changes from Gen 3 (Rocky 10 + Slurm 24.05):**
+
+*Same feature recipe, newer Slurm.* Gen 6 carries the Gen 3/5 configuration unchanged —
+`cloud_reg_addrs`, cgroup v2 only, `task/cgroup` — onto Slurm 25.11. Slurm 25.11 built
+cleanly from source with the Gen 2/3 configure line during obol validation, so the build
+recipe is unchanged; the Slurm version is two minor releases past Gen 3/5's 24.05.
+
+*Amazon Linux 2023, not Rocky.* AL2023 is RHEL-adjacent and `dnf`-based, but with real
+packaging differences: SSH user is `ec2-user`, the base AMI is Amazon's own (resolved via
+the `amazon` owner alias, available in every region), and — the notable one — **AL2023 has
+no EPEL and no CRB**. Every `-devel` package the build needs is in the AL2023 core repos,
+so no third-party repo is added; MariaDB is the versioned `mariadb105-*` package.
+
+*slurmrestd not built.* Same as Gen 3: `http-parser-devel` isn't available (it needs EPEL),
+and slurmrestd is optional and unused by the demo.
+
+*Workload-overlay caveat.* AL2023 has no `lua-socket` / luarocks by default, which the obol
+GATE shim needs on a minimal managed AMI. The base generation (AMI + Slurm + node roles)
+doesn't need it; the overlay concern is tracked in obol#137, not here.
+
+**Relevant customer profiles:**
+- Running (or migrating to) AWS ParallelCluster 3.15.x or AWS PCS
+- Standardizing on Amazon Linux 2023 with Slurm 25.11
+- Wanting a burstlab generation that mirrors the managed-AWS-Slurm target
+
+**Files:**
+- AMI: `ami/alinux2023-slurm2511.pkr.hcl`
+- Config: `configs/gen6-slurm2511-alinux2023/`
+- Terraform: `terraform/generations/gen6-slurm2511-alinux2023/`
 
 ---
 

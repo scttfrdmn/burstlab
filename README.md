@@ -45,7 +45,7 @@ burstlab/
 ├── docs/
 │   ├── prerequisites.md             # AWS quota requirements and pre-flight check
 │   ├── quickstart.md                # Step-by-step: zero to running cluster (Gen 1)
-│   ├── generations.md               # Why five generations exist; which to choose
+│   ├── generations.md               # Why the generations exist; which to choose
 │   ├── slurm-intro.md               # Slurm concepts and commands from zero
 │   ├── architecture.md              # Network, EFS, NAT, IAM, and security design
 │   ├── slurm-gen1-deep-dive.md      # Every slurm.conf directive explained (Gen 1)
@@ -73,7 +73,8 @@ burstlab/
 │   │   ├── gen2-slurm2311-rocky9/      # Gen 2: Rocky 9 + Slurm 23.11
 │   │   ├── gen3-slurm2405-rocky10/     # Gen 3: Rocky 10 + Slurm 24.05
 │   │   ├── gen4-slurm2311-ubuntu2204/  # Gen 4: Ubuntu 22.04 + Slurm 23.11
-│   │   └── gen5-slurm2405-ubuntu2404/  # Gen 5: Ubuntu 24.04 + Slurm 24.05
+│   │   ├── gen5-slurm2405-ubuntu2404/  # Gen 5: Ubuntu 24.04 + Slurm 24.05
+│   │   └── gen6-slurm2511-alinux2023/  # Gen 6: Amazon Linux 2023 + Slurm 25.11 (authored, unvalidated)
 │   └── workloads/                   # Overlay: attaches to existing generation clusters
 │       ├── base/                    # S3 bucket, transfer tools, script deploy
 │       ├── scenario1-compute/       # Spack + GROMACS install
@@ -91,7 +92,8 @@ burstlab/
 │   ├── gen2-slurm2311-rocky9/       # Gen 2 config templates (Rocky 9)
 │   ├── gen3-slurm2405-rocky10/      # Gen 3 config templates (Rocky 10)
 │   ├── gen4-slurm2311-ubuntu2204/   # Gen 4 config templates (Ubuntu 22.04)
-│   └── gen5-slurm2405-ubuntu2404/   # Gen 5 config templates (Ubuntu 24.04)
+│   ├── gen5-slurm2405-ubuntu2404/   # Gen 5 config templates (Ubuntu 24.04)
+│   └── gen6-slurm2511-alinux2023/   # Gen 6 config templates (Amazon Linux 2023)
 │
 ├── scripts/
 │   ├── check-quotas.sh              # Pre-flight AWS quota check
@@ -120,7 +122,8 @@ burstlab/
 │   ├── rocky9-slurm2311.pkr.hcl     # Packer: Rocky 9 + Slurm 23.11 (Gen 2)
 │   ├── rocky10-slurm2405.pkr.hcl    # Packer: Rocky 10 + Slurm 24.05 (Gen 3)
 │   ├── ubuntu2204-slurm2311.pkr.hcl # Packer: Ubuntu 22.04 + Slurm 23.11 (Gen 4)
-│   └── ubuntu2404-slurm2405.pkr.hcl # Packer: Ubuntu 24.04 + Slurm 24.05 (Gen 5)
+│   ├── ubuntu2404-slurm2405.pkr.hcl # Packer: Ubuntu 24.04 + Slurm 24.05 (Gen 5)
+│   └── alinux2023-slurm2511.pkr.hcl # Packer: Amazon Linux 2023 + Slurm 25.11 (Gen 6)
 │
 └── cdk/                             # Experimental CDK (Go), Gen 1 only — see cdk/README.md
 ```
@@ -192,7 +195,8 @@ terraform destroy
 
 ## Slurm Generations
 
-BurstLab provides five complete generations spanning two OS families (RHEL/Rocky and Ubuntu).
+BurstLab provides five validated generations spanning two OS families (RHEL/Rocky and Ubuntu),
+plus a sixth (Amazon Linux 2023 + Slurm 25.11) that is authored but not yet built/deployed.
 Each is an independently deployable cluster matching a specific customer environment.
 
 ### RHEL/Rocky Track
@@ -209,6 +213,12 @@ Each is an independently deployable cluster matching a specific customer environ
 |---|---|---|---|---|
 | **Gen 4** | Ubuntu 22.04 | 23.11.x | apt/AppArmor; Python 3.10; cgroup v2; [FSx requires burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) | Ubuntu 22.04, Slurm 23.x; academic/cloud-native/NVIDIA |
 | **Gen 5** | Ubuntu 24.04 | 24.05.x | apt/AppArmor; Python 3.12; `cloud_reg_addrs`; [FSx requires burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) | Ubuntu 24.04, Slurm 24.x; latest LTS |
+
+### Managed-AWS-Slurm Track
+
+| Generation | OS | Slurm | Key Features | When to Use |
+|---|---|---|---|---|
+| **Gen 6** | Amazon Linux 2023 | 25.11.x | `cloud_reg_addrs`; cgroup v2 only; matches ParallelCluster/PCS; **authored, not yet validated** | Migrating to/from AWS ParallelCluster 3.15.x or AWS PCS |
 
 **Start with Gen 1 for RHEL/Rocky customers** or **Gen 4 for Ubuntu customers** unless you know
 the specific OS and Slurm version. Most HPC teams struggling with cloud bursting today are on
@@ -325,7 +335,7 @@ BurstLab eliminates the "can we even get it working" phase. The Terraform and co
 | [support-matrix.md](docs/support-matrix.md) | Everyone | **Single source of truth** — per-generation node counts, EFS/FSx, lifecycle, status |
 | [prerequisites.md](docs/prerequisites.md) | Everyone | AWS quota requirements and pre-flight check |
 | [quickstart.md](docs/quickstart.md) | Everyone | Step-by-step deploy with time estimates (Gen 1) |
-| [generations.md](docs/generations.md) | Everyone | Why five generations exist; which to choose |
+| [generations.md](docs/generations.md) | Everyone | Why the generations exist; which to choose |
 | [quickstart-ubuntu.md](docs/quickstart-ubuntu.md) | Ubuntu users | Ubuntu-specific deltas from the canonical quickstart (Gen 4 & 5) |
 | [roadmap.md](docs/roadmap.md) | Everyone | Planned work and project direction |
 | [slurm-intro.md](docs/slurm-intro.md) | Everyone | Slurm concepts and commands from zero |

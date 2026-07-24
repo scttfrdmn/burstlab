@@ -194,11 +194,12 @@ if [[ "$VPC_QUOTA" -eq 0 ]]; then
   _warn "VPCs per region:           could not retrieve quota (check IAM permissions)"
 else
   VPC_AVAILABLE=$((VPC_QUOTA - VPC_COUNT))
-  # BurstLab has 5 generations, each using 1 VPC. Report how many can run at once.
-  if [[ "$VPC_AVAILABLE" -ge 5 ]]; then
-    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run all 5 generations in parallel)"
+  # BurstLab has 6 generations, each using 1 VPC. Report how many can run at once.
+  # (Deploying all 6 at once needs a VPC limit increase to 6+; the default is 5.)
+  if [[ "$VPC_AVAILABLE" -ge 6 ]]; then
+    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run all 6 generations in parallel)"
   elif [[ "$VPC_AVAILABLE" -ge 3 ]]; then
-    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run $VPC_AVAILABLE generations in parallel; 5 total exist)"
+    _pass "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE  (can run $VPC_AVAILABLE generations in parallel; 6 total exist)"
   elif [[ "$VPC_AVAILABLE" -ge 1 ]]; then
     _warn "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE"
     _note "Can deploy $VPC_AVAILABLE generation(s) at a time. Deploy sequentially (destroy before next)."

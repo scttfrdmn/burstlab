@@ -12,6 +12,7 @@ Status legend:
 |--------|---------|
 | ✅ **Validated** | Exercised end-to-end on a live cluster and confirmed working |
 | 🧪 **Experimental** | Implemented and expected to work; not yet validated end-to-end |
+| 📝 **Authored** | Files written and offline-validated; AMI not built, never deployed |
 | ⛔ **Blocked** | Cannot work with the current code/AMIs; see note |
 | — **Not tested** | No validation attempted yet |
 
@@ -26,6 +27,13 @@ Status legend:
 | **Gen 3** | Rocky 10 | 24.05.x | AWS Plugin for Slurm v2 | 1 head + 4 compute | 10 |
 | **Gen 4** | Ubuntu 22.04 | 23.11.x | AWS Plugin for Slurm v2 | 1 head + 4 compute | 10 |
 | **Gen 5** | Ubuntu 24.04 | 24.05.x | AWS Plugin for Slurm v2 | 1 head + 4 compute | 10 |
+| **Gen 6** | Amazon Linux 2023 | 25.11.x | AWS Plugin for Slurm v2 | 1 head + 4 compute | 10 |
+
+Gen 6 matches the OS + Slurm combination AWS ParallelCluster 3.15.x and AWS PCS
+actually ship (AL2023 + Slurm 25.11). It reuses the Gen 3/5 recipe (cgroup v2,
+`cloud_reg_addrs`); the new axis is AL2023 packaging (no EPEL/CRB) and Slurm 25.11.
+Its AMI/config are authored but **not yet built or deployed** — see the status table
+below.
 
 The base cluster is 5 always-on instances (1 head + 4 compute). Burst nodes launch
 on demand up to `max_burst_nodes` (default **10**, set per generation in
@@ -38,16 +46,22 @@ see [prerequisites.md](prerequisites.md).
 
 ## Storage and workloads
 
-| Capability | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 |
-|------------|:-----:|:-----:|:-----:|:-----:|:-----:|
-| Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ |
-| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 |
-| FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
-| Lifecycle 0 — Chain | ✅ | — | — | — | — |
-| Lifecycle A — Wrapper | ✅ | — | — | — | — |
-| Lifecycle B — Prolog/Epilog | ✅ | ✅ | ✅ (EFS) | — | — |
-| Lifecycle C — Burst Buffer | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 |
+| Capability | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 | Gen 6 |
+|------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ | 📝 |
+| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | ✅ | ✅ | 📝 |
+| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 📝 |
+| FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 | 📝 |
+| Lifecycle 0 — Chain | ✅ | — | — | — | — | — |
+| Lifecycle A — Wrapper | ✅ | — | — | — | — | — |
+| Lifecycle B — Prolog/Epilog | ✅ | ✅ | ✅ (EFS) | — | — | — |
+| Lifecycle C — Burst Buffer | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 | 📝 |
+
+📝 = **authored, not yet built or deployed.** Gen 6's Packer template, Terraform
+config, and Slurm templates exist and pass offline validation (`terraform validate`,
+`packer validate`), but no AMI has been built and no cluster deployed, so nothing is
+confirmed on live AWS yet. It reuses the Gen 3/5 recipe, so behavior is *expected* to
+match — but "expected" is not "validated."
 
 ### Notes
 
@@ -85,6 +99,7 @@ Prolog/Epilog approach uses a deterministic state-file path on those versions. S
 | Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | 2026-06 | `ami-0e6d8478ca888e22d` |
 | Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | 2026-05 | `ami-0b0c1d1a248632a4e` |
 | Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting + `cloud_reg_addrs` | 2026-05 | `ami-072b0d10402ab6d51` |
+| Gen 6 (AL2023 / Slurm 25.11) | Not yet validated — authored only (issue #7) | — | AMI not built |
 
 Dates are the month the capability was last exercised on a live cluster; where an exact
 validation commit was not recorded, the AMI ID identifies the tested image. **When you
