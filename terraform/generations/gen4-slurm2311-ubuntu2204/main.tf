@@ -50,6 +50,15 @@ provider "aws" {
 # generally-available zones for the two-AZ burst subnet layout.
 data "aws_availability_zones" "available" {
   state = "available"
+
+  # Exclude Local Zones / Wavelength (e.g. us-west-2-lax-1a) and any opt-in
+  # region: those are returned by describe-availability-zones but do NOT support
+  # core services like EFS mount targets, so taking names[0]/[1] blindly can pick
+  # a Local Zone and fail EFS creation. opt-in-not-required = standard AZs only.
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
 }
 
 # =============================================================================
