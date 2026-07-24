@@ -217,6 +217,14 @@ build {
       # so we simply omit curl here. (The `|| true` also keeps this non-fatal.)
       "sudo dnf install -y git wget jq rsync nfs-utils stunnel || true",
 
+      # cronie: the cron daemon + crontab binary. Unlike Rocky/RHEL, Amazon Linux
+      # 2023's minimal base does NOT include cron, so the head-node init's
+      # `crontab -u slurm` (which installs the change_state.py node-state
+      # reconciliation cron) fails with "crontab: command not found" and burst
+      # node state never reconciles. Install cronie and enable crond.
+      "sudo dnf install -y cronie",
+      "sudo systemctl enable crond",
+
       # AWS Systems Manager agent — SSM Session Manager fallback access.
       # AL2023 ships amazon-ssm-agent in its repos (no external RPM needed).
       "sudo dnf install -y amazon-ssm-agent || sudo dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm 2>&1 | tail -3 || true",
