@@ -1,8 +1,8 @@
 # BurstLab Generations: The Why and the What
 
-BurstLab ships five validated, independently-deployable cluster configurations spanning
-two OS families (RHEL/Rocky and Ubuntu), plus a sixth (Amazon Linux 2023 + Slurm 25.11)
-that is authored but not yet built or deployed. This document explains why, what each one
+BurstLab ships six validated, independently-deployable cluster configurations spanning
+three OS families: RHEL/Rocky (8/9/10), Ubuntu (22.04/24.04), and Amazon Linux 2023
+(matching what AWS ParallelCluster/PCS run). This document explains why, what each one
 is for, and how to choose the right one.
 
 ---
@@ -269,9 +269,10 @@ cgroup/v2 plugin compiled with dbus-devel and kernel-headers for full systemd in
 
 ## Generation 6 — Amazon Linux 2023 + Slurm 25.11
 
-> **Status: authored, not yet validated.** The files exist and pass offline
-> validation, but no AMI has been built and no cluster deployed. See the
-> [support matrix](support-matrix.md). Everything below is the *intended* design.
+> **Status: core cluster + bursting validated live** (2026-07). AMI builds on AL2023,
+> cluster deploys single-pass, and a burst job completed end-to-end on a launched EC2
+> node. EFS/FSx-workload and lifecycle scenarios not yet exercised on Gen 6 (see the
+> [support matrix](support-matrix.md)).
 
 **The target customer**: a team using AWS's own managed Slurm — **AWS ParallelCluster
 3.15.x** or **AWS PCS** — both of which ship **Slurm 25.11 on Amazon Linux 2023 / RHEL 9**.

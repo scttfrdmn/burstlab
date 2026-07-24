@@ -12,7 +12,6 @@ Status legend:
 |--------|---------|
 | ✅ **Validated** | Exercised end-to-end on a live cluster and confirmed working |
 | 🧪 **Experimental** | Implemented and expected to work; not yet validated end-to-end |
-| 📝 **Authored** | Files written and offline-validated; AMI not built, never deployed |
 | ⛔ **Blocked** | Cannot work with the current code/AMIs; see note |
 | — **Not tested** | No validation attempted yet |
 
@@ -32,8 +31,8 @@ Status legend:
 Gen 6 matches the OS + Slurm combination AWS ParallelCluster 3.15.x and AWS PCS
 actually ship (AL2023 + Slurm 25.11). It reuses the Gen 3/5 recipe (cgroup v2,
 plugin-set burst addresses); the new axis is AL2023 packaging (no EPEL/CRB) and Slurm 25.11.
-Its AMI/config are authored but **not yet built or deployed** — see the status table
-below.
+Its core cluster + cloud bursting are **validated live** (2026-07) — see the status
+table below.
 
 The base cluster is 5 always-on instances (1 head + 4 compute). Burst nodes launch
 on demand up to `max_burst_nodes` (default **10**, set per generation in
@@ -48,31 +47,25 @@ see [prerequisites.md](prerequisites.md).
 
 | Capability | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 | Gen 6 |
 |------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
-| Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ | 📝 |
-| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | ✅ | ✅ | 📝 |
-| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 📝 |
-| FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 | 📝 |
+| Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | ✅ |
+| FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 |
 | Lifecycle 0 — Chain | ✅ | — | — | — | — | — |
 | Lifecycle A — Wrapper | ✅ | — | — | — | — | — |
 | Lifecycle B — Prolog/Epilog | ✅ | ✅ | ✅ (EFS) | — | — | — |
-| Lifecycle C — Burst Buffer | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 | 📝 |
+| Lifecycle C — Burst Buffer | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 |
 
-📝 = **partially validated live; blocked on a Slurm 25.11 config change.** Gen 6's AMI
-now builds on Amazon Linux 2023 (`ami-041df8b89a4bb7c7a`) and the cluster deploys — head
-node, 4 compute nodes, EFS, munge/slurmctld/slurmdbd all come up, `sinfo` shows both
-partitions, and a burst job *does* launch an EC2 node (`resume.py` fires, `aws-burst-0`
-reaches `mix#`). Live validation shook out five AL2023 fixes (now in the AMI/init:
-kernel-headers, curl-minimal, cronie, git, and the `ec2-user` SSH user) **plus one
-blocker**:
-
-> **Slurm 25.11 removed `cloud_reg_addrs`.** slurmctld logs
-> `error: The SlurmctldParameters option "cloud_reg_addrs" is defunct`. Gen 6's
-> `slurm.conf` was copied from Gen 3 (Slurm 24.05), where that parameter is valid; in
-> 25.11 it's gone (cloud node address registration changed). Jobs currently fail
-> (`WTERMSIG`) with power-save degraded. **Fixing this needs research into the 25.11
-> replacement, not a blind edit** — tracked as follow-up before Gen 6 is "validated."
-
-So the OS/AMI/infra axis is proven on live AWS; the Slurm-25.11 config axis is not yet.
+**Gen 6 core cluster + bursting is validated live** (2026-07). The AMI builds on Amazon
+Linux 2023 and the cluster deploys single-pass; munge/slurmctld/slurmdbd come up, both
+partitions show in `sinfo`, and — the real test — a burst job **completed end-to-end** on
+a dynamically launched EC2 node (`resume.py` set its `NodeAddr`, job exited 0). Getting
+there shook out six fixes now in the code: five AL2023 packaging/init issues
+(kernel-headers conflict, curl-minimal, cronie, git, `ec2-user` SSH user), the Local-Zone
+AZ selection bug (all gens), and the defunct `cloud_reg_addrs` parameter (all gens — see
+below). Gen 6's EFS/FSx-workload and lifecycle rows are 🧪 (not yet exercised), matching
+the other recent generations. Note: AL2023 has **native Lustre packages** (installed from
+the AWS FSx repo during init), so unlike Gen 3–5 it needs no burstlab-lustre.
 
 ### Notes
 
@@ -110,7 +103,7 @@ Prolog/Epilog approach uses a deterministic state-file path on those versions. S
 | Gen 3 (Rocky 10 / Slurm 24.05) | Core + bursting + Lifecycle B (EFS only) | 2026-06 | `ami-0e6d8478ca888e22d` |
 | Gen 4 (Ubuntu 22.04 / Slurm 23.11) | Core + bursting | 2026-05 | `ami-0b0c1d1a248632a4e` |
 | Gen 5 (Ubuntu 24.04 / Slurm 24.05) | Core + bursting | 2026-05 | `ami-072b0d10402ab6d51` |
-| Gen 6 (AL2023 / Slurm 25.11) | AMI + infra validated live; **blocked on Slurm 25.11 config** (see note) | 2026-07 | `ami-041df8b89a4bb7c7a` |
+| Gen 6 (AL2023 / Slurm 25.11) | Core + bursting (local + burst job COMPLETED end-to-end) | 2026-07 | rebuilt per deploy (AMI is ephemeral) |
 
 Dates are the month the capability was last exercised on a live cluster; where an exact
 validation commit was not recorded, the AMI ID identifies the tested image. **When you

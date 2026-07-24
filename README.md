@@ -74,7 +74,7 @@ burstlab/
 │   │   ├── gen3-slurm2405-rocky10/     # Gen 3: Rocky 10 + Slurm 24.05
 │   │   ├── gen4-slurm2311-ubuntu2204/  # Gen 4: Ubuntu 22.04 + Slurm 23.11
 │   │   ├── gen5-slurm2405-ubuntu2404/  # Gen 5: Ubuntu 24.04 + Slurm 24.05
-│   │   └── gen6-slurm2511-alinux2023/  # Gen 6: Amazon Linux 2023 + Slurm 25.11 (authored, unvalidated)
+│   │   └── gen6-slurm2511-alinux2023/  # Gen 6: Amazon Linux 2023 + Slurm 25.11
 │   └── workloads/                   # Overlay: attaches to existing generation clusters
 │       ├── base/                    # S3 bucket, transfer tools, script deploy
 │       ├── scenario1-compute/       # Spack + GROMACS install
@@ -195,8 +195,8 @@ terraform destroy
 
 ## Slurm Generations
 
-BurstLab provides five validated generations spanning two OS families (RHEL/Rocky and Ubuntu),
-plus a sixth (Amazon Linux 2023 + Slurm 25.11) that is authored but not yet built/deployed.
+BurstLab provides six validated generations spanning three OS families (RHEL/Rocky,
+Ubuntu, and Amazon Linux 2023 — the last matching AWS ParallelCluster/PCS).
 Each is an independently deployable cluster matching a specific customer environment.
 
 ### RHEL/Rocky Track
@@ -218,7 +218,7 @@ Each is an independently deployable cluster matching a specific customer environ
 
 | Generation | OS | Slurm | Key Features | When to Use |
 |---|---|---|---|---|
-| **Gen 6** | Amazon Linux 2023 | 25.11.x | cgroup v2 only; matches ParallelCluster/PCS; **authored, not yet validated** | Migrating to/from AWS ParallelCluster 3.15.x or AWS PCS |
+| **Gen 6** | Amazon Linux 2023 | 25.11.x | cgroup v2 only; matches ParallelCluster/PCS; native Lustre (no burstlab-lustre) | Migrating to/from AWS ParallelCluster 3.15.x or AWS PCS |
 
 **Start with Gen 1 for RHEL/Rocky customers** or **Gen 4 for Ubuntu customers** unless you know
 the specific OS and Slurm version. Most HPC teams struggling with cloud bursting today are on
