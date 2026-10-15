@@ -1,6 +1,6 @@
 # =============================================================================
 # slurmdbd.conf — Slurm Database Daemon configuration
-# BurstLab Gen 1 — Slurm 22.05.11 / CentOS 8
+# BurstLab Gen 1 — Slurm 22.05.11 / Rocky Linux 8
 #
 # slurmdbd is the accounting daemon. Plugin v2 uses it to track node state
 # history and enforce job accounting. Without it, SuspendTime-based power

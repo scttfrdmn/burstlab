@@ -10,7 +10,7 @@
 #     slurmrestd daemon, partition-level ResumeTimeout/SuspendTime support
 #   - Python: system python3.10 has pip; boto3 installed directly
 #   - PAM modules: /usr/lib/x86_64-linux-gnu/security (not /usr/lib64/security)
-#   - FSx Lustre: BLOCKED (AWS repo has no Ubuntu packages, like Gen 3/Rocky 10)
+#   - FSx Lustre: client installed at boot from burstlab-lustre (AWS publishes no Ubuntu packages)
 #   - EFS: fully functional (standard NFS4)
 #
 # Build: packer build ubuntu2204-slurm2311.pkr.hcl

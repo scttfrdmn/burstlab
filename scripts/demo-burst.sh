@@ -89,7 +89,8 @@ _step "Current cluster state (sinfo)"
 $SBIN/sinfo
 echo
 echo "Note: ${NODE_PREFIX} nodes show idle~ — they are powered off but registered."
-echo "The ~ means PrivateData=CLOUD is set, making them visible in sinfo."
+echo "The ~ means powered down: no EC2 instance exists yet. PrivateData=CLOUD is what"
+echo "makes these CLOUD nodes visible in sinfo at all."
 
 _wait
 

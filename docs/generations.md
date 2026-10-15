@@ -81,8 +81,9 @@ tracks them as CLOUD-state nodes that are powered off until needed.
 8 repos (`vault.centos.org`). This is irrelevant for Rocky 8 (which has active repos) but
 demonstrates the exact fix a customer's sysadmin needed to apply when migrating.
 
-*cgroup v1.* Rocky 8 EC2 AMIs boot with cgroup v1. The `cgroup.conf` uses
-`CgroupPlugin=cgroup/v1` and `CgroupAutomount=yes`.
+*cgroup v1.* Rocky 8 EC2 AMIs boot with cgroup v1. The `cgroup.conf` leaves
+`CgroupPlugin` unset (Slurm 22.05 autodetects v1) and sets `CgroupAutomount=no`
+— the hierarchy is already mounted at `/sys/fs/cgroup`.
 
 **Relevant customer profiles:**
 - Running CentOS 8 or Rocky 8

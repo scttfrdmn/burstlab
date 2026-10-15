@@ -1,6 +1,6 @@
 # =============================================================================
 # slurm.conf — BurstLab Gen 1
-# Slurm 22.05.11 on CentOS 8 with AWS Plugin for Slurm v2
+# Slurm 22.05.11 on Rocky Linux 8 with AWS Plugin for Slurm v2
 #
 # This is a template. Variables in $${VAR} are substituted by Terraform/CDK
 # at deploy time via templatefile(). The resulting file is written to
@@ -93,11 +93,10 @@ ResumeRate=100
 SuspendRate=100
 
 # ResumeTimeout: seconds Slurm waits for a cloud node to become IDLE after
-# resumption. AWS m7a.xlarge cold starts occasionally take 5-6 minutes (EFS
-# mount, slurmd registration). 600s gives comfortable headroom; change_state.py
-# auto-recovers any node that does hit the timeout.
-# ResumeProgram is called. m7a instances typically register in 90-120s.
-# 300s gives plenty of margin.
+# resumption. m7a instances typically register in 90-120s, but cold starts
+# occasionally take 5-6 minutes (EFS mount, slurmd registration). 600s gives
+# comfortable headroom; change_state.py auto-recovers any node that does hit
+# the timeout.
 ResumeTimeout=600
 
 # SuspendTime: seconds a node must be idle before SuspendProgram is called.
@@ -139,8 +138,8 @@ PartitionName=local Nodes=compute[01-%{ if compute_node_count < 10 }0%{ endif }$
 # Run once after partitions.json and config.json are in place, then append
 # the output (slurm.conf.aws) below. This section documents what it produces:
 #
-#   NodeName=aws-burst-[0-7] CPUs=8 RealMemory=31000 Weight=1 State=CLOUD
-#   PartitionName=aws Nodes=aws-burst-[0-7] MaxTime=4:00:00 State=UP
+#   NodeName=aws-burst-[0-9] CPUs=8 RealMemory=31000 Weight=1 State=CLOUD
+#   PartitionName=aws Nodes=aws-burst-[0-9] MaxTime=4:00:00 State=UP
 #
 # The node names MUST match: {PartitionName}-{NodeGroupName}-{index}
 # as defined in partitions.json. The EC2 Name tag is set to this value

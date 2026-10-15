@@ -17,7 +17,7 @@
 #         (gcc, munge-devel, openssl-devel, pam-devel, readline-devel,
 #         dbus-devel, lua-devel, mariadb105-devel). We do NOT add EPEL.
 #       * mariadb package is 'mariadb105-server' / 'mariadb105-devel'
-#   - Slurm 25.11: same cgroup v2 + cloud_reg_addrs recipe as Gen 3/5
+#   - Slurm 25.11: same cgroup v2 recipe as Gen 3/5 (no cloud_reg_addrs — defunct in 25.11)
 #     (obol built 25.11.1 from source on Rocky 9 with the gen2/3 recipe
 #     unchanged, so the configure/build deps carry over; AL2023 packaging is
 #     the new variable). cgroup v2 only.
@@ -344,8 +344,6 @@ build {
 
       "sudo mkdir -p /opt/slurm/etc",
       "sudo chown slurm:slurm /opt/slurm /opt/slurm/etc",
-
-      "sudo mkdir -p /u && sudo chmod 755 /u",
 
       "sudo mkdir -p /etc/slurm && sudo chown slurm:slurm /etc/slurm",
 

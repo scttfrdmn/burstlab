@@ -467,12 +467,6 @@ build {
       "sudo mkdir -p /opt/slurm/etc",
       "sudo chown slurm:slurm /opt/slurm /opt/slurm/etc",
 
-      # /u: EFS mount point for cluster user home directories.
-      # Cluster users (e.g. alice) have homes at /u/home/<username>.
-      # Rocky's /home stays local so SSH access is never EFS-dependent.
-      "sudo mkdir -p /u",
-      "sudo chmod 755 /u",
-
       # /etc/slurm: some Slurm utilities and RPM-era tools default to looking here.
       # We create it so that cloud-init can optionally symlink slurm.conf here.
       "sudo mkdir -p /etc/slurm",

@@ -74,9 +74,11 @@ terraform init && terraform apply
 # 4. Connect (ubuntu user)
 ssh -i "$SSH_KEY" ubuntu@$(terraform output -raw head_node_public_ip)
 
-# 5. Validate on the head node
+# 5. Validate on the head node (as ubuntu), then run the demo as alice —
+#    demo-burst.sh refuses to run as any other user. Exit back to your workstation first.
 bash /opt/slurm/etc/validate-cluster.sh
-bash /opt/slurm/etc/demo-burst.sh
+exit
+ssh -i "$SSH_KEY" alice@$(terraform output -raw head_node_public_ip) 'bash /opt/slurm/etc/demo-burst.sh'
 
 # 6. Tear down when done (from your local workstation)
 terraform -chdir="$BURSTLAB_ROOT/terraform/generations/gen5-slurm2405-ubuntu2404" destroy
