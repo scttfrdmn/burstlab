@@ -4,12 +4,17 @@ name: docs-consistency
 # broken relative doc links, stale burst-node counts, stale "FSx blocked" language,
 # and the wrong validation-script path. The support matrix (docs/support-matrix.md)
 # is the single source of truth; these checks keep prose from contradicting it.
+#
+# The "cross-generation" steps at the end (Oct 2026 audit, #59) guard code and
+# comments too: copy-paste leftovers when a generation is cloned from another,
+# Gen-1-only assumptions (SSH user, cluster name, python path), and leaked
+# identifiers.
 
 on:
   push:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example']
+    paths: ['**/*.md', 'scripts/**', 'configs/**', 'ami/**', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example', '.github/workflows/docs-consistency.yml']
   pull_request:
-    paths: ['**/*.md', 'scripts/check-quotas.sh', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example']
+    paths: ['**/*.md', 'scripts/**', 'configs/**', 'ami/**', 'terraform/**/*.tf', 'terraform/**/*.tfvars.example', '.github/workflows/docs-consistency.yml']
 
 jobs:
   docs-consistency:
@@ -236,9 +241,9 @@ jobs:
           # a 'cp terraform.tfvars.example' for that scenario in the same file, so readers
           # configure gen_state_path/profile/region/cluster_name before applying.
           fail=0
-          for f in README.md docs/workloads/overview.md; do
+          for f in README.md docs/workloads/*.md; do
             if grep -qE 'workloads/scenario[0-9][^ ]*" (init|apply)|chdir="[^"]*scenario[0-9]' "$f" \
-               && ! grep -q 'cp terraform.tfvars.example' "$f"; then
+               && ! grep -qE 'cp ("?[^ ]*/)?terraform\.tfvars\.example' "$f"; then
               echo "::error file=$f::scenario apply without a 'cp terraform.tfvars.example' config step"
               fail=1
             fi
@@ -256,3 +261,125 @@ jobs:
             exit 1
           fi
           echo "OK: SLR flags in tfvars.example match the true first-run default"
+
+      # ---- Cross-generation guards (Oct 2026 audit, #59) ----------------------
+
+      - name: SSH user is per-generation, never a hard-coded rocky@
+        run: |
+          # Gen 4/5 log in as ubuntu and Gen 6 as ec2-user. Generation roots take it from
+          # local.ssh_user; the overlay and helper scripts read the ssh_user output.
+          fail=0
+          if grep -nE 'rocky@' terraform/generations/gen[456]-*/*.tf; then
+            echo "::error::rocky@ in a Gen 4-6 root — use local.ssh_user"; fail=1
+          fi
+          if grep -rnE 'rocky@' --include='*.tf' terraform/workloads/ terraform/modules/; then
+            echo "::error::rocky@ in the overlay/modules — use the generation's ssh_user output"; fail=1
+          fi
+          if grep -nE 'rocky@' scripts/*.sh; then
+            echo "::error::rocky@ in a helper script — resolve SSH_USER (terraform output ssh_user)"; fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "OK: no hard-coded rocky@ outside Gen 1-3 roots"
+          exit "$fail"
+
+      - name: Generation files reference only their own generation
+        run: |
+          # When a generation is cloned from another, labels, Packer files and OS names
+          # get left behind (Gen 4/5 shipped tfvars with cluster_name=burstlab-gen2/gen3).
+          # Lines that deliberately describe lineage ("Same ... as Gen 2", "vs Gen 1") are allowed.
+          fail=0
+          pkrs="rocky8-slurm2205 rocky9-slurm2311 rocky10-slurm2405 ubuntu2204-slurm2311 ubuntu2404-slurm2405 alinux2023-slurm2511"
+          for d in terraform/generations/gen* configs/gen*; do
+            n=$(basename "$d"); g=${n%%-*}; rest=${n#*-}
+            own_pkr="${rest#*-}-${rest%%-*}"            # slurm2311-rocky9 -> rocky9-slurm2311
+            case $g in
+              gen1|gen2|gen3) foreign='Ubuntu|Amazon Linux|AL2023' ;;
+              gen4|gen5)      foreign='Rocky|RHEL|Amazon Linux|AL2023' ;;
+              gen6)           foreign='Rocky|Ubuntu' ;;
+            esac
+            hits=$( {
+              for p in $pkrs; do [ "$p" = "$own_pkr" ] || grep -nH "$p" "$d"/* ; done
+              grep -nHE "$foreign" "$d"/*
+              grep -nHoE '"gen[0-9]"|burstlab-gen[0-9]|gen[0-9]-slurm' "$d"/* | grep -v ":.*$g"
+            } 2>/dev/null | grep -vE 'Same .* as Gen|vs Gen' || true)
+            if [ -n "$hits" ]; then
+              echo "$hits"
+              echo "::error::$n references another generation, Packer template or OS (clone leftover?)"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "OK: every generation references only itself"
+          exit "$fail"
+
+      - name: cloud_reg_addrs only appears as a removed/defunct note in code
+        run: |
+          # It was dropped from every slurm.conf (defunct on 25.11); comments must not
+          # present it as a feature.
+          if grep -rnE 'cloud_reg_addrs' terraform/ ami/ configs/ scripts/ \
+               | grep -viE 'not|no cloud_reg_addrs|removed|defunct|dropped|absent|rejects'; then
+            echo "::error::cloud_reg_addrs presented as active in code/comments — it was removed."
+            exit 1
+          fi
+          echo "OK: cloud_reg_addrs only referenced as removed"
+
+      - name: Stale-claim greps also cover code and templates
+        run: |
+          # The FSx-blocked and 8-node checks above only scan Markdown; the same drift
+          # showed up in Packer headers and slurm.conf comments.
+          fail=0
+          if grep -rniE 'fsx.{0,20}(blocked|is blocked)' --include='*.tf' --include='*.tpl' --include='*.hcl' --include='*.sh' . \
+               | grep -viE 'was blocked|previously blocked'; then
+            echo "::error::Stale 'FSx blocked' language in code/templates."; fail=1
+          fi
+          if grep -rnE 'aws-burst-\[0-7\]' --include='*.tf' --include='*.tpl' --include='*.hcl' --include='*.sh' .; then
+            echo "::error::Stale 8-node example (aws-burst-[0-7]) in code/templates."; fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "OK: no stale FSx/8-node claims in code"
+          exit "$fail"
+
+      - name: Helper scripts don't assume Gen 1
+        run: |
+          fail=0
+          # A silent burstlab-gen1 default makes cleanup scan the wrong cluster and "succeed".
+          if grep -nE ':-burstlab-gen1|="burstlab-gen1"|default: burstlab-gen1' scripts/*.sh; then
+            echo "::error::burstlab-gen1 default in a helper script — resolve from terraform output."; fail=1
+          fi
+          # /usr/local/bin/python3 exists only on the Gen 1 AMI; it must be behind an -x test.
+          if grep -nE '^[[:space:]]*PYTHON3=/usr/local/bin/python3[[:space:]]*$' scripts/*.sh; then
+            echo "::error::Unconditional /usr/local/bin/python3 — Gen 2+ AMIs don't have it."; fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "OK: helper scripts are generation-agnostic"
+          exit "$fail"
+
+      - name: No account IDs or real AMI IDs in docs
+        run: |
+          # 12-digit numbers look like AWS account IDs. Allowed: AMI publisher owner IDs
+          # (Rocky 792107900819, Canonical 099720109477) and the doc placeholder 123456789012.
+          fail=0
+          if grep -rnwE '[0-9]{12}' --include='*.md' . | grep -vE '792107900819|099720109477|123456789012'; then
+            echo "::error::Account-ID-shaped number in docs. Redact it, or allow-list a publisher ID here."; fail=1
+          fi
+          # Tested AMI IDs belong in support-matrix.md only; elsewhere use placeholders.
+          if grep -rnoE 'ami-[0-9a-f]{8,17}' --include='*.md' . | grep -v 'docs/support-matrix.md' \
+               | grep -vE 'ami-0abcdef1234567890|ami-0abc1234def56789a'; then
+            echo "::error::Real AMI ID outside docs/support-matrix.md — link to the matrix instead."; fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "OK: no account IDs or stray AMI IDs in docs"
+          exit "$fail"
+
+      - name: Every workloads overlay ships a terraform.tfvars.example
+        run: |
+          fail=0
+          for d in terraform/workloads/*/; do
+            [ -f "$d/terraform.tfvars.example" ] || { echo "::error::$d has no terraform.tfvars.example"; fail=1; }
+          done
+          [ "$fail" -eq 0 ] && echo "OK: all overlays have a tfvars example"
+          exit "$fail"
+
+      - name: Workstation scripts run on macOS bash 3.2
+        run: |
+          # macOS ships /bin/bash 3.2: no associative arrays (declare -A), no mapfile/readarray.
+          if grep -nE '^[^#]*(declare -A|mapfile|readarray)' scripts/*.sh; then
+            echo "::error::bash 4+ feature in a workstation script — macOS /bin/bash is 3.2."
+            exit 1
+          fi
+          echo "OK: scripts/*.sh avoid bash 4+ features"
