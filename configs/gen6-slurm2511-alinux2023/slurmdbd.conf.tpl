@@ -3,7 +3,7 @@
 # Slurm 25.11.x / Amazon Linux 2023
 #
 # No structural changes from Gen 1/2. slurmdbd.conf format is stable across
-# Slurm 22.05, 23.11, and 25.11.
+# Slurm 22.05, 23.11, 24.05, and 25.11.
 # =============================================================================
 
 # --- Identity ----------------------------------------------------------------

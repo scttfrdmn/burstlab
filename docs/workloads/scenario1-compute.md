@@ -20,7 +20,7 @@ before adding the complexity of cloud storage.
 
 ## Prerequisites
 
-1. Core cluster deployed (gen1, gen2, or gen3)
+1. Core cluster deployed (any generation — see the [support matrix](../support-matrix.md) for which have been validated)
 2. Base workloads layer applied (`terraform/workloads/base/`)
 3. Scenario 1 layer applied (`terraform/workloads/scenario1-compute/`)
 

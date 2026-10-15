@@ -6,10 +6,10 @@
 #   - Ubuntu 24.04 LTS (Noble Numbat): uses 'apt' package manager (not dnf),
 #     package names use -dev suffix (not -devel), AppArmor (not SELinux),
 #     ufw firewall (not firewalld), Python 3.12 default, cgroup v2 only
-#   - Slurm 24.05: same version as Gen 3, adds SlurmctldParameters=cloud_reg_addrs
-#     for dynamic IP registration, improved cgroup v2 integration, slurmrestd v0.0.40+
+#   - Slurm 24.05: same version as Gen 3 — improved cgroup v2 integration,
+#     slurmrestd v0.0.40+ (burst node addresses come from resume.py, not cloud_reg_addrs)
 #   - PAM modules: /usr/lib/x86_64-linux-gnu/security (not /usr/lib64/security)
-#   - FSx Lustre: BLOCKED (AWS repo has no Ubuntu packages, like Gen 3/Gen 4)
+#   - FSx Lustre: client installed at boot from burstlab-lustre (AWS publishes no Ubuntu packages)
 #   - EFS: fully functional (standard NFS4)
 #
 # Build: packer build ubuntu2404-slurm2405.pkr.hcl

@@ -257,7 +257,7 @@ module "head_node" {
   # slurmdbd password — injected into slurmdbd.conf
   slurmdbd_db_password = random_password.slurmdbd_db.result
 
-  # EFS — head node mounts /u and /opt/slurm via plain NFSv4
+  # EFS — head node mounts /home and /opt/slurm via plain NFSv4
   efs_dns_name = module.shared_storage.efs_dns_name
 
   # Network info for iptables NAT configuration

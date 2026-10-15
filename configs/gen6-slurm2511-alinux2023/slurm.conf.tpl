@@ -14,7 +14,7 @@
 #     nodeaddr=<ip> nodehostname=<h>` once the EC2 instance has an IP. That is exactly
 #     the default cloud-node registration path Slurm documents (see `cloud_dns`), so
 #     dropping the parameter changes nothing operationally — the plugin still sets the
-#     address. (gen3/gen5 carry it too but only warn on 24.05; 25.11 rejects it.)
+#     address. (Gen 3/5 dropped it as well; 24.05 only warned, 25.11 rejects it.)
 #   - TaskPlugin=task/cgroup: AL2023 uses cgroup v2 exclusively;
 #     task/affinity is removed (deprecated in 24.x for pure-cgroup configs).
 #   - cgroup.conf uses CgroupPlugin=cgroup/v2 (see separate file).

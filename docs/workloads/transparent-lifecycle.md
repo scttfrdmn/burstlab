@@ -38,7 +38,7 @@ Gen 2 (Slurm 23.11, Rocky 9) is fully validated for Approach B. Gen 3 (Slurm 24.
 Rocky 10) is validated for EFS; its FSx client is now auto-installed via burstlab-lustre
 but the FSx workload has not yet been re-validated (see Gen 3 notes below).
 
-**Gen 2 operational notes (Slurm 23.11.10, Rocky 9, AMI `ami-069e41e072fedcf8e`):**
+**Gen 2 operational notes (Slurm 23.11.10, Rocky 9; tested AMI recorded in the [support matrix](../support-matrix.md#last-validated)):**
 - `scontrol update Environment=` is NOT supported in 23.11.10 (returns "Update of
   this parameter is not supported") — deterministic state file path workaround required
 - **FSx Lustre version:** The Lustre client version varies by OS: EL8 has 2.12.x, EL9 has
@@ -51,7 +51,7 @@ but the FSx workload has not yet been re-validated (see Gen 3 notes below).
   (returned by `efs_get_mount_target_ip()` in `efs-lifecycle.sh`). The prolog writes
   `EFS_MOUNT_IP` to the state file; the job script uses `${EFS_MOUNT_IP:-${EFS_DNS}}`.
 
-**Gen 3 operational notes (Slurm 24.05.5, Rocky 10, AMI `ami-0e6d8478ca888e22d`):**
+**Gen 3 operational notes (Slurm 24.05.5, Rocky 10; tested AMI recorded in the [support matrix](../support-matrix.md#last-validated)):**
 - **FSx Lustre: client now auto-installed.** The AWS FSx Lustre client repo does not
   publish `el/10` packages, so the node init scripts install a compatible client
   (Lustre 2.17.0) from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)

@@ -5,9 +5,8 @@
 # Key differences from Gen 2 (Rocky 9 + 23.11):
 #   - Rocky Linux 10 (RHEL 10 based): cgroup v2 only (no v1 support),
 #     Python 3.12 default, nftables replaces iptables-services
-#   - Slurm 24.05: SlurmctldParameters=cloud_reg_addrs enables dynamic IP
-#     registration for burst nodes (no pre-configured NodeAddr needed),
-#     improved cgroup v2 integration, slurmrestd v0.0.40+
+#   - Slurm 24.05: improved cgroup v2 integration, slurmrestd v0.0.40+. Burst
+#     node addresses are set by the plugin's resume.py, not cloud_reg_addrs.
 #   - iptables: RHEL 10 removes iptables-services; install iptables-nft
 #     (provides /sbin/iptables as an nftables compatibility wrapper) so the
 #     existing NAT init scripts work without modification
@@ -317,8 +316,6 @@ build {
 
       "sudo mkdir -p /opt/slurm/etc",
       "sudo chown slurm:slurm /opt/slurm /opt/slurm/etc",
-
-      "sudo mkdir -p /u && sudo chmod 755 /u",
 
       "sudo mkdir -p /etc/slurm && sudo chown slurm:slurm /etc/slurm",
 

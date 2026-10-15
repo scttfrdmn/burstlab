@@ -1,7 +1,22 @@
-# BurstLab Gen 1 AMI
+# BurstLab AMIs
 
-This directory contains the Packer template that builds the base AMI for all BurstLab nodes
-(head, compute, and burst). The AMI is Rocky Linux 8 (CentOS 8 compatible) with Slurm 22.05.11 compiled from source.
+This directory contains one Packer template per generation. Each builds the single base AMI
+used by all of that generation's nodes (head, compute, and burst), with Slurm compiled from source.
+
+| Gen | Template | Base OS (publisher) | Slurm | SSH user | AMI name prefix |
+|-----|----------|---------------------|-------|----------|-----------------|
+| 1 | `rocky8-slurm2205.pkr.hcl` | Rocky Linux 8 (Rocky, `792107900819`) | 22.05.11 | `rocky` | `burstlab-gen1-rocky8-` |
+| 2 | `rocky9-slurm2311.pkr.hcl` | Rocky Linux 9 (Rocky, `792107900819`) | 23.11.10 | `rocky` | `burstlab-gen2-rocky9-` |
+| 3 | `rocky10-slurm2405.pkr.hcl` | Rocky Linux 10 (Rocky, `792107900819`) | 24.05.5 | `rocky` | `burstlab-gen3-rocky10-` |
+| 4 | `ubuntu2204-slurm2311.pkr.hcl` | Ubuntu 22.04 (Canonical, `099720109477`) | 23.11.10 | `ubuntu` | `burstlab-gen4-ubuntu2204-` |
+| 5 | `ubuntu2404-slurm2405.pkr.hcl` | Ubuntu 24.04 (Canonical, `099720109477`) | 24.05.5 | `ubuntu` | `burstlab-gen5-ubuntu2404-` |
+| 6 | `alinux2023-slurm2511.pkr.hcl` | Amazon Linux 2023 (Amazon) | 25.11.4 | `ec2-user` | `burstlab-gen6-alinux2023-` |
+
+**The walkthrough below uses Gen 1 as the worked example.** Every template follows the same
+`packer init` → `validate` → `build` flow and takes the same variables (`aws_profile`,
+`aws_region`, `slurm_version`, …) — substitute your generation's template name. Per-OS
+differences (package manager, SSH user, repo quirks) are documented in each template's header
+comment. Gen 1's AMI is Rocky Linux 8 (CentOS 8 compatible) with Slurm 22.05.11.
 
 ---
 

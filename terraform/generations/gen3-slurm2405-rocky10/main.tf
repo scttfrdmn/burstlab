@@ -7,9 +7,8 @@
 # Same six modules as Gen 1 and Gen 2. Generation-specific differences:
 #   - AMI: packer build ami/rocky10-slurm2405.pkr.hcl
 #   - Config templates: configs/gen3-slurm2405-rocky10/
-#   - slurm.conf: SlurmctldParameters=idle_on_node_suspend,cloud_reg_addrs
-#     cloud_reg_addrs: burst nodes register with their actual EC2 IP — no
-#     pre-configured NodeAddr required. Significant operational improvement.
+#   - slurm.conf: SlurmctldParameters=idle_on_node_suspend. Burst node addresses
+#     are set by the plugin's resume.py, not cloud_reg_addrs (see the slurm.conf note).
 #   - cgroup.conf: CgroupPlugin=cgroup/v2 (Rocky 10, cgroup v2 only)
 #   - iptables: AMI installs iptables-nft (nftables backend compat layer)
 #     so NAT init scripts work unchanged
