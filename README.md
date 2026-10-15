@@ -23,7 +23,7 @@ VPC 10.0.0.0/16
 Head node  (m7a.2xlarge):     slurmctld + slurmdbd + munge + NAT (iptables masquerade)
 Compute nodes (m7a.2xlarge × 4):  slurmd, private only, internet via head node NAT
 Burst nodes (m7a.2xlarge):    launched by Plugin v2 via EC2 CreateFleet, same NAT path
-EFS:  /u (user homes) and /opt/slurm (Slurm binaries + config) shared across all nodes
+EFS:  /home (user homes) and /opt/slurm (Slurm binaries + config) shared across all nodes
 ```
 
 The head node is the cluster's NAT gateway — on-prem compute and burst nodes route all outbound traffic through it. This mirrors real on-prem HPC environments where compute nodes live on isolated private networks with no direct internet access.

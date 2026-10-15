@@ -11,6 +11,12 @@
 
 set -uo pipefail
 
+# Point the Slurm clients at the shared config explicitly. A login shell gets this
+# from /etc/profile.d, but a non-login invocation (ssh host 'bash ...', SSM, CI)
+# does not — and without it the clients fall back to configless DNS SRV lookup and
+# fail, producing false sinfo/sacctmgr failures below.
+export SLURM_CONF=/opt/slurm/etc/slurm.conf
+
 PASS=0
 FAIL=0
 WARN=0
@@ -37,7 +43,7 @@ done
 _section "EFS Mounts"
 # -----------------------------------------------------------------------------
 
-for mount in /u /opt/slurm; do
+for mount in /home /opt/slurm; do
   if mountpoint -q "$mount"; then
     _pass "$mount is mounted"
     # Check it's actually EFS (nfs4)
@@ -166,7 +172,7 @@ for directive in "PrivateData=CLOUD" "ReturnToService=2" "DebugFlags=NO_CONF_HAS
   fi
 done
 
-# Detect burst partition name from partitions.json (Gen 1=aws, Gen 2/3=cloud)
+# Detect burst partition name from partitions.json (all generations use "aws")
 BURST_PARTITION=$(python3 -c "
 import json, sys
 try:
