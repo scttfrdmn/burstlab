@@ -11,6 +11,7 @@ This guide walks through the plugin as if you are setting it up manually. In Bur
 - [config.json Walkthrough](#configjson-walkthrough)
 - [partitions.json Walkthrough](#partitionsjson-walkthrough)
 - [Running generate_conf.py](#running-generate_confpy)
+- [Changing Config on a Running Cluster](#changing-config-on-a-running-cluster)
 - [The change_state.py Cron](#the-change_statepy-cron)
 - [The Launch Template: InstanceMetadataTags=enabled](#the-launch-template-instancemetadatatagsenabled)
 - [IAM Deep Dive](#iam-deep-dive)
@@ -239,6 +240,33 @@ sinfo  # verify cloud partition and nodes appear
 Run `generate_conf.py` exactly once during initial setup. If you change `partitions.json` (different instance type, more nodes, different partition), remove the old stanza from `slurm.conf` before running it again to avoid duplicate node definitions.
 
 In BurstLab, the head node cloud-init script runs `generate_conf.py` automatically during first boot.
+
+---
+
+## Changing Config on a Running Cluster
+
+Change the Terraform inputs (e.g. `max_burst_nodes`, `burst_node_instance_type`) or
+a template under `configs/<gen>/` and run `terraform apply` again. The head node
+is **not** replaced: its user_data is in `ignore_changes`, because re-running
+init would wipe the cluster. Instead `null_resource.config_push`:
+
+1. uploads the rendered `slurm.conf`, `cgroup.conf`, `partitions.json` and
+   `config.json` to the cluster's scripts bucket (`config/` prefix)
+2. runs `scripts/push-config.sh`, which sends `scripts/apply-config.sh` to the
+   head node via **SSM Run Command** — no SSH key needed
+3. `apply-config.sh` backs up the current files to `/opt/slurm/etc/config-backup-<timestamp>/`,
+   writes the new ones, re-runs `generate_conf.py`, rebuilds the
+   `BEGIN/END BURST PARTITIONS` block, restarts `slurmctld` and runs
+   `scontrol reconfigure`. If `slurmctld` won't start, it restores the backup.
+
+The SSM output is printed in the `terraform apply` log. On the very first apply
+the push is skipped (the head node is still initialising and writes the same
+configs itself).
+
+**Caveat:** a push replaces `partitions.json` with Terraform's version, so
+partitions added on the cluster with `manage-partitions.sh` are dropped. Re-add
+them afterwards, or make the change in `partitions.json.tpl` instead.
+`slurmdbd.conf` (database password) and the munge key are never pushed.
 
 ---
 

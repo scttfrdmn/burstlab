@@ -90,14 +90,15 @@ resource "aws_instance" "head_node" {
   # launch template ID. If user_data_replace_on_change = true, updating the
   # launch template (e.g., to install Lustre client) would destroy and recreate
   # the head node, wiping all in-progress cluster state. Config updates
-  # (partitions.json, slurm.conf) are instead applied via the null_resource
-  # SSH deploy that uploads to EFS — no head node recreation needed.
+  # (slurm.conf, cgroup.conf, partitions.json, config.json) are instead applied
+  # by null_resource.config_push in each generation root, which runs
+  # scripts/apply-config.sh on the head node via SSM — no recreation needed.
 
   lifecycle {
     ignore_changes = [
       # Prevent head node recreation when launch template or other config files
-      # embedded in user_data change. The null_resource SSH deploy handles config
-      # updates without requiring a new instance.
+      # embedded in user_data change. null_resource.config_push (generation
+      # root) applies config updates without requiring a new instance.
       user_data_base64,
     ]
   }

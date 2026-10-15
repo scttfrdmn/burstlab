@@ -408,3 +408,60 @@ resource "null_resource" "burst_node_cleanup" {
 
   depends_on = [module.burst_config]
 }
+
+# =============================================================================
+# CONFIG PUSH — apply config changes to a running cluster
+# =============================================================================
+# The head node's user_data is in ignore_changes (re-running init would wipe the
+# cluster), so without this, editing max_burst_nodes, burst_node_instance_type or
+# a config template after the first apply would never reach the cluster.
+#
+# The rendered configs are uploaded to the scripts bucket; whenever they change,
+# push-config.sh runs scripts/apply-config.sh on the head node via SSM Run Command
+# (the head node role has AmazonSSMManagedInstanceCore and s3:GetObject on this
+# bucket — no SSH key needed). On the first apply the push is a no-op: the head
+# node isn't online in SSM yet, and its init writes the same configs.
+#
+# A push replaces partitions.json, dropping partitions added on the cluster with
+# manage-partitions.sh. slurmdbd.conf (DB password) and the munge key are never pushed.
+locals {
+  pushed_configs = {
+    "slurm.conf"      = local.slurm_conf
+    "cgroup.conf"     = local.cgroup_conf
+    "partitions.json" = local.partitions_json
+    "config.json"     = local.plugin_config_json
+  }
+}
+
+resource "aws_s3_object" "config" {
+  for_each = local.pushed_configs
+
+  bucket  = aws_s3_bucket.scripts.id
+  key     = "config/${each.key}"
+  content = each.value
+}
+
+resource "aws_s3_object" "apply_config_script" {
+  bucket  = aws_s3_bucket.scripts.id
+  key     = "apply-config.sh"
+  content = file("${local.scripts_dir}/apply-config.sh")
+}
+
+resource "null_resource" "config_push" {
+  triggers = {
+    config_hash = sha256(join("\n", [for k in sort(keys(local.pushed_configs)) : local.pushed_configs[k]]))
+    script_hash = filesha256("${local.scripts_dir}/apply-config.sh")
+  }
+
+  provisioner "local-exec" {
+    command = "bash ${local.scripts_dir}/push-config.sh"
+    environment = {
+      AWS_PROFILE = var.aws_profile
+      INSTANCE_ID = module.head_node.instance_id
+      REGION      = var.aws_region
+      BUCKET      = aws_s3_bucket.scripts.id
+    }
+  }
+
+  depends_on = [aws_s3_object.config, aws_s3_object.apply_config_script, module.head_node]
+}
