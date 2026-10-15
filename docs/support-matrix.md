@@ -48,7 +48,7 @@ see [prerequisites.md](prerequisites.md).
 | Capability | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 | Gen 6 |
 |------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
 | Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 |
 | FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | ✅ |
 | FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 |
 | Lifecycle 0 — Chain | ✅ | — | — | — | — | — |
@@ -68,6 +68,12 @@ the other recent generations. Note: AL2023 has **native Lustre packages** (insta
 the AWS FSx repo during init), so unlike Gen 3–5 it needs no burstlab-lustre.
 
 ### Notes
+
+**Workloads on Gen 4–6.** Until the Oct 2026 audit (#22), the workloads overlay
+hard-coded the `rocky` SSH user, so it could not run as written on Gen 4/5 (`ubuntu`)
+or Gen 6 (`ec2-user`). The overlay now reads the SSH user from the generation's
+`ssh_user` output. The Gen 4/5 EFS-workload rows are 🧪 until re-run end-to-end on
+the current code; bump them back to ✅ (with date and commit below) once validated.
 
 **FSx Lustre client (Gen 3–5).** AWS does not publish Lustre client packages for
 Rocky 10 or Ubuntu LTS. As of the [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)

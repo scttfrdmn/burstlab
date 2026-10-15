@@ -39,7 +39,7 @@ output "onprem_subnet_cidr" {
 }
 
 output "cloud_subnet_a_id" {
-  description = "Subnet ID for cloud burst subnet A (us-west-2a). Referenced in the burst launch template and partitions.json."
+  description = "Subnet ID for cloud burst subnet A (primary AZ). Referenced in the burst launch template and partitions.json."
   value       = aws_subnet.cloud_a.id
 }
 
@@ -49,7 +49,7 @@ output "cloud_subnet_a_cidr" {
 }
 
 output "cloud_subnet_b_id" {
-  description = "Subnet ID for cloud burst subnet B (us-west-2b). Second AZ improves burst capacity availability."
+  description = "Subnet ID for cloud burst subnet B (AZ b). Second AZ improves burst capacity availability."
   value       = aws_subnet.cloud_b.id
 }
 

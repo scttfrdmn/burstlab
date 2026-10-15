@@ -132,6 +132,8 @@ Jobs without the comment pass through to real `sbatch` unchanged.
 
 **Deploy:**
 ```bash
+cp "$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper/terraform.tfvars.example" \
+   "$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper/terraform.tfvars"   # set gen_state_path, key_path
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" apply
 # Writes /etc/sysconfig/burstlab-workloads, installs fsx-sbatch to /opt/slurm/bin/
@@ -185,6 +187,8 @@ Jobs without the trigger comment run without any overhead.
 
 **Deploy:**
 ```bash
+cp "$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog/terraform.tfvars.example" \
+   "$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog/terraform.tfvars"   # set gen_state_path, key_path
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-prolog-epilog" apply
 # Deploys scripts to /opt/slurm/etc/scripts/
@@ -277,6 +281,8 @@ the AMI with `--with-lua` in the `./configure` step.
 
 **Deploy:**
 ```bash
+cp "$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer/terraform.tfvars.example" \
+   "$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer/terraform.tfvars"   # set gen_state_path, key_path
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-burst-buffer" apply
 # Checks burst_buffer_lua.so is present (fails fast if not)

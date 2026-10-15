@@ -28,7 +28,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -38,6 +38,14 @@ data "terraform_remote_state" "cluster" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   burst_node_role_name = element(split("/", data.terraform_remote_state.cluster.outputs.burst_node_role_arn), 1)
   head_node_role_name  = element(split("/", data.terraform_remote_state.cluster.outputs.head_node_role_arn), 1)
   vpc_id               = data.terraform_remote_state.cluster.outputs.vpc_id
@@ -50,7 +58,7 @@ data "aws_security_group" "burst" {
   vpc_id = local.vpc_id
   filter {
     name   = "tag:Name"
-    values = ["${var.cluster_name}-burst-node-sg"]
+    values = ["${local.cluster_name}-burst-node-sg"]
   }
 }
 
@@ -59,12 +67,12 @@ data "aws_security_group" "burst" {
 # =============================================================================
 
 resource "aws_s3_bucket" "fsx_data" {
-  bucket_prefix = "${var.cluster_name}-fsx-data-"
+  bucket_prefix = "${local.cluster_name}-fsx-data-"
   force_destroy = true
 
   tags = {
     Project     = "burstlab"
-    ClusterName = var.cluster_name
+    ClusterName = local.cluster_name
     Scenario    = "ephemeral-fsx"
   }
 }
@@ -96,12 +104,12 @@ resource "aws_s3_bucket_public_access_block" "fsx_data" {
 # to explicitly clean up when done.
 
 resource "aws_s3_bucket" "fsx_results" {
-  bucket_prefix = "${var.cluster_name}-fsx-results-"
+  bucket_prefix = "${local.cluster_name}-fsx-results-"
   force_destroy = false
 
   tags = {
     Project     = "burstlab"
-    ClusterName = var.cluster_name
+    ClusterName = local.cluster_name
     Scenario    = "ephemeral-fsx"
     Durable     = "true"
   }
@@ -130,13 +138,13 @@ resource "aws_s3_bucket_public_access_block" "fsx_results" {
 
 # Head node needs FSx + S3 permissions because FSx create runs inline on the head node
 resource "aws_iam_role_policy" "head_node_fsx_lifecycle" {
-  name   = "${var.cluster_name}-workloads-fsx-lifecycle"
+  name   = "${local.cluster_name}-workloads-fsx-lifecycle"
   role   = local.head_node_role_name
   policy = aws_iam_role_policy.burst_node_fsx_lifecycle.policy
 }
 
 resource "aws_iam_role_policy" "burst_node_fsx_lifecycle" {
-  name = "${var.cluster_name}-workloads-fsx-lifecycle"
+  name = "${local.cluster_name}-workloads-fsx-lifecycle"
   role = local.burst_node_role_name
 
   policy = jsonencode({

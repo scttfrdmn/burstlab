@@ -5,10 +5,10 @@
 #
 # Topology:
 #   VPC 10.0.0.0/16
-#   ├── management  10.0.0.0/24  (us-west-2a) - head node, public EIP
-#   ├── on-prem     10.0.1.0/24  (us-west-2a) - compute01-04, no public IPs
-#   ├── cloud-a     10.0.2.0/24  (us-west-2a) - burst nodes
-#   └── cloud-b     10.0.3.0/24  (us-west-2b) - burst nodes, second AZ
+#   ├── management  10.0.0.0/24  (AZ a) - head node, public EIP
+#   ├── on-prem     10.0.1.0/24  (AZ a) - compute01-04, no public IPs
+#   ├── cloud-a     10.0.2.0/24  (AZ a) - burst nodes
+#   └── cloud-b     10.0.3.0/24  (AZ b) - burst nodes, second AZ
 #
 # The head node acts as a NAT router for the on-prem and cloud subnets.
 # Routes for 0.0.0.0/0 pointing to the head node ENI are added by the
@@ -103,7 +103,7 @@ resource "aws_subnet" "onprem" {
 }
 
 # -----------------------------------------------------------------------------
-# Cloud burst subnet A - us-west-2a
+# Cloud burst subnet A - AZ a
 # -----------------------------------------------------------------------------
 # Burst nodes launched by the aws-plugin-for-slurm land here (or in subnet B).
 # Keeping burst nodes in the same VPC as the "on-prem" network means Slurm
@@ -124,7 +124,7 @@ resource "aws_subnet" "cloud_a" {
 }
 
 # -----------------------------------------------------------------------------
-# Cloud burst subnet B - us-west-2b
+# Cloud burst subnet B - AZ b
 # -----------------------------------------------------------------------------
 # A second AZ improves capacity availability. EC2 spot and on-demand pools are
 # independent per AZ, so spanning two AZs roughly doubles the chance of getting

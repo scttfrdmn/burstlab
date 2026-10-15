@@ -9,7 +9,7 @@
 #   - AMI: packer build ami/rocky9-slurm2311.pkr.hcl
 #   - Config templates: configs/gen2-slurm2311-rocky9/
 #   - slurm.conf: SlurmctldParameters=idle_on_node_suspend, TaskPlugin=task/cgroup
-#   - cgroup.conf: CgroupPlugin=cgroup/v1 (explicit for Rocky 9 hybrid hierarchy)
+#   - cgroup.conf: CgroupPlugin=cgroup/v2 (Rocky 9 defaults to the unified cgroup v2 hierarchy)
 #   - plugin_config.json: ResumeTimeout/SuspendTime corrected to match slurm.conf
 #
 # After `terraform apply`, SSH to the head node:

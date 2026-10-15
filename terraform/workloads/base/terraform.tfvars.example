@@ -7,8 +7,9 @@
 #   gen_state_path  — path to the generation cluster's terraform.tfstate
 #   key_path        — path to your SSH private key
 #
-# Optional (defaults provided in variables.tf):
-#   aws_region, aws_profile, cluster_name
+# Optional:
+#   aws_profile (default "aws")
+#   aws_region, cluster_name (default: read from the generation's state)
 
 # Path to the deployed generation cluster's state file.
 # Relative to this directory (terraform/workloads/base/).
@@ -20,8 +21,7 @@ key_path = "~/.ssh/burstlab-key.pem"
 # AWS CLI profile. Replace 'aws' with your actual profile name.
 aws_profile = "aws"
 
-# AWS region where the cluster is deployed.
-aws_region = "us-west-2"
-
-# Must match the cluster_name used when deploying the generation cluster.
-cluster_name = "burstlab-gen1"
+# Optional overrides — by default both are read from the generation's state
+# (gen_state_path), so they always match the cluster you point at.
+# aws_region   = "us-west-2"
+# cluster_name = "burstlab-gen1"

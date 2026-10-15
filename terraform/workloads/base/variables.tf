@@ -15,9 +15,9 @@ variable "key_path" {
 }
 
 variable "aws_region" {
-  description = "AWS region where the cluster is deployed."
+  description = "AWS region. Defaults to the generation cluster's region (read from gen_state_path); set only to override."
   type        = string
-  default     = "us-west-2"
+  default     = null
 }
 
 variable "aws_profile" {
@@ -27,7 +27,7 @@ variable "aws_profile" {
 }
 
 variable "cluster_name" {
-  description = "Must match the cluster_name used when deploying the generation cluster."
+  description = "Cluster name. Defaults to the generation cluster's cluster_name (read from gen_state_path); set only to override."
   type        = string
-  default     = "burstlab-gen1"
+  default     = null
 }

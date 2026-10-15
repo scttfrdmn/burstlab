@@ -19,7 +19,7 @@ the Terraform apply is ~5 min (morning of).
 After deploy, run quickstart **Step 5** to confirm the cluster is healthy before the call:
 
 ```bash
-ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" <ssh_user>@<head_node_public_ip>   # rocky (Gen 1–3), ubuntu (Gen 4/5), ec2-user (Gen 6); or: terraform output -raw ssh_command
 bash /opt/slurm/etc/validate-cluster.sh
 ```
 
@@ -47,7 +47,7 @@ scenario. Match the customer's environment:
 **Note:** AWS provides no Lustre client packages for Gen 3–5 (Rocky 10, Ubuntu), so those
 generations install a client from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)
 automatically at boot. The full FSx (Scenario 4) workload has been validated end-to-end
-only on Gen 1 so far. EFS workloads work on all generations. See the
+only on Gen 1 so far, and EFS workloads on Gen 1–3. See the
 [support matrix](support-matrix.md) for authoritative status.
 
 See [generations.md](generations.md) for detailed comparison and [quickstart-ubuntu.md](quickstart-ubuntu.md)
@@ -69,7 +69,7 @@ Run through this in sequence. Each step has a talking point. Adjust the depth ba
 ### 1. Show the Cluster is Running
 
 ```bash
-ssh -i "$SSH_KEY" rocky@<head_node_public_ip>
+ssh -i "$SSH_KEY" <ssh_user>@<head_node_public_ip>
 ```
 
 **Talking point:** "We're SSH'd into the head node — this is where slurmctld runs, the Slurm controller daemon. Think of it as the scheduler brain."

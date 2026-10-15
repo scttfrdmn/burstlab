@@ -36,7 +36,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -54,6 +54,14 @@ data "terraform_remote_state" "cluster" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_ip         = data.terraform_remote_state.cluster.outputs.head_node_public_ip
   head_node_priv_ip    = data.terraform_remote_state.cluster.outputs.head_node_private_ip
   vpc_id               = data.terraform_remote_state.cluster.outputs.vpc_id
@@ -80,12 +88,12 @@ locals {
 # force_destroy=true makes terraform destroy clean without manual emptying.
 
 resource "aws_s3_bucket" "workloads" {
-  bucket_prefix = "${var.cluster_name}-workloads-"
+  bucket_prefix = "${local.cluster_name}-workloads-"
   force_destroy = true
 
   tags = {
     Project     = "burstlab"
-    ClusterName = var.cluster_name
+    ClusterName = local.cluster_name
     Layer       = "workloads-base"
   }
 }
@@ -115,7 +123,7 @@ resource "aws_s3_bucket_public_access_block" "workloads" {
 # Inline policies are scenario-scoped and removed cleanly with terraform destroy.
 
 resource "aws_iam_role_policy" "head_node_workloads_s3" {
-  name = "${var.cluster_name}-workloads-s3"
+  name = "${local.cluster_name}-workloads-s3"
   role = local.head_node_role_name
 
   policy = jsonencode({
@@ -159,25 +167,25 @@ resource "null_resource" "deploy_workload_scripts" {
 
       # Wait for SSH (head node may still be initializing)
       for attempt in $(seq 1 20); do
-        ssh $SSH_OPTS rocky@${local.head_node_ip} "echo ok" >/dev/null 2>&1 && break
+        ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} "echo ok" >/dev/null 2>&1 && break
         echo "  SSH attempt $attempt/20 — waiting 15s..."
         sleep 15
       done
-      ssh $SSH_OPTS rocky@${local.head_node_ip} "echo ok" >/dev/null 2>&1 \
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} "echo ok" >/dev/null 2>&1 \
         || { echo "ERROR: SSH never became available on ${local.head_node_ip}"; exit 1; }
 
       # Create directory structure on EFS
-      ssh $SSH_OPTS rocky@${local.head_node_ip} \
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} \
         "sudo mkdir -p /opt/slurm/etc/workloads/lib /opt/slurm/etc/workloads/jobs/scenario{1,2,3,4} /opt/slurm/etc/workloads/data"
 
       # rsync scripts (preserves directory structure, skips unchanged files)
       rsync -avz --delete \
         -e "ssh $SSH_OPTS" \
         ${local.scripts_dir}/ \
-        rocky@${local.head_node_ip}:/tmp/burstlab-workloads/
+        ${local.ssh_user}@${local.head_node_ip}:/tmp/burstlab-workloads/
 
       # Move from /tmp to EFS location and set permissions
-      ssh $SSH_OPTS rocky@${local.head_node_ip} "
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} "
         sudo cp -r /tmp/burstlab-workloads/. /opt/slurm/etc/workloads/
         sudo find /opt/slurm/etc/workloads -name '*.sh' -exec chmod 755 {} +
         echo 'Scripts deployed to /opt/slurm/etc/workloads/'
@@ -204,8 +212,8 @@ resource "null_resource" "install_transfer_tools" {
     command = <<-EOT
       SSH_OPTS="-i ${var.key_path} -o StrictHostKeyChecking=no"
       echo "=== BurstLab Workloads: installing transfer tools ==="
-      ssh $SSH_OPTS rocky@${local.head_node_ip} \
-        "sudo bash /opt/slurm/etc/workloads/install-transfer-tools.sh ${var.aws_region}" \
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} \
+        "sudo bash /opt/slurm/etc/workloads/install-transfer-tools.sh ${local.aws_region}" \
         && echo "=== Transfer tools installed ==="
     EOT
   }

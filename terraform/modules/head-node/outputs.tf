@@ -13,7 +13,7 @@ output "private_ip" {
 }
 
 output "public_ip" {
-  description = "Public IP address (EIP) of the head node. Use this for SSH access: ssh rocky@<public_ip>"
+  description = "Public IP address (EIP) of the head node. Use this for SSH access: ssh <ssh_user>@<public_ip> (rocky / ubuntu / ec2-user — see the generation root's ssh_user output)"
   value       = aws_eip.head_node.public_ip
 }
 

@@ -4,10 +4,13 @@
 # =============================================================================
 
 locals {
+  # Admin SSH user baked into this generation's AMI (rocky / ubuntu / ec2-user).
+  ssh_user = "ubuntu"
+
   effective_compute_ami = var.compute_node_ami != "" ? var.compute_node_ami : var.head_node_ami
   head_node_private_ip  = var.head_node_static_ip
 
-  # Config templates for Gen 5 (Rocky 10 + Slurm 24.05)
+  # Config templates for Gen 5 (Ubuntu 24.04 + Slurm 24.05)
   config_dir  = "${path.module}/../../../configs/gen5-slurm2405-ubuntu2404"
   scripts_dir = "${path.module}/../../../scripts"
 

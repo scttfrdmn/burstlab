@@ -4,7 +4,7 @@ variable "cluster_name" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for the head node. Must be the output of the BurstLab Packer build (rocky8-slurm2205). This AMI has Slurm 22.05.11, slurmctld, slurmdbd, and all dependencies pre-installed."
+  description = "AMI ID for the head node. Must be the output of the BurstLab Packer build for this generation (ami/*.pkr.hcl), which has Slurm, slurmctld, slurmdbd, and all dependencies pre-installed."
   type        = string
 }
 
@@ -112,7 +112,6 @@ variable "partitions_json" {
 variable "aws_region" {
   description = "AWS region. Written into plugin_config.json and used by the aws-plugin-for-slurm Python scripts."
   type        = string
-  default     = "us-west-2"
 }
 
 variable "static_private_ip" {

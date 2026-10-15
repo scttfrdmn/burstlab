@@ -31,6 +31,8 @@ ssh -i "$SSH_KEY" alice@<head_node_public_ip>
 bash /opt/slurm/etc/workloads/jobs/scenario4/submit-chain.sh
 
 # 4. Optional: deploy a transparent lifecycle approach on top
+cp "$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper/terraform.tfvars.example" \
+   "$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper/terraform.tfvars"   # set gen_state_path, key_path
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" init
 terraform -chdir="$BURSTLAB_ROOT/terraform/workloads/scenario4-wrapper" apply
 # Then: fsx-sbatch /opt/slurm/etc/workloads/jobs/scenario4/wrapper/example-job.sh

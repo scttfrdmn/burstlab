@@ -25,7 +25,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -35,6 +35,14 @@ data "terraform_remote_state" "cluster" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_role_name  = element(split("/", data.terraform_remote_state.cluster.outputs.head_node_role_arn), 1)
   burst_node_role_name = element(split("/", data.terraform_remote_state.cluster.outputs.burst_node_role_arn), 1)
   vpc_id               = data.terraform_remote_state.cluster.outputs.vpc_id
@@ -48,13 +56,13 @@ data "aws_security_group" "efs" {
   vpc_id = local.vpc_id
   filter {
     name   = "tag:Name"
-    values = ["${var.cluster_name}-efs-sg"]
+    values = ["${local.cluster_name}-efs-sg"]
   }
 }
 
 # EFS lifecycle permissions for head node (submits the create/destroy jobs)
 resource "aws_iam_role_policy" "head_node_efs_lifecycle" {
-  name = "${var.cluster_name}-workloads-efs-lifecycle"
+  name = "${local.cluster_name}-workloads-efs-lifecycle"
   role = local.head_node_role_name
 
   policy = jsonencode({
@@ -83,7 +91,7 @@ resource "aws_iam_role_policy" "head_node_efs_lifecycle" {
 
 # EFS lifecycle permissions for burst nodes (execute the create/destroy jobs)
 resource "aws_iam_role_policy" "burst_node_efs_lifecycle" {
-  name = "${var.cluster_name}-workloads-efs-lifecycle"
+  name = "${local.cluster_name}-workloads-efs-lifecycle"
   role = local.burst_node_role_name
 
   policy = jsonencode({

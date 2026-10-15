@@ -1,0 +1,17 @@
+# =============================================================================
+# SCENARIO4-PROLOG-EPILOG — terraform.tfvars example
+# =============================================================================
+# cp terraform.tfvars.example terraform.tfvars
+# Prerequisite: scenario4-ephemeral-fsx/ applied first.
+
+# Point at the generation you deployed (any of gen1 … gen6).
+gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
+
+# SSH private key for the head node (the SSH user comes from the generation's state).
+key_path    = "~/.ssh/burstlab-key.pem"
+aws_profile = "aws"
+
+# Optional overrides — by default both are read from the generation's state
+# (gen_state_path), so they always match the cluster you point at.
+# aws_region   = "us-west-2"
+# cluster_name = "burstlab-gen1"

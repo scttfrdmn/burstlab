@@ -30,7 +30,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -45,6 +45,14 @@ data "terraform_remote_state" "scenario4" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_ip    = data.terraform_remote_state.cluster.outputs.head_node_public_ip
   s3_data_bucket  = data.terraform_remote_state.scenario4.outputs.s3_data_bucket
   burst_subnet_id = data.terraform_remote_state.scenario4.outputs.burst_subnet_id
@@ -63,7 +71,7 @@ resource "null_resource" "check_bb_lua_plugin" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} \
+        ${local.ssh_user}@${local.head_node_ip} \
         "ls /opt/slurm-baked/lib/slurm/burst_buffer_lua.so 2>/dev/null || {
           echo ''
           echo 'ERROR: burst_buffer_lua.so not found in Slurm installation.'
@@ -95,7 +103,7 @@ resource "null_resource" "install_lua" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} \
+        ${local.ssh_user}@${local.head_node_ip} \
         "lua -v 2>/dev/null || sudo dnf install -y lua && echo 'Lua ready'"
     EOT
   }
@@ -115,9 +123,9 @@ resource "null_resource" "write_sysconfig" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} \
+        ${local.ssh_user}@${local.head_node_ip} \
         "sudo tee /etc/sysconfig/burstlab-workloads > /dev/null << 'EOF'
-AWS_REGION=${var.aws_region}
+AWS_REGION=${local.aws_region}
 BURST_SUBNET_ID=${local.burst_subnet_id}
 FSX_SG_ID=${local.fsx_sg_id}
 S3_DATA_BUCKET=${local.s3_data_bucket}
@@ -147,9 +155,9 @@ resource "null_resource" "deploy_burst_buffer" {
         ${local.scripts_dir}/jobs/scenario4/burst-buffer/fsx-bb.lua \
         ${local.scripts_dir}/jobs/scenario4/burst-buffer/burstbuffer.conf \
         ${local.scripts_dir}/jobs/scenario4/burst-buffer/example-job.sh \
-        rocky@${local.head_node_ip}:/tmp/
+        ${local.ssh_user}@${local.head_node_ip}:/tmp/
 
-      $SSH rocky@${local.head_node_ip} "
+      $SSH ${local.ssh_user}@${local.head_node_ip} "
         sudo install -o root -g root -m 0644 /tmp/fsx-bb.lua \
           /opt/slurm/etc/fsx-bb.lua
         sudo install -o root -g root -m 0644 /tmp/burstbuffer.conf \
@@ -175,7 +183,7 @@ resource "null_resource" "patch_slurm_conf" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} << 'ENDSSH'
+        ${local.ssh_user}@${local.head_node_ip} << 'ENDSSH'
         CONF=/opt/slurm/etc/slurm.conf
 
         # Add BurstBufferType if not present

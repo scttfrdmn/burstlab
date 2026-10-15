@@ -25,12 +25,12 @@ variable "burst_node_sg_id" {
 }
 
 variable "cloud_subnet_a_id" {
-  description = "Subnet ID for cloud burst subnet A (us-west-2a). Listed in partitions.json so the plugin can launch burst nodes here."
+  description = "Subnet ID for cloud burst subnet A (primary AZ). Listed in partitions.json so the plugin can launch burst nodes here."
   type        = string
 }
 
 variable "cloud_subnet_b_id" {
-  description = "Subnet ID for cloud burst subnet B (us-west-2b). Second AZ for higher burst capacity availability."
+  description = "Subnet ID for cloud burst subnet B (secondary AZ). Second AZ for higher burst capacity availability."
   type        = string
 }
 
@@ -59,7 +59,6 @@ variable "head_node_private_ip" {
 variable "aws_region" {
   description = "AWS region. Written into the burst node init script for any region-specific AWS CLI calls."
   type        = string
-  default     = "us-west-2"
 }
 
 variable "generation" {
