@@ -29,6 +29,11 @@
 #
 # Requires: root or passwordless sudo. Run on the head node.
 #
+# NOTE: partitions added here live only on the cluster. A later `terraform apply`
+# that changes the rendered configs pushes Terraform's partitions.json
+# (apply-config.sh) and drops them. For a permanent partition, edit
+# configs/<gen>/partitions.json.tpl instead.
+#
 # Examples:
 #   manage-partitions.sh add gpu g5xl g5.xlarge --spot --max-nodes 4
 #   manage-partitions.sh add highmem r7a2xl r7a.2xlarge --max-nodes 2
