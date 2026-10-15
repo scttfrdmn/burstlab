@@ -64,11 +64,11 @@ source "amazon-ebs" "rocky8" {
   # RHEL 8, same package versions, same kernel series (4.18.x), same systemd.
   # For BurstLab purposes it is functionally identical to CentOS 8.
   #
-  # What this means for TCU simulations:
+  # What this means when simulating a CentOS 8 site:
   # - The Slurm 22.05.11 build process is identical
   # - All Slurm directives in slurm.conf are identical
   # - The vault.centos.org repo fix documented in the UserData scripts applies
-  #   to TCU's actual CentOS 8 machines — not needed here since Rocky 8 repos
+  #   to real CentOS 8 machines — not needed here since Rocky 8 repos
   #   are actively maintained (the fix is documented but gated by OS check)
   # - SSH user is "rocky" instead of "centos"
   #
@@ -180,7 +180,7 @@ build {
       # CentOS 8 is no longer published to AWS. Rocky 8 repos are actively
       # maintained — no vault redirect needed.
       #
-      # NOTE for TCU simulations: TCU's actual machines run CentOS 8 and DO
+      # NOTE when simulating a CentOS 8 site: real CentOS 8 machines DO
       # need the vault.centos.org fix. The UserData scripts document and apply
       # that fix when running on CentOS 8 (detected via /etc/os-release).
       #

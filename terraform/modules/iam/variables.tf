@@ -7,3 +7,8 @@ variable "cluster_name" {
 # policy references aws_iam_role.burst_node.arn directly, which is resolved
 # within this module. Both roles are created in this module to avoid any
 # cross-module circular dependency.
+
+variable "generation" {
+  description = "BurstLab generation label (gen1 … gen6). Applied as the Generation tag so resources from different generations in one account can be told apart."
+  type        = string
+}

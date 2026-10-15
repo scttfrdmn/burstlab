@@ -35,7 +35,7 @@ resource "aws_vpc" "main" {
   tags = {
     Name       = "${var.cluster_name}-vpc"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -52,7 +52,7 @@ resource "aws_internet_gateway" "main" {
   tags = {
     Name       = "${var.cluster_name}-igw"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -76,7 +76,7 @@ resource "aws_subnet" "management" {
   tags = {
     Name       = "${var.cluster_name}-mgmt-subnet"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "management"
   }
@@ -96,7 +96,7 @@ resource "aws_subnet" "onprem" {
   tags = {
     Name       = "${var.cluster_name}-onprem-subnet"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "onprem-compute"
   }
@@ -117,7 +117,7 @@ resource "aws_subnet" "cloud_a" {
   tags = {
     Name       = "${var.cluster_name}-cloud-a-subnet"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "cloud-burst"
   }
@@ -138,7 +138,7 @@ resource "aws_subnet" "cloud_b" {
   tags = {
     Name       = "${var.cluster_name}-cloud-b-subnet"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "cloud-burst"
   }
@@ -164,7 +164,7 @@ resource "aws_route_table" "management" {
   tags = {
     Name       = "${var.cluster_name}-mgmt-rtb"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -189,7 +189,7 @@ resource "aws_route_table" "onprem" {
   tags = {
     Name       = "${var.cluster_name}-onprem-rtb"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -214,7 +214,7 @@ resource "aws_route_table" "cloud" {
   tags = {
     Name       = "${var.cluster_name}-cloud-rtb"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -274,7 +274,7 @@ resource "aws_security_group" "head_node" {
   tags = {
     Name       = "${var.cluster_name}-head-node-sg"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -309,7 +309,7 @@ resource "aws_security_group" "compute_node" {
   tags = {
     Name       = "${var.cluster_name}-compute-node-sg"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -344,7 +344,7 @@ resource "aws_security_group" "burst_node" {
   tags = {
     Name       = "${var.cluster_name}-burst-node-sg"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -379,7 +379,7 @@ resource "aws_security_group" "efs" {
   tags = {
     Name       = "${var.cluster_name}-efs-sg"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }

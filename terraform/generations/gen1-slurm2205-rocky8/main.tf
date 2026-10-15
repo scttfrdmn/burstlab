@@ -107,6 +107,7 @@ module "vpc" {
   source = "../../modules/vpc"
 
   cluster_name = var.cluster_name
+  generation   = "gen1"
 
   # CIDR blocks follow the architecture spec:
   #   10.0.0.0/16  — VPC
@@ -132,6 +133,7 @@ module "iam" {
   source = "../../modules/iam"
 
   cluster_name = var.cluster_name
+  generation   = "gen1"
   # Both IAM roles (head node and burst node) are created in the same module.
   # The head node PassRole policy references the burst node role ARN directly
   # via aws_iam_role.burst_node.arn within the module — no cross-module cycle.
@@ -199,6 +201,7 @@ module "shared_storage" {
   source = "../../modules/shared-storage"
 
   cluster_name         = var.cluster_name
+  generation           = "gen1"
   vpc_id               = module.vpc.vpc_id
   efs_sg_id            = module.vpc.efs_sg_id
   management_subnet_id = module.vpc.management_subnet_id
@@ -229,12 +232,13 @@ resource "time_sleep" "efs_dns" {
 module "head_node" {
   source = "../../modules/head-node"
 
-  cluster_name         = var.cluster_name
-  ami_id               = var.head_node_ami
-  instance_type        = var.head_node_instance_type
-  key_name             = var.key_name
-  subnet_id            = module.vpc.management_subnet_id
-  sg_id                = module.vpc.head_node_sg_id
+  cluster_name          = var.cluster_name
+  generation            = "gen1"
+  ami_id                = var.head_node_ami
+  instance_type         = var.head_node_instance_type
+  key_name              = var.key_name
+  subnet_id             = module.vpc.management_subnet_id
+  sg_id                 = module.vpc.head_node_sg_id
   instance_profile_name = module.iam.head_node_instance_profile_name
 
   # Static private IP — must match local.head_node_private_ip (var.head_node_static_ip).
@@ -329,6 +333,7 @@ module "compute_nodes" {
   source = "../../modules/compute-nodes"
 
   cluster_name       = var.cluster_name
+  generation         = "gen1"
   ami_id             = local.effective_compute_ami
   instance_type      = var.compute_node_instance_type
   key_name           = var.key_name

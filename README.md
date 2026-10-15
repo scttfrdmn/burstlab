@@ -23,7 +23,7 @@ VPC 10.0.0.0/16
 Head node  (m7a.2xlarge):     slurmctld + slurmdbd + munge + NAT (iptables masquerade)
 Compute nodes (m7a.2xlarge × 4):  slurmd, private only, internet via head node NAT
 Burst nodes (m7a.2xlarge):    launched by Plugin v2 via EC2 CreateFleet, same NAT path
-EFS:  /u (user homes) and /opt/slurm (Slurm binaries + config) shared across all nodes
+EFS:  /home (user homes) and /opt/slurm (Slurm binaries + config) shared across all nodes
 ```
 
 The head node is the cluster's NAT gateway — on-prem compute and burst nodes route all outbound traffic through it. This mirrors real on-prem HPC environments where compute nodes live on isolated private networks with no direct internet access.
@@ -294,7 +294,7 @@ for a full comparison of the three transparent lifecycle approaches.
 
 ## Alternative IaC: CDK (Go, experimental)
 
-The primary, fully-supported implementation is **Terraform** (all five
+The primary, fully-supported implementation is **Terraform** (all six
 generations + the workloads overlay). For teams that prefer a CDK /
 CloudFormation workflow, `cdk/` provides an **experimental AWS CDK (Go)**
 implementation that currently covers **Gen 1 only** and does not include the
@@ -362,5 +362,5 @@ BurstLab is intentionally structured for extension:
 
 - **New Slurm version**: Copy `configs/gen1-slurm2205-rocky8/` to a new directory, update the config templates, add a Packer template, add a Terraform generation module.
 - **New OS**: Swap the Packer source AMI and update the repo-fix steps in the init scripts.
-- **New instance type**: Change instance types in `terraform.tfvars` and update the CPU/memory values in `partitions.json.tpl` and `slurm.conf.tpl` to match.
+- **New instance type**: Change instance types in `terraform.tfvars` and update the CPU/memory values (and `DefMemPerCPU`) in `partitions.json.tpl` and `slurm.conf.tpl` to match.
 - **Spot instances**: Set `"PurchasingOption": "spot"` in `partitions.json.tpl` and add a `SpotOptions` block with your interruption strategy.

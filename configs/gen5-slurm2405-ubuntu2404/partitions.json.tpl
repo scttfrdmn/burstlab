@@ -1,5 +1,5 @@
 {
-  "_comment": "AWS Plugin for Slurm v2 — partitions.json for BurstLab Gen 3",
+  "_comment": "AWS Plugin for Slurm v2 — partitions.json for BurstLab Gen 5",
   "_comment2": "IMPORTANT: PartitionName and NodeGroupName must match ^[a-zA-Z0-9]+$ (no hyphens/underscores). Node names will be: {PartitionName}-{NodeGroupName}-{index} => aws-burst-0 through aws-burst-N",
 
   "Partitions": [
@@ -39,7 +39,7 @@
 
           "Tags": [
             { "Key": "Project",    "Value": "burstlab" },
-            { "Key": "Generation", "Value": "gen3" },
+            { "Key": "Generation", "Value": "gen5" },
             { "Key": "Cluster",    "Value": "${cluster_name}" }
           ]
         }

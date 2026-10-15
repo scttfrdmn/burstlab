@@ -1,5 +1,5 @@
 {
-  "_comment": "AWS Plugin for Slurm v2 — config.json for BurstLab Gen 2",
+  "_comment": "AWS Plugin for Slurm v2 — config.json for BurstLab Gen 4",
   "_comment2": "SlurmConf values MUST match slurm.conf exactly. common.py validates them on startup.",
 
   "LogLevel": "INFO",

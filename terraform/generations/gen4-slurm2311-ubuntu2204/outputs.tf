@@ -1,6 +1,6 @@
 # =============================================================================
-# ROOT MODULE OUTPUTS — BurstLab Gen 2
-# Generation: gen2-slurm2311-rocky9
+# ROOT MODULE OUTPUTS — BurstLab Gen 4
+# Generation: gen4-slurm2311-ubuntu2204
 # =============================================================================
 # These outputs are printed after `terraform apply` and accessible via
 # `terraform output`. They provide the essential connection and reference
@@ -67,7 +67,7 @@ output "burst_launch_template_id" {
 # -----------------------------------------------------------------------------
 
 output "vpc_id" {
-  description = "VPC ID for the BurstLab Gen 2 cluster."
+  description = "VPC ID for the BurstLab Gen 4 cluster."
   value       = module.vpc.vpc_id
 }
 

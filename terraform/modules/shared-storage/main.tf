@@ -47,7 +47,7 @@ resource "aws_efs_file_system" "main" {
   tags = {
     Name       = "${var.cluster_name}-efs"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -105,7 +105,7 @@ resource "aws_efs_access_point" "home" {
   tags = {
     Name       = "${var.cluster_name}-efs-home"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Export     = "/home"
   }
@@ -136,7 +136,7 @@ resource "aws_efs_access_point" "slurm" {
   tags = {
     Name       = "${var.cluster_name}-efs-slurm"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Export     = "/opt/slurm"
   }

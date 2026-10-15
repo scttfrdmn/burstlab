@@ -63,7 +63,6 @@ variable "aws_region" {
 }
 
 variable "generation" {
-  description = "BurstLab generation label (gen1, gen2, gen3). Applied to EC2 resource tags so burst nodes from different generations can be identified and cleaned up independently."
+  description = "BurstLab generation label (gen1 … gen6). Applied as the Generation tag so resources from different generations in one account can be told apart."
   type        = string
-  default     = "gen1"
 }

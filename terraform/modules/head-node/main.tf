@@ -52,7 +52,7 @@ resource "aws_instance" "head_node" {
     tags = {
       Name       = "${var.cluster_name}-head-node-root"
       Project    = "burstlab"
-      Generation = "gen1"
+      Generation = var.generation
       ManagedBy  = "terraform"
     }
   }
@@ -105,7 +105,7 @@ resource "aws_instance" "head_node" {
   tags = {
     Name       = "${var.cluster_name}-head-node"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "head-node"
   }
@@ -125,7 +125,7 @@ resource "aws_eip" "head_node" {
   tags = {
     Name       = "${var.cluster_name}-head-node-eip"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }

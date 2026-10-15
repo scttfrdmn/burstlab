@@ -88,6 +88,7 @@ ConstrainSwapSpace=no
 ```ini
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core_Memory
+DefMemPerCPU=3875
 ```
 
 **SelectType=select/cons_tres** (Consumable Resources with Trackable RESources) is the scheduler's resource allocation plugin. With `cons_tres`, Slurm tracks individual cores, memory, and other resources (GPUs, network) as consumable — once allocated to a job, they are not available to other jobs until released.
@@ -97,6 +98,8 @@ The alternative, `select/linear`, allocates entire nodes at a time. Linear was c
 **Why this matters for cloud bursting:** Plugin v2 uses the node's resource specs (`CPUs`, `RealMemory`, `Gres`) from `slurm.conf` to size EC2 instances correctly. `cons_tres` with `CR_Core_Memory` ensures that both CPU and memory are tracked, which in turn ensures `RealMemory` values in node definitions are enforced. This affects which jobs get scheduled to burst nodes and how many jobs pack onto a single burst instance.
 
 **Why it matters for cloud billing:** A mismatched `SelectType` or wrong `SelectTypeParameters` can cause jobs to over-allocate burst nodes. If `SelectTypeParameters=CR_Core` (no memory tracking), a job requesting 4 CPUs and 8GB on a 4-CPU burst node could still run even if another job already consumed 7GB of that node's memory — you end up with OOM kills on expensive burst instances.
+
+**DefMemPerCPU — the default memory request:** Once memory is a consumable resource, every job needs a memory request. If a job omits `--mem` / `--mem-per-cpu` and no default is configured, Slurm allocates it **all** of the node's `RealMemory`. A one-core job then occupies an entire 8-CPU node, a second small job can't share it, and on the `aws` partition each such job triggers its own burst instance ("why did four one-core jobs launch four EC2 instances?"). `DefMemPerCPU=3875` (`RealMemory` 31000 ÷ 8 CPUs) gives each requested core a proportional share, so eight one-core jobs pack onto one node. Users can still override it with `--mem`. If you change instance types, update this value along with `CPUs` and `RealMemory`. Every generation sets it the same way.
 
 **Config drift on SelectType:** A common misconfiguration is `SelectType` set differently between the head node and login node configs. This is a silent divergence — slurm.conf accepts `SelectType` mismatches across node types without logging an obvious error, but the scheduler's behavior becomes undefined. `cons_tres` with `CR_Core_Memory` must be identical on every node.
 

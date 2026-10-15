@@ -64,7 +64,7 @@ Burst nodes × up to 10 (launched automatically when jobs need them)
 ```
 
 All nodes share two EFS-mounted filesystems:
-- `/u` — home directories (alice's files live here)
+- `/home` — home directories (alice's files live here)
 - `/opt/slurm` — Slurm binaries, configs, and plugins
 
 ---
@@ -309,8 +309,8 @@ Expected output (all green):
   [PASS] slurmctld is running
 
 === EFS Mounts ===
-  [PASS] /u is mounted
-  [PASS] /u is NFS/EFS type
+  [PASS] /home is mounted
+  [PASS] /home is NFS/EFS type
   [PASS] /opt/slurm is mounted
   [PASS] /opt/slurm is NFS/EFS type
 

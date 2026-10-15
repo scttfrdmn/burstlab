@@ -11,7 +11,7 @@
 #   - slurm.conf: SlurmctldParameters=idle_on_node_suspend, TaskPlugin=task/cgroup
 #   - cgroup.conf: CgroupPlugin=cgroup/v2 (Ubuntu 22.04 uses cgroup v2 exclusively)
 #   - SSH user: ubuntu (not rocky)
-#   - FSx Lustre: BLOCKED (AWS repo has no Ubuntu packages, like Gen 3/Rocky 10)
+#   - FSx Lustre: client installed at boot from burstlab-lustre (AWS publishes no Ubuntu packages)
 #
 # After `terraform apply`, SSH to the head node:
 #   ssh -i ~/.ssh/<key>.pem ubuntu@$(terraform output -raw head_node_public_ip)
@@ -81,6 +81,7 @@ module "vpc" {
   source = "../../modules/vpc"
 
   cluster_name           = var.cluster_name
+  generation             = "gen4"
   vpc_cidr               = "10.0.0.0/16"
   management_subnet_cidr = "10.0.0.0/24"
   onprem_subnet_cidr     = "10.0.1.0/24"
@@ -97,6 +98,7 @@ module "iam" {
   source = "../../modules/iam"
 
   cluster_name = var.cluster_name
+  generation   = "gen4"
 }
 
 # =============================================================================
@@ -155,6 +157,7 @@ module "shared_storage" {
   source = "../../modules/shared-storage"
 
   cluster_name         = var.cluster_name
+  generation           = "gen4"
   vpc_id               = module.vpc.vpc_id
   efs_sg_id            = module.vpc.efs_sg_id
   management_subnet_id = module.vpc.management_subnet_id
@@ -174,6 +177,7 @@ module "head_node" {
   source = "../../modules/head-node"
 
   cluster_name          = var.cluster_name
+  generation            = "gen4"
   ami_id                = var.head_node_ami
   instance_type         = var.head_node_instance_type
   key_name              = var.key_name
@@ -226,7 +230,7 @@ module "burst_config" {
   efs_dns_name         = module.shared_storage.efs_dns_name
   head_node_private_ip = local.head_node_private_ip
   aws_region           = var.aws_region
-  generation           = "gen2"
+  generation           = "gen4"
 }
 
 # =============================================================================
@@ -236,6 +240,7 @@ module "compute_nodes" {
   source = "../../modules/compute-nodes"
 
   cluster_name       = var.cluster_name
+  generation         = "gen4"
   ami_id             = local.effective_compute_ami
   instance_type      = var.compute_node_instance_type
   key_name           = var.key_name
@@ -275,7 +280,7 @@ resource "null_resource" "burst_node_cleanup" {
   provisioner "local-exec" {
     when    = destroy
     command = <<-EOT
-      echo "=== BurstLab Gen 2: terminating burst nodes before destroy ==="
+      echo "=== BurstLab Gen 4: terminating burst nodes before destroy ==="
       INSTANCE_IDS=$(AWS_PROFILE="${self.triggers.aws_profile}" aws ec2 describe-instances \
         --region "${self.triggers.aws_region}" \
         --filters \

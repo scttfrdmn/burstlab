@@ -62,3 +62,8 @@ variable "onprem_cidr" {
   description = "CIDR block of the on-prem compute subnet (e.g. 10.0.1.0/24). Used in the compute node init script to populate /etc/hosts entries for all compute nodes using cidrhost() so they can resolve each other by short name."
   type        = string
 }
+
+variable "generation" {
+  description = "BurstLab generation label (gen1 … gen6). Applied as the Generation tag so resources from different generations in one account can be told apart."
+  type        = string
+}
