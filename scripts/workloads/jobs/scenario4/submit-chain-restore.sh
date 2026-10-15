@@ -15,6 +15,7 @@
 # Usage:
 #   bash submit-chain-restore.sh <RUN_ID>
 #   bash submit-chain-restore.sh --run <RUN_ID>
+#   bash submit-chain-restore.sh --run <RUN_ID> --keep   # leave the FSx up after verify
 #   bash submit-chain-restore.sh \
 #     --s3-data-bucket <BUCKET> --s3-prefix <PREFIX>
 #
@@ -38,6 +39,7 @@ S3_DATA_BUCKET="${S3_DATA_BUCKET:-}"
 S3_PREFIX="${S3_PREFIX:-}"
 PARTITION="${PARTITION:-aws}"
 FSX_STORAGE_GB="${FSX_STORAGE_GB:-1200}"
+KEEP=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --s3-prefix)      S3_PREFIX="$2";      shift 2 ;;
     --partition)      PARTITION="$2";      shift 2 ;;
     --fsx-storage-gb) FSX_STORAGE_GB="$2"; shift 2 ;;
+    --keep)           KEEP=true;           shift   ;;
     -*)               echo "Unknown option: $1"; exit 1 ;;
     *)                RUN_ID="$1";         shift   ;;  # positional arg = run ID
   esac
@@ -177,7 +180,12 @@ echo "Job 1 (verify restore): ${JOB1}"
 
 # -----------------------------------------------------------------------------
 # Job 2: Destroy FSx (afterok: verify — no flush needed, data already in S3)
+# Skipped with --keep; the FSx then bills until destroyed with the command printed.
 # -----------------------------------------------------------------------------
+if [ "$KEEP" = true ]; then
+  echo "Job 2 (destroy FSx):    skipped (--keep). The FSx stays up and bills until destroyed:"
+  echo "  sbatch --partition=local --export=\"${EXPORT_VARS}\" ${SCRIPT_DIR}/job3-destroy-fsx.sh"
+else
 JOB2=$(sbatch --parsable \
   --job-name=fsx-destroy \
   --partition=local \
@@ -187,6 +195,7 @@ JOB2=$(sbatch --parsable \
   --export="${EXPORT_VARS}" \
   "${SCRIPT_DIR}/job3-destroy-fsx.sh")
 echo "Job 2 (destroy FSx):    ${JOB2}"
+fi
 
 echo ""
 echo "=== Restore chain submitted. Monitor with: ==="

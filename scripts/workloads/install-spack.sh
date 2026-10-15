@@ -41,21 +41,31 @@ echo "Directories created: ${SPACK_ROOT}, ${MODULES_ROOT}"
 
 # -----------------------------------------------------------------------------
 # 2. Install Lmod
-# Lmod provides `module load/unload/avail`. Install via EPEL if available,
-# fall back to direct install from GitHub releases.
+# Lmod provides `module load/unload/avail`. Install from the distro (apt on
+# Ubuntu, EPEL on Rocky); fall back to a source build from GitHub releases.
 # -----------------------------------------------------------------------------
 if command -v module &>/dev/null; then
   echo "Lmod already available."
 else
   echo "Installing Lmod..."
-  # Try EPEL first (available on Rocky 8/9/10)
-  dnf install -y epel-release 2>/dev/null || true
-  dnf install -y Lmod 2>/dev/null && LMOD_INSTALLED=true || LMOD_INSTALLED=false
+  if command -v apt-get &>/dev/null; then
+    # Ubuntu (Gen 4/5): lmod is in universe and pulls in lua + lua-posix.
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y lmod && LMOD_INSTALLED=true || LMOD_INSTALLED=false
+  else
+    # Rocky: EPEL (available on Rocky 8/9/10; absent on AL2023 → source build)
+    dnf install -y epel-release 2>/dev/null || true
+    dnf install -y Lmod 2>/dev/null && LMOD_INSTALLED=true || LMOD_INSTALLED=false
+  fi
 
   if [ "$LMOD_INSTALLED" = "false" ]; then
     # Fallback: install Lua dependencies and Lmod from source
-    echo "EPEL Lmod install failed — installing from source..."
-    dnf install -y lua lua-devel lua-posix tcl 2>/dev/null || true
+    echo "Package Lmod install failed — installing from source..."
+    if command -v apt-get &>/dev/null; then
+      DEBIAN_FRONTEND=noninteractive apt-get install -y lua5.3 liblua5.3-dev lua-posix tcl 2>/dev/null || true
+    else
+      dnf install -y lua lua-devel lua-posix tcl 2>/dev/null || true
+    fi
 
     LMOD_VERSION="8.7.37"
     curl -fsSL "https://github.com/TACC/Lmod/archive/refs/tags/${LMOD_VERSION}.tar.gz" \

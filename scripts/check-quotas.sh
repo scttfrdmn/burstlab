@@ -45,48 +45,21 @@ done
 
 # --- vCPU lookup table (Standard family: A, C, D, H, I, M, R, T, Z) ---------
 # Add instance types as needed. Values are vCPU count.
-declare -A VCPU_MAP
-VCPU_MAP["m7a.large"]=2
-VCPU_MAP["m7a.xlarge"]=4
-VCPU_MAP["m7a.2xlarge"]=8
-VCPU_MAP["m7a.4xlarge"]=16
-VCPU_MAP["m7a.8xlarge"]=32
-VCPU_MAP["m6a.large"]=2
-VCPU_MAP["m6a.xlarge"]=4
-VCPU_MAP["m6a.2xlarge"]=8
-VCPU_MAP["m6a.4xlarge"]=16
-VCPU_MAP["m6i.large"]=2
-VCPU_MAP["m6i.xlarge"]=4
-VCPU_MAP["m6i.2xlarge"]=8
-VCPU_MAP["m6i.4xlarge"]=16
-VCPU_MAP["m5.large"]=2
-VCPU_MAP["m5.xlarge"]=4
-VCPU_MAP["m5.2xlarge"]=8
-VCPU_MAP["m5.4xlarge"]=16
-VCPU_MAP["c6i.large"]=2
-VCPU_MAP["c6i.xlarge"]=4
-VCPU_MAP["c6i.2xlarge"]=8
-VCPU_MAP["c7i.large"]=2
-VCPU_MAP["c7i.xlarge"]=4
-VCPU_MAP["c7i.2xlarge"]=8
-VCPU_MAP["r6i.large"]=2
-VCPU_MAP["r6i.xlarge"]=4
-VCPU_MAP["r6i.2xlarge"]=8
-VCPU_MAP["r7a.large"]=2
-VCPU_MAP["r7a.xlarge"]=4
-VCPU_MAP["r7a.2xlarge"]=8
-VCPU_MAP["t3.micro"]=2
-VCPU_MAP["t3.small"]=2
-VCPU_MAP["t3.medium"]=2
-VCPU_MAP["t3.large"]=2
-VCPU_MAP["t3.xlarge"]=4
-VCPU_MAP["t3.2xlarge"]=8
-VCPU_MAP["t3a.micro"]=2
-VCPU_MAP["t3a.small"]=2
-VCPU_MAP["t3a.medium"]=2
-VCPU_MAP["t3a.large"]=2
-VCPU_MAP["t3a.xlarge"]=4
-VCPU_MAP["t3a.2xlarge"]=8
+# A case lookup rather than an associative array: macOS ships bash 3.2, which has
+# no `declare -A`, and this script runs on the developer workstation.
+vcpus_for() {
+  case "$1" in
+    m7a.large|m6a.large|m6i.large|m5.large|c6i.large|c7i.large|r6i.large|r7a.large|\
+    t3.micro|t3.small|t3.medium|t3.large|t3a.micro|t3a.small|t3a.medium|t3a.large) echo 2 ;;
+    m7a.xlarge|m6a.xlarge|m6i.xlarge|m5.xlarge|c6i.xlarge|c7i.xlarge|r6i.xlarge|\
+    r7a.xlarge|t3.xlarge|t3a.xlarge) echo 4 ;;
+    m7a.2xlarge|m6a.2xlarge|m6i.2xlarge|m5.2xlarge|c6i.2xlarge|c7i.2xlarge|\
+    r6i.2xlarge|r7a.2xlarge|t3.2xlarge|t3a.2xlarge) echo 8 ;;
+    m7a.4xlarge|m6a.4xlarge|m6i.4xlarge|m5.4xlarge) echo 16 ;;
+    m7a.8xlarge) echo 32 ;;
+    *) return 1 ;;
+  esac
+}
 
 # --- BurstLab requirements ---------------------------------------------------
 # Derived from the per-generation Terraform defaults. Keep these in sync with
@@ -141,8 +114,8 @@ RUNNING_TYPES=$(
 VCPU_INUSE=0
 for itype in $RUNNING_TYPES; do
   # Look up vCPU count; fall back to querying EC2 API for unknown types
-  if [[ -n "${VCPU_MAP[$itype]+x}" ]]; then
-    VCPU_INUSE=$((VCPU_INUSE + VCPU_MAP[$itype]))
+  if itype_vcpus=$(vcpus_for "$itype"); then
+    VCPU_INUSE=$((VCPU_INUSE + itype_vcpus))
   else
     VCPUS=$(
       $AWS_CMD ec2 describe-instance-types \
@@ -203,13 +176,10 @@ else
   elif [[ "$VPC_AVAILABLE" -ge 1 ]]; then
     _warn "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE"
     _note "Can deploy $VPC_AVAILABLE generation(s) at a time. Deploy sequentially (destroy before next)."
-    if [[ "$VPC_AVAILABLE" -lt 1 ]]; then
-      _note "Consider requesting a VPC limit increase:"
-      _note "  aws service-quotas request-service-quota-increase --service-code vpc --quota-code L-F678F1CE --desired-value 10"
-    fi
   else
     _fail "VPCs per region:           quota=$VPC_QUOTA  in-use=$VPC_COUNT  available=$VPC_AVAILABLE"
-    _note "No VPC capacity remaining. Delete an existing VPC or request a quota increase."
+    _note "No VPC capacity remaining. Delete an existing VPC or request a quota increase:"
+    _note "  aws service-quotas request-service-quota-increase --service-code vpc --quota-code L-F678F1CE --desired-value 10"
   fi
 fi
 

@@ -39,14 +39,15 @@ else
   echo "rclone already installed: $(rclone version | head -1)"
 fi
 
-# Configure rclone for AWS (uses instance profile — no credentials needed)
+# Configure rclone for AWS (uses instance profile — no credentials needed).
+# Unquoted heredoc so the deployment's region is written, not a literal us-west-2.
 mkdir -p /root/.config/rclone
-cat > /root/.config/rclone/rclone.conf << 'EOF'
+cat > /root/.config/rclone/rclone.conf << EOF
 [aws]
 type = s3
 provider = AWS
 env_auth = true
-region = us-west-2
+region = ${AWS_REGION}
 acl = private
 server_side_encryption = AES256
 EOF
@@ -78,12 +79,15 @@ fi
 # -----------------------------------------------------------------------------
 if ! command -v mount-s3 &>/dev/null; then
   echo "Installing AWS Mountpoint for S3..."
-  if [ "$ARCH" = "x86_64" ]; then
-    MP_URL="https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.rpm"
+  MP_ARCH=$([ "$ARCH" = "x86_64" ] && echo x86_64 || echo arm64)
+  if command -v apt-get &>/dev/null; then
+    # Ubuntu (Gen 4/5): Mountpoint publishes a .deb alongside the .rpm.
+    curl -fsSL "https://s3.amazonaws.com/mountpoint-s3-release/latest/${MP_ARCH}/mount-s3.deb" -o /tmp/mount-s3.deb \
+      && apt-get install -y /tmp/mount-s3.deb && rm -f /tmp/mount-s3.deb
   else
-    MP_URL="https://s3.amazonaws.com/mountpoint-s3-release/latest/aarch64/mount-s3.rpm"
-  fi
-  dnf install -y "$MP_URL" 2>/dev/null || {
+    MP_URL="https://s3.amazonaws.com/mountpoint-s3-release/latest/$([ "$ARCH" = "x86_64" ] && echo x86_64 || echo aarch64)/mount-s3.rpm"
+    dnf install -y "$MP_URL"
+  fi 2>/dev/null || {
     echo "RPM install failed, trying direct binary..."
     curl -fsSL "https://s3.amazonaws.com/mountpoint-s3-release/latest/${ARCH}/mount-s3" \
       -o /usr/local/bin/mount-s3

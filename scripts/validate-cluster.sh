@@ -145,8 +145,9 @@ else
 fi
 
 # Check change_state.py cron is installed for slurm user.
-# The cron spool file is root-owned so we use sudo (rocky has passwordless sudo).
-if sudo grep -q "change_state.py" /var/spool/cron/slurm 2>/dev/null; then
+# Ask crontab rather than reading the spool file: the path differs by distro
+# (/var/spool/cron/slurm on RHEL/AL2023, /var/spool/cron/crontabs/slurm on Ubuntu).
+if sudo crontab -u slurm -l 2>/dev/null | grep -q "change_state.py"; then
   _pass "change_state.py cron is installed for slurm user"
 else
   _fail "change_state.py cron NOT found for slurm user"

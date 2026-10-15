@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "${RUN_ID}" ]; then
-  echo "Usage: fsx-restore <RUN_ID>"
+  echo "Usage: fsx-restore <RUN_ID> [--keep]"
   echo ""
   echo "Re-creates FSx scratch from a previous run's S3 data."
   echo "Use 'fsx-list' to see available runs."
@@ -52,4 +52,5 @@ fi
 
 # Delegate to the restore chain script
 RESTORE_ARGS=("--run" "${RUN_ID}" "--partition" "${PARTITION}")
+[ "${AUTO_DESTROY}" = true ] || RESTORE_ARGS+=("--keep")
 exec bash "${WORKLOAD_DIR}/submit-chain-restore.sh" "${RESTORE_ARGS[@]}"

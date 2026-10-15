@@ -156,6 +156,7 @@ resource "aws_iam_role" "head_node" {
 #   ec2:CreateTags         - tag newly launched burst nodes with their Slurm NodeName
 #   ec2:DescribeInstances  - check instance status after launch / during power-save
 #   ec2:DescribeInstanceStatus - verify instance is running before Slurm marks it UP
+#   ec2:DescribeInstanceTypes - manage-partitions.sh sizes new partitions (vCPU, memory)
 #   ec2:ModifyInstanceAttribute - may be needed to adjust instance settings post-launch
 #   iam:CreateServiceLinkedRole - EC2 Fleet requires the AWSServiceRoleForEC2Fleet SLR;
 #                                 this lets Terraform / the plugin create it on first use
@@ -173,10 +174,11 @@ data "aws_iam_policy_document" "head_node_permissions" {
       "ec2:CreateTags",
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceStatus",
+      "ec2:DescribeInstanceTypes",
       "ec2:ModifyInstanceAttribute",
     ]
     resources = ["*"]
-    # Note: DescribeInstances/DescribeInstanceStatus don't support resource-level
+    # Note: the Describe* actions don't support resource-level
     # restrictions. CreateFleet/RunInstances restrictions would require specifying
     # AMI and subnet ARNs - kept as * here for lab simplicity.
   }

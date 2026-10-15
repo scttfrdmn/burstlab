@@ -56,7 +56,14 @@ chmod 440 /etc/sudoers.d/alice-mount
 # Rocky 8/9: Use AWS FSx Lustre client repo (available for el8/el9).
 # Rocky 10: Use burstlab-lustre GitHub release (AWS repo has no el10 packages).
 # Ubuntu: Use burstlab-lustre GitHub release (AWS repo has no Ubuntu packages).
-if [ "$OS_FAMILY" = "rhel" ]; then
+# AL2023: Use the AL2023 repos (native lustre-client package).
+if [ "$OS_ID" = "amzn" ]; then
+  # Amazon Linux 2023 (Gen 6): lustre-client is in the AL2023 repos. Neither
+  # burstlab-lustre nor the AWS FSx el repo applies (it has no el/2023 path).
+  echo "Installing Lustre client from the AL2023 repos..."
+  dnf install -y lustre-client || echo "[WARN] lustre-client install failed — FSx Lustre unavailable on this node (EFS unaffected)."
+  modprobe lustre || echo "[WARN] modprobe lustre failed on kernel $(uname -r) — FSx Lustre unavailable on this node."
+elif [ "$OS_FAMILY" = "rhel" ]; then
   OS_MAJOR=$(. /etc/os-release && echo "$${VERSION_ID%%.*}")
   if [ "$OS_MAJOR" = "10" ]; then
     # Rocky 10: Install from burstlab-lustre GitHub release
@@ -75,23 +82,25 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 REPOEOF
-    dnf install -y kmod-lustre-client lustre-client 2>/dev/null || true
+    dnf install -y kmod-lustre-client lustre-client || echo "[WARN] Lustre client install from the AWS FSx repo failed — FSx Lustre unavailable on this node (EFS unaffected)."
   fi
 else
   # Ubuntu: Install from burstlab-lustre GitHub release
   . /etc/os-release
   if [ "$VERSION_ID" = "22.04" ]; then
     echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 22.04)..."
+    LUSTRE_KVER="6.8.0-1053-aws"   # the module deb is built for exactly this kernel
     curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.8.0-1053-aws_2.17.53-1_amd64.deb
     curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2204_2.17.53-1_amd64.deb
     apt-get install -y ./*.deb && rm -f *.deb
-    modprobe lustre && echo "Lustre 2.17.53 loaded successfully"
+    modprobe lustre && echo "Lustre 2.17.53 loaded successfully" || echo "[WARN] modprobe lustre failed: the module deb targets kernel $LUSTRE_KVER but this node runs $(uname -r). FSx Lustre is unavailable until they match; EFS is unaffected."
   elif [ "$VERSION_ID" = "24.04" ]; then
     echo "Installing Lustre 2.17.53 from burstlab-lustre (Ubuntu 24.04)..."
+    LUSTRE_KVER="6.17.0-1013-aws"   # the module deb is built for exactly this kernel
     curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-modules-6.17.0-1013-aws_2.17.53-1_amd64.deb
     curl -sLO https://github.com/scttfrdmn/burstlab-lustre/releases/download/v1.0.0/lustre-client-utils-ubuntu2404_2.17.53-1_amd64.deb
     apt-get install -y ./*.deb && rm -f *.deb
-    modprobe lustre && echo "Lustre 2.17.53 loaded successfully"
+    modprobe lustre && echo "Lustre 2.17.53 loaded successfully" || echo "[WARN] modprobe lustre failed: the module deb targets kernel $LUSTRE_KVER but this node runs $(uname -r). FSx Lustre is unavailable until they match; EFS is unaffected."
   else
     echo "WARNING: Ubuntu $VERSION_ID not supported. FSx Lustre unavailable. EFS workloads unaffected."
   fi

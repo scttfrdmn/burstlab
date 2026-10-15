@@ -65,7 +65,7 @@ resource "null_resource" "write_sysconfig" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
         ${local.ssh_user}@${local.head_node_ip} << 'ENDSSH'
-        sudo touch /etc/sysconfig/burstlab-workloads
+        sudo mkdir -p /etc/sysconfig && sudo touch /etc/sysconfig/burstlab-workloads
         grep -q '^AWS_REGION=' /etc/sysconfig/burstlab-workloads || \
           echo "AWS_REGION=${local.aws_region}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^BURST_SUBNET_ID=' /etc/sysconfig/burstlab-workloads || \

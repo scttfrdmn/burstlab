@@ -13,9 +13,11 @@
 #
 # Options for 'add':
 #   --spot              Use Spot instances (default: on-demand)
-#   --max-nodes N       Max burst nodes for this partition (default: 8)
-#   --cpus N            CPUs per node (default: from instance type, or 8)
-#   --memory MB         RealMemory in MB (default: 31000)
+#   --max-nodes N       Max burst nodes for this partition (default: 10)
+#   --cpus N            CPUs per node (default: the instance type's vCPU count)
+#   --memory MB         RealMemory in MB (default: ~95% of the instance type's
+#                       memory, rounded down to 1000 — 32 GiB → 31000, matching
+#                       the generation templates; the rest is OS headroom)
 #   --max-time HH:MM:SS Max job time (default: 4:00:00)
 #
 # Node naming: {partition}-{nodegroup}-{index}
@@ -29,7 +31,7 @@
 #
 # Examples:
 #   manage-partitions.sh add gpu g5xl g5.xlarge --spot --max-nodes 4
-#   manage-partitions.sh add highmem mem r7a2xl r7a.2xlarge --max-nodes 2
+#   manage-partitions.sh add highmem r7a2xl r7a.2xlarge --max-nodes 2
 #   manage-partitions.sh remove gpu
 #   manage-partitions.sh list
 # =============================================================================
@@ -38,8 +40,10 @@ set -uo pipefail
 export SLURM_CONF=/opt/slurm/etc/slurm.conf
 PLUGIN_DIR=/opt/slurm/etc/aws
 SLURM_BIN=/opt/slurm/bin
-# Must use Python 3.8 wrapper — boto3 is installed there (not in system Python 3.6)
-PYTHON3=/usr/local/bin/python3
+# Gen 1 (Rocky 8) needs the /usr/local/bin/python3 wrapper — boto3 is installed for
+# Python 3.8 there, not the system Python 3.6. Gen 2+ AMIs deliberately don't create
+# that wrapper; their system python3 has boto3.
+if [ -x /usr/local/bin/python3 ]; then PYTHON3=/usr/local/bin/python3; else PYTHON3=/usr/bin/python3; fi
 
 _die() { echo "ERROR: $1" >&2; exit 1; }
 
@@ -187,9 +191,9 @@ cmd_add() {
 
   # Parse options
   SPOT=false
-  MAX_NODES=8
-  CPUS=8
-  MEMORY=31000
+  MAX_NODES=10
+  CPUS=""
+  MEMORY=""
   MAX_TIME="4:00:00"
 
   while [ $# -gt 0 ]; do
@@ -213,15 +217,33 @@ print('yes' if '$PARTITION' in names else 'no')
 ")
   [ "$EXISTING" = "no" ] || _die "Partition '$PARTITION' already exists. Remove it first."
 
-  # Read launch template and subnets from first existing partition (reuse infra)
-  read -r LT_ID SUBNET_A SUBNET_B REGION <<< "$($PYTHON3 -c "
+  # Size nodes from the instance type unless --cpus/--memory were given. Declaring
+  # more CPUs or memory than the hardware has makes slurmd register with less and
+  # Slurm marks the node INVALID/drained.
+  if [ -z "$CPUS" ] || [ -z "$MEMORY" ]; then
+    read -r TYPE_CPUS TYPE_MEMORY <<< "$($PYTHON3 -c "
+import json, boto3
+region = json.load(open('$PLUGIN_DIR/partitions.json'))['Partitions'][0]['NodeGroups'][0]['Region']
+it = boto3.client('ec2', region_name=region).describe_instance_types(InstanceTypes=['$INSTANCE_TYPE'])['InstanceTypes'][0]
+print(it['VCpuInfo']['DefaultVCpus'], it['MemoryInfo']['SizeInMiB'] * 95 // 100 // 1000 * 1000)
+" 2>/dev/null)"
+    [ -n "${TYPE_CPUS:-}" ] || _die "Could not look up $INSTANCE_TYPE (ec2:DescribeInstanceTypes). Check the name, or pass --cpus N --memory MB."
+    CPUS="${CPUS:-$TYPE_CPUS}"
+    MEMORY="${MEMORY:-$TYPE_MEMORY}"
+  fi
+
+  # Read launch template, subnets and identity tags from the first existing partition
+  # (reuse infra). The Cluster tag is what cleanup-burst-nodes.sh filters on.
+  read -r LT_ID SUBNET_A SUBNET_B REGION CLUSTER_TAG GENERATION_TAG <<< "$($PYTHON3 -c "
 import json
 data = json.load(open('$PLUGIN_DIR/partitions.json'))
 ng = data['Partitions'][0]['NodeGroups'][0]
 lt = ng['LaunchTemplateSpecification']['LaunchTemplateId']
 subnets = ng['SubnetIds']
 region = ng['Region']
-print(lt, subnets[0], subnets[1] if len(subnets) > 1 else subnets[0], region)
+tags = {t['Key']: t['Value'] for t in ng.get('Tags', [])}
+print(lt, subnets[0], subnets[1] if len(subnets) > 1 else subnets[0], region,
+      tags.get('Cluster', 'unknown'), tags.get('Generation', 'unknown'))
 ")"
 
   echo "Adding partition '$PARTITION' (nodegroup '$NODEGROUP'):"
@@ -284,6 +306,8 @@ new_partition = {
 
             "Tags": [
                 { "Key": "Project",    "Value": "burstlab" },
+                { "Key": "Generation", "Value": "$GENERATION_TAG" },
+                { "Key": "Cluster",    "Value": "$CLUSTER_TAG" },
                 { "Key": "Partition",  "Value": "$PARTITION" }
             ]
         }
