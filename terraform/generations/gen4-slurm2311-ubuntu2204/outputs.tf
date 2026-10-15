@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 output "head_node_public_ip" {
-  description = "Public IP (EIP) of the head node. SSH with: ssh -i ~/.ssh/<key>.pem rocky@<this_ip>"
+  description = "Public IP (EIP) of the head node. SSH with: ssh -i ~/.ssh/<key>.pem ubuntu@<this_ip>"
   value       = module.head_node.public_ip
 }
 
@@ -121,5 +121,31 @@ output "munge_key_b64" {
 
 output "ssh_command" {
   description = "Ready-to-use SSH command for connecting to the head node."
-  value       = "ssh -i ~/.ssh/${var.key_name}.pem rocky@${module.head_node.public_ip}"
+  value       = "ssh -i ~/.ssh/${var.key_name}.pem ${local.ssh_user}@${module.head_node.public_ip}"
+}
+
+# -----------------------------------------------------------------------------
+# Cluster identity — read by the workloads overlay (terraform_remote_state) and
+# the helper scripts (terraform output), so nothing downstream hard-codes the
+# generation's SSH user, cluster name, or region.
+# -----------------------------------------------------------------------------
+
+output "ssh_user" {
+  description = "Admin SSH user for this generation's AMI (ubuntu)."
+  value       = local.ssh_user
+}
+
+output "cluster_name" {
+  description = "Cluster name used to name and tag every resource."
+  value       = var.cluster_name
+}
+
+output "aws_region" {
+  description = "AWS region the cluster is deployed in."
+  value       = var.aws_region
+}
+
+output "generation" {
+  description = "BurstLab generation label (Generation tag value)."
+  value       = "gen4"
 }

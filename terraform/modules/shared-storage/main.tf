@@ -14,9 +14,9 @@
 #   /slurm → mounted as /opt/slurm on all nodes  (Slurm install + config)
 #
 # Two mount targets (one per AZ):
-#   - us-west-2a covers management, onprem, and cloud-a subnets
+#   - AZ a covers management, onprem, and cloud-a subnets
 #     (EFS allows one target per AZ; VPC routing handles all three subnets)
-#   - us-west-2b covers cloud-b subnet for multi-AZ burst nodes
+#   - AZ b covers cloud-b subnet for multi-AZ burst nodes
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -60,8 +60,8 @@ resource "aws_efs_file_system" "main" {
 # Instances connect to the mount target's DNS name, which resolves to the
 # correct mount target IP for the instance's AZ.
 
-# us-west-2a — covers management, onprem, and cloud-a subnets.
-# EFS allows only one mount target per AZ. All three subnets in us-west-2a
+# AZ a — covers management, onprem, and cloud-a subnets.
+# EFS allows only one mount target per AZ. All three subnets in AZ a
 # (management 10.0.0.0/24, onprem 10.0.1.0/24, cloud-a 10.0.2.0/24) reach
 # EFS via this single mount target; VPC routing handles intra-AZ delivery.
 resource "aws_efs_mount_target" "management" {
@@ -70,7 +70,7 @@ resource "aws_efs_mount_target" "management" {
   security_groups = [var.efs_sg_id]
 }
 
-# us-west-2b — burst nodes launched in cloud-b subnet use this mount target.
+# AZ b — burst nodes launched in cloud-b subnet use this mount target.
 resource "aws_efs_mount_target" "cloud_b" {
   file_system_id  = aws_efs_file_system.main.id
   subnet_id       = var.cloud_subnet_b_id

@@ -1,6 +1,6 @@
 # =============================================================================
 # slurmdbd.conf — BurstLab Gen 4
-# Slurm 23.11.x / Rocky Linux 9
+# Slurm 23.11.x / Ubuntu 22.04 LTS
 #
 # No structural changes from Gen 1. slurmdbd.conf format is stable across
 # Slurm 22.05, 23.11, and 24.05.

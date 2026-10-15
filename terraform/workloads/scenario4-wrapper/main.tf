@@ -21,7 +21,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -36,6 +36,14 @@ data "terraform_remote_state" "scenario4" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_ip     = data.terraform_remote_state.cluster.outputs.head_node_public_ip
   s3_data_bucket   = data.terraform_remote_state.scenario4.outputs.s3_data_bucket
   s3_results_bucket = data.terraform_remote_state.scenario4.outputs.s3_results_bucket
@@ -58,10 +66,10 @@ resource "null_resource" "write_sysconfig" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} << 'ENDSSH'
+        ${local.ssh_user}@${local.head_node_ip} << 'ENDSSH'
         sudo touch /etc/sysconfig/burstlab-workloads
         grep -q '^AWS_REGION=' /etc/sysconfig/burstlab-workloads || \
-          echo "AWS_REGION=${var.aws_region}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
+          echo "AWS_REGION=${local.aws_region}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^BURST_SUBNET_ID=' /etc/sysconfig/burstlab-workloads || \
           echo "BURST_SUBNET_ID=${local.burst_subnet_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^FSX_SG_ID=' /etc/sysconfig/burstlab-workloads || \
@@ -100,9 +108,9 @@ resource "null_resource" "deploy_fsx_commands" {
         ${local.scripts_dir}/jobs/scenario4/fsx-purge \
         ${local.scripts_dir}/jobs/scenario4/fsx-restore \
         ${local.scripts_dir}/jobs/scenario4/wrapper/example-job.sh \
-        rocky@${local.head_node_ip}:/tmp/
+        ${local.ssh_user}@${local.head_node_ip}:/tmp/
 
-      $SSH rocky@${local.head_node_ip} "
+      $SSH ${local.ssh_user}@${local.head_node_ip} "
         sudo install -o root -g root -m 0755 /tmp/fsx-sbatch  /opt/slurm/bin/fsx-sbatch
         sudo install -o root -g root -m 0755 /tmp/fsx-list    /opt/slurm/bin/fsx-list
         sudo install -o root -g root -m 0755 /tmp/fsx-purge   /opt/slurm/bin/fsx-purge

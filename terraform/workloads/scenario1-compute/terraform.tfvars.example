@@ -1,5 +1,9 @@
+# Point at the generation you deployed (any of gen1 … gen6).
 gen_state_path = "../../generations/gen1-slurm2205-rocky8/terraform.tfstate"
 key_path       = "~/.ssh/burstlab-key.pem"
 aws_profile    = "aws"
-aws_region     = "us-west-2"
-cluster_name   = "burstlab-gen1"
+
+# Optional overrides — by default both are read from the generation's state
+# (gen_state_path), so they always match the cluster you point at.
+# aws_region   = "us-west-2"
+# cluster_name = "burstlab-gen1"

@@ -9,8 +9,9 @@ variable "key_path" {
 }
 
 variable "aws_region" {
-  type    = string
-  default = "us-west-2"
+  description = "AWS region. Defaults to the generation cluster's region (read from gen_state_path); set only to override."
+  type        = string
+  default     = null
 }
 
 variable "aws_profile" {
@@ -19,6 +20,7 @@ variable "aws_profile" {
 }
 
 variable "cluster_name" {
-  type    = string
-  default = "burstlab-gen1"
+  description = "Cluster name. Defaults to the generation cluster's cluster_name (read from gen_state_path); set only to override."
+  type        = string
+  default     = null
 }

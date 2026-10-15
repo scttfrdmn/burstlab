@@ -18,7 +18,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -33,6 +33,14 @@ data "terraform_remote_state" "scenario3" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_ip      = data.terraform_remote_state.cluster.outputs.head_node_public_ip
   burst_subnet_id   = data.terraform_remote_state.scenario3.outputs.burst_subnet_id
   # Also get cloud_subnet_a_id for EFS — burst nodes can land in either AZ,
@@ -57,11 +65,11 @@ resource "null_resource" "write_sysconfig" {
   provisioner "local-exec" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-        rocky@${local.head_node_ip} << 'ENDSSH'
+        ${local.ssh_user}@${local.head_node_ip} << 'ENDSSH'
         # Idempotently add EFS vars to sysconfig (preserve existing FSx vars)
         sudo touch /etc/sysconfig/burstlab-workloads
         grep -q '^AWS_REGION=' /etc/sysconfig/burstlab-workloads || \
-          echo "AWS_REGION=${var.aws_region}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
+          echo "AWS_REGION=${local.aws_region}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^BURST_SUBNET_ID=' /etc/sysconfig/burstlab-workloads || \
           echo "BURST_SUBNET_ID=${local.burst_subnet_id}" | sudo tee -a /etc/sysconfig/burstlab-workloads > /dev/null
         grep -q '^EFS_SG_ID=' /etc/sysconfig/burstlab-workloads || \
@@ -97,9 +105,9 @@ resource "null_resource" "deploy_efs_commands" {
         ${local.scripts_dir}/jobs/scenario3/wrapper/efs-sbatch \
         ${local.scripts_dir}/jobs/scenario3/efs-cleanup \
         ${local.scripts_dir}/jobs/scenario3/wrapper/example-job.sh \
-        rocky@${local.head_node_ip}:/tmp/
+        ${local.ssh_user}@${local.head_node_ip}:/tmp/
 
-      $SSH rocky@${local.head_node_ip} "
+      $SSH ${local.ssh_user}@${local.head_node_ip} "
         sudo install -o root -g root -m 0755 /tmp/efs-sbatch  /opt/slurm/bin/efs-sbatch
         sudo install -o root -g root -m 0755 /tmp/efs-cleanup /opt/slurm/bin/efs-cleanup
         sudo mkdir -p /opt/slurm/etc/workloads/jobs/scenario3/wrapper

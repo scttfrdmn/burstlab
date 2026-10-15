@@ -19,7 +19,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -29,17 +29,25 @@ data "terraform_remote_state" "cluster" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   burst_node_role_name = element(split("/", data.terraform_remote_state.cluster.outputs.burst_node_role_arn), 1)
 }
 
 # Results bucket for job output
 resource "aws_s3_bucket" "results" {
-  bucket_prefix = "${var.cluster_name}-roda-results-"
+  bucket_prefix = "${local.cluster_name}-roda-results-"
   force_destroy = true
 
   tags = {
     Project     = "burstlab"
-    ClusterName = var.cluster_name
+    ClusterName = local.cluster_name
     Scenario    = "roda"
   }
 }
@@ -63,7 +71,7 @@ resource "aws_s3_bucket_public_access_block" "results" {
 
 # Grant burst nodes read access to the RODA dataset bucket
 resource "aws_iam_role_policy" "burst_node_roda_read" {
-  name = "${var.cluster_name}-workloads-roda-read"
+  name = "${local.cluster_name}-workloads-roda-read"
   role = local.burst_node_role_name
 
   policy = jsonencode({

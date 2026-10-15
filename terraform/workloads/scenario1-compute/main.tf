@@ -22,7 +22,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region
+  region  = local.aws_region
   profile = var.aws_profile
 }
 
@@ -32,6 +32,14 @@ data "terraform_remote_state" "cluster" {
 }
 
 locals {
+  # Cluster identity comes from the generation's outputs so the overlay works on
+  # every generation (SSH user rocky / ubuntu / ec2-user). The try() fallbacks keep
+  # generation states applied before these outputs existed working on Gen 1–3;
+  # re-apply the generation root (outputs-only change) to pick them up.
+  ssh_user     = try(data.terraform_remote_state.cluster.outputs.ssh_user, "rocky")
+  aws_region   = coalesce(var.aws_region, try(data.terraform_remote_state.cluster.outputs.aws_region, null))
+  cluster_name = coalesce(var.cluster_name, try(data.terraform_remote_state.cluster.outputs.cluster_name, null))
+
   head_node_ip = data.terraform_remote_state.cluster.outputs.head_node_public_ip
   scripts_dir  = "${path.module}/../../../scripts/workloads"
 }
@@ -47,7 +55,7 @@ resource "null_resource" "install_spack" {
     command = <<-EOT
       SSH_OPTS="-i ${var.key_path} -o StrictHostKeyChecking=no"
       echo "=== Installing Spack + Lmod (this takes 10-15 minutes) ==="
-      ssh $SSH_OPTS rocky@${local.head_node_ip} \
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} \
         "sudo bash /opt/slurm/etc/workloads/install-spack.sh" \
         && echo "=== Spack installed ==="
     EOT
@@ -65,7 +73,7 @@ resource "null_resource" "install_gromacs" {
     command = <<-EOT
       SSH_OPTS="-i ${var.key_path} -o StrictHostKeyChecking=no"
       echo "=== Installing GROMACS via Spack binary cache ==="
-      ssh $SSH_OPTS rocky@${local.head_node_ip} \
+      ssh $SSH_OPTS ${local.ssh_user}@${local.head_node_ip} \
         "sudo bash /opt/slurm/etc/workloads/install-gromacs.sh" \
         && echo "=== GROMACS installed ==="
     EOT

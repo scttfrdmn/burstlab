@@ -13,24 +13,29 @@
 #   - After terraform destroy   (cleanup of missed nodes)
 #   - Any time nodes are stuck  (e.g., failed demo runs)
 #
-# Usage (from repo root or any directory):
+# Usage (from a generation directory, any other directory, or the head node):
 #   AWS_PROFILE=aws bash scripts/cleanup-burst-nodes.sh [--cluster NAME] [--region REGION] [--dry-run]
 #
 # Options:
-#   --cluster NAME    Cluster name prefix (default: burstlab-gen1)
-#   --region REGION   AWS region (default: us-west-2)
+#   --cluster NAME    Cluster name (Cluster tag). Default: `terraform output cluster_name`
+#                     in a generation directory, else the Cluster tag in
+#                     /opt/slurm/etc/aws/partitions.json on the head node.
+#   --region REGION   AWS region. Default: $AWS_REGION, $AWS_DEFAULT_REGION, then the
+#                     same terraform-output / partitions.json lookup.
 #   --dry-run         Show what would be terminated without doing it
 #
-# If HEAD_NODE_IP is set, also resets down/failed burst nodes in Slurm:
+# If HEAD_NODE_IP is set, also resets down/failed burst nodes in Slurm
+# (SSH_USER defaults to `terraform output ssh_user`: rocky / ubuntu / ec2-user):
 #   HEAD_NODE_IP=x.x.x.x AWS_PROFILE=aws bash scripts/cleanup-burst-nodes.sh
 # =============================================================================
 
 set -uo pipefail
 
-CLUSTER="${CLUSTER:-burstlab-gen1}"
-REGION="${AWS_DEFAULT_REGION:-us-west-2}"
+CLUSTER="${CLUSTER:-}"
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
 DRY_RUN=false
 HEAD_NODE_IP="${HEAD_NODE_IP:-}"
+SSH_USER="${SSH_USER:-}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -44,6 +49,29 @@ done
 
 _info() { echo ">>> $1"; }
 _warn() { echo "[WARN] $1"; }
+
+# Read a value from `terraform output` when run from a generation directory.
+_tf_out() { [ -f main.tf ] && command -v terraform >/dev/null 2>&1 && terraform output -raw "$1" 2>/dev/null; }
+# Read the Cluster tag / Region from the plugin config when run on the head node.
+_plugin_cfg() {
+  [ -f /opt/slurm/etc/aws/partitions.json ] && python3 -c "
+import json, sys
+ng = json.load(open('/opt/slurm/etc/aws/partitions.json'))['Partitions'][0]['NodeGroups'][0]
+print(ng['Region'] if sys.argv[1] == 'region' else
+      next(t['Value'] for t in ng.get('Tags', []) if t['Key'] == 'Cluster'))
+" "$1" 2>/dev/null
+}
+
+# Resolve cluster identity: flags/env win, then terraform output, then plugin config.
+# Never fall back to a guessed default — scanning the wrong cluster or region would
+# report "no instances" and look like success.
+: "${CLUSTER:=$(_tf_out cluster_name)}"
+: "${CLUSTER:=$(_plugin_cfg cluster)}"
+: "${REGION:=$(_tf_out aws_region)}"
+: "${REGION:=$(_plugin_cfg region)}"
+: "${SSH_USER:=$(_tf_out ssh_user)}"
+[ -n "$CLUSTER" ] || { echo "ERROR: cluster name unknown. Run from a generation directory or pass --cluster NAME." >&2; exit 1; }
+[ -n "$REGION" ]  || { echo "ERROR: region unknown. Set AWS_REGION or pass --region REGION." >&2; exit 1; }
 
 # Require AWS CLI
 command -v aws >/dev/null 2>&1 || { echo "ERROR: aws CLI not found"; exit 1; }
@@ -96,8 +124,9 @@ fi
 # If we have access to the head node, also reset any down/failed burst nodes in Slurm
 if [ -n "$HEAD_NODE_IP" ]; then
   KEY="${KEY:-~/.ssh/burstlab-key.pem}"
+  [ -n "$SSH_USER" ] || { echo "ERROR: SSH_USER unknown (rocky / ubuntu / ec2-user). Set SSH_USER or run from a generation directory." >&2; exit 1; }
   _info "Resetting failed/down burst nodes in Slurm on $HEAD_NODE_IP..."
-  ssh -i "$KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "rocky@$HEAD_NODE_IP" "
+  ssh -i "$KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$SSH_USER@$HEAD_NODE_IP" "
     SLURM_CONF=/opt/slurm/etc/slurm.conf
     export SLURM_CONF
     SBIN=/opt/slurm/bin

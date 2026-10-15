@@ -224,7 +224,7 @@ Each is an independently deployable cluster matching a specific customer environ
 the specific OS and Slurm version. Most HPC teams struggling with cloud bursting today are on
 Rocky 8 with Slurm 22.05.
 
-**FSx Lustre on Gen 3-5:** AWS doesn't provide Lustre packages for Rocky 10 or Ubuntu LTS versions. Install Lustre clients from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) to enable FSx support on Gen 3, Gen 4, and Gen 5 clusters. EFS workloads work on all generations without additional setup.
+**FSx Lustre on Gen 3-5:** AWS doesn't provide Lustre packages for Rocky 10 or Ubuntu LTS versions, so the node init scripts install a client from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre) automatically at boot. Which workloads are validated on which generation varies — see the [support matrix](docs/support-matrix.md).
 
 See [docs/generations.md](docs/generations.md) for detailed comparison, decision tables, and
 architectural differences between generations. See [docs/quickstart-ubuntu.md](docs/quickstart-ubuntu.md) for

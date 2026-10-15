@@ -16,7 +16,7 @@ variable "aws_profile" {
 }
 
 variable "cluster_name" {
-  description = "Name prefix applied to every resource. Use 'burstlab-gen6' to distinguish from Gen 1 and Gen 2 deployments in the same account."
+  description = "Name prefix applied to every resource. Use 'burstlab-gen6' to distinguish from the other generations' deployments in the same account."
   type        = string
   default     = "burstlab-gen6"
 }

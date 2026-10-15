@@ -14,12 +14,12 @@ variable "efs_sg_id" {
 }
 
 variable "management_subnet_id" {
-  description = "Subnet ID for the management subnet (us-west-2a). One EFS mount target here serves all us-west-2a subnets (management, onprem, cloud-a)."
+  description = "Subnet ID for the management subnet (primary AZ). One EFS mount target here serves all primary-AZ subnets (management, onprem, cloud-a)."
   type        = string
 }
 
 variable "cloud_subnet_b_id" {
-  description = "Subnet ID for cloud burst subnet B (us-west-2b). Mount target here serves burst nodes launched in AZ-B."
+  description = "Subnet ID for cloud burst subnet B (secondary AZ). Mount target here serves burst nodes launched in AZ-B."
   type        = string
 }
 
