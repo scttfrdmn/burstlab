@@ -362,5 +362,5 @@ BurstLab is intentionally structured for extension:
 
 - **New Slurm version**: Copy `configs/gen1-slurm2205-rocky8/` to a new directory, update the config templates, add a Packer template, add a Terraform generation module.
 - **New OS**: Swap the Packer source AMI and update the repo-fix steps in the init scripts.
-- **New instance type**: Change instance types in `terraform.tfvars` and update the CPU/memory values in `partitions.json.tpl` and `slurm.conf.tpl` to match.
+- **New instance type**: Change instance types in `terraform.tfvars` and update the CPU/memory values (and `DefMemPerCPU`) in `partitions.json.tpl` and `slurm.conf.tpl` to match.
 - **Spot instances**: Set `"PurchasingOption": "spot"` in `partitions.json.tpl` and add a `SpotOptions` block with your interruption strategy.

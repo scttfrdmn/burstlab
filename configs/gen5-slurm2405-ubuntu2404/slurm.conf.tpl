@@ -29,7 +29,7 @@ MpiDefault=none
 
 # --- Process & Task Tracking -------------------------------------------------
 ProctrackType=proctrack/cgroup
-# Rocky 10 uses cgroup v2 only. task/cgroup in Slurm 24.05 uses the cgroup/v2
+# Ubuntu 24.04 uses cgroup v2 only. task/cgroup in Slurm 24.05 uses the cgroup/v2
 # plugin configured in cgroup.conf. task/affinity removed — redundant with cgroup.
 TaskPlugin=task/cgroup
 
@@ -37,6 +37,13 @@ TaskPlugin=task/cgroup
 SchedulerType=sched/backfill
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core_Memory
+# DefMemPerCPU: with memory consumable (CR_Core_Memory), a job that doesn't pass
+# --mem / --mem-per-cpu is otherwise allocated ALL of the node's RealMemory, so
+# `sbatch -c 1` occupies a whole node — and on the aws partition every such job
+# launches its own EC2 instance. 3875 = RealMemory 31000 / CPUs 8, so a node's
+# full core count fits exactly. Keep in sync with the NodeName / partitions.json
+# CPUs and RealMemory if you change instance types. Jobs can still override with --mem.
+DefMemPerCPU=3875
 
 # --- Controller Parameters ---------------------------------------------------
 # idle_on_node_suspend: powered-down cloud nodes show as IDLE (not IDLE~) in sinfo.

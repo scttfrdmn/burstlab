@@ -38,8 +38,15 @@ TaskPlugin=task/affinity,task/cgroup
 SchedulerType=sched/backfill
 SelectType=select/cons_tres
 # CR_Core_Memory: allocates by core AND memory. Prevents over-subscription.
-# TCU had SelectType mismatched between nodes — this must be identical everywhere.
+# A common on-prem failure is SelectType mismatched between nodes — this must be identical everywhere.
 SelectTypeParameters=CR_Core_Memory
+# DefMemPerCPU: with memory consumable (CR_Core_Memory), a job that doesn't pass
+# --mem / --mem-per-cpu is otherwise allocated ALL of the node's RealMemory, so
+# `sbatch -c 1` occupies a whole node — and on the aws partition every such job
+# launches its own EC2 instance. 3875 = RealMemory 31000 / CPUs 8, so a node's
+# full core count fits exactly. Keep in sync with the NodeName / partitions.json
+# CPUs and RealMemory if you change instance types. Jobs can still override with --mem.
+DefMemPerCPU=3875
 
 # --- Accounting --------------------------------------------------------------
 # slurmdbd is required by Plugin v2 for node state tracking.
