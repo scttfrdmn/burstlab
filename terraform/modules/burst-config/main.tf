@@ -44,7 +44,7 @@ resource "aws_launch_template" "burst" {
   #   http://169.254.169.254/latest/meta-data/tags/instance/Name
   #
   # WHY this matters: aws-plugin-for-slurm sets the EC2 Name tag to the Slurm
-  # node name (e.g., "cloud-burst-0") when launching burst nodes. The burst
+  # node name (e.g., "aws-burst-0") when launching burst nodes. The burst
   # node's init script reads this tag from IMDS to set its hostname and to
   # tell slurmd what NodeName to register with slurmctld.
   #

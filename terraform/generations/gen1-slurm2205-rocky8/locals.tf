@@ -132,7 +132,7 @@ locals {
   # IMPORTANT naming rules:
   #   PartitionName and NodeGroupName must be ALPHANUMERIC ONLY.
   #   The plugin constructs burst node names as: {PartitionName}-{NodeGroupName}-{N}
-  #   Example: "cloud" + "burst" → "cloud-burst-0", "cloud-burst-1", ...
+  #   Example: "aws" + "burst" → "aws-burst-0", "aws-burst-1", ...
   #   Hyphens in the partition or group name would break this convention.
   partitions_json = templatefile("${local.config_dir}/partitions.json.tpl", {
     # partition_name and node_group_name are hard-coded in the template as

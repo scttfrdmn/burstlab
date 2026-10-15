@@ -294,7 +294,7 @@ for a full comparison of the three transparent lifecycle approaches.
 
 ## Alternative IaC: CDK (Go, experimental)
 
-The primary, fully-supported implementation is **Terraform** (all five
+The primary, fully-supported implementation is **Terraform** (all six
 generations + the workloads overlay). For teams that prefer a CDK /
 CloudFormation workflow, `cdk/` provides an **experimental AWS CDK (Go)**
 implementation that currently covers **Gen 1 only** and does not include the

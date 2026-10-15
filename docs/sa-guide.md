@@ -27,10 +27,9 @@ You should see all PASSes. Fix any failures before the meeting. A non-functional
 
 ### Choose the Right Generation
 
-Five core cluster generations are built and validated for cloud bursting; a sixth
-(Gen 6, Amazon Linux 2023 + Slurm 25.11, matching AWS ParallelCluster/PCS) is authored
-but not yet built or deployed. Workload and storage-lifecycle validation varies by
-generation — consult the [support matrix](support-matrix.md) before promising a specific
+All six core cluster generations are built and validated for cloud bursting, including
+Gen 6 (Amazon Linux 2023 + Slurm 25.11, matching AWS ParallelCluster/PCS). Workload and
+storage-lifecycle validation varies by generation — consult the [support matrix](support-matrix.md) before promising a specific
 scenario. Match the customer's environment:
 
 | Customer Environment | Use | Why |
@@ -43,7 +42,7 @@ scenario. Match the customer's environment:
 | Not sure / first contact (RHEL) | **Gen 1** | Covers largest RHEL installed base |
 | Not sure / first contact (Ubuntu) | **Gen 4** | Covers largest Ubuntu installed base |
 | CentOS 7 or older RHEL | **Gen 1** as reference | Note OS differences; Slurm/Plugin config identical |
-| AWS ParallelCluster 3.15.x or AWS PCS — Slurm 25.11 | **Gen 6** | Matches AL2023 + Slurm 25.11 (authored, not yet validated — see support matrix) |
+| AWS ParallelCluster 3.15.x or AWS PCS — Slurm 25.11 | **Gen 6** | Matches AL2023 + Slurm 25.11; core + bursting validated, workloads not yet — see support matrix |
 
 **Note:** AWS provides no Lustre client packages for Gen 3–5 (Rocky 10, Ubuntu), so those
 generations install a client from [burstlab-lustre](https://github.com/scttfrdmn/burstlab-lustre)

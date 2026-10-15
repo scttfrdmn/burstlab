@@ -3,7 +3,7 @@
 # burst-node-init.sh — BurstLab Gen 1 burst node cloud-init
 #
 # This script runs on EC2 instances launched by Plugin v2 (resume.py).
-# The instance is named cloud-burst-N by resume.py (via EC2 Name tag).
+# The instance is named aws-burst-N by resume.py (via EC2 Name tag).
 # IMDS tag access (InstanceMetadataTags=enabled) is set in the launch template.
 #
 # What this script does:
@@ -109,7 +109,7 @@ iptables -P OUTPUT ACCEPT 2>/dev/null || true
 # -----------------------------------------------------------------------------
 # 2. Read node name from EC2 Name tag
 # InstanceMetadataTags=enabled is set in the launch template.
-# resume.py sets the Name tag to cloud-burst-N before the instance starts.
+# resume.py sets the Name tag to aws-burst-N before the instance starts.
 # This is how slurmd knows what name to register under.
 # -----------------------------------------------------------------------------
 TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" \
@@ -208,7 +208,7 @@ done
 
 # -----------------------------------------------------------------------------
 # 7. Start slurmd
-# The -N flag is critical — it tells slurmd to register as cloud-burst-N,
+# The -N flag is critical — it tells slurmd to register as aws-burst-N,
 # which matches the NodeName= in slurm.conf that slurmctld is expecting.
 # Without -N, slurmd uses the OS hostname, which may differ or not be in conf.
 # -----------------------------------------------------------------------------

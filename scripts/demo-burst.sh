@@ -52,6 +52,16 @@ except Exception:
     print('gen1')
 " 2>/dev/null)
 
+# Detect burst instance type from partitions.json (launch template override)
+BURST_INSTANCE_TYPE=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('$PLUGIN_DIR/partitions.json'))
+    print(data['Partitions'][0]['NodeGroups'][0]['LaunchTemplateOverrides'][0]['InstanceType'])
+except Exception:
+    print('m7a.2xlarge')
+" 2>/dev/null)
+
 _banner() {
   echo
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -121,12 +131,12 @@ $SBIN/sinfo
 echo
 echo "${NODE_PREFIX} nodes are in CLOUD* state — EC2 instances do NOT exist yet."
 echo "When we submit to the ${BURST_PARTITION} partition, slurmctld will call resume.py,"
-echo "which calls ec2:CreateFleet to launch an m7a.xlarge in the cloud subnet."
+echo "which calls ec2:CreateFleet to launch an ${BURST_INSTANCE_TYPE} in the cloud subnet."
 
 _wait
 
 _step "Submitting a job to the cloud partition"
-_info "This triggers Plugin v2 resume.py → EC2 CreateFleet → m7a.xlarge launch."
+_info "This triggers Plugin v2 resume.py → EC2 CreateFleet → ${BURST_INSTANCE_TYPE} launch."
 
 BURST_JOB_ID=$($SBIN/sbatch \
   --partition="${BURST_PARTITION}" \
@@ -194,7 +204,7 @@ echo "  1. slurmctld detected job pending with nodes in CLOUD* state"
 echo "  2. slurmctld called ResumeProgram (/opt/slurm/etc/aws/resume.py)"
 echo "  3. resume.py read partitions.json → called ec2:CreateFleet"
 echo "     - Fleet type: instant (not maintain)"
-echo "     - Instance: m7a.xlarge in cloud subnets A or B"
+echo "     - Instance: ${BURST_INSTANCE_TYPE} in cloud subnets A or B"
 echo "     - Set the EC2 Name tag to ${NODE_PREFIX}-N"
 echo "  4. EC2 instance launched, ran burst-node-init.sh:"
 echo "     - Read its name from IMDS tag (InstanceMetadataTags=enabled)"

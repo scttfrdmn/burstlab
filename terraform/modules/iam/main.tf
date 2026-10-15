@@ -54,7 +54,7 @@ resource "aws_iam_role" "burst_node" {
 # -----------------------------------------------------------------------------
 # slurmd on each burst node must discover its Slurm node name at boot time.
 # The aws-plugin-for-slurm sets the instance's Name tag to the Slurm node name
-# (e.g., "cloud-burst-0"). The node's init script reads this tag via the EC2
+# (e.g., "aws-burst-0"). The node's init script reads this tag via the EC2
 # metadata service (InstanceMetadataTags=enabled in the launch template) or
 # via DescribeTags as a fallback.
 #
@@ -66,7 +66,7 @@ data "aws_iam_policy_document" "burst_node_permissions" {
     effect = "Allow"
     actions = [
       # Needed to read the Name tag set by aws-plugin-for-slurm at launch time.
-      # The tag contains the Slurm NodeName (e.g. "cloud-burst-0"), which slurmd
+      # The tag contains the Slurm NodeName (e.g. "aws-burst-0"), which slurmd
       # uses to register itself with slurmctld.
       "ec2:DescribeTags",
     ]
