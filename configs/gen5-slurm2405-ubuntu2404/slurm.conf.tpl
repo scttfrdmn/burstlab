@@ -1,6 +1,6 @@
 # =============================================================================
-# slurm.conf — BurstLab Gen 3
-# Slurm 24.05.x on Rocky Linux 10 with AWS Plugin for Slurm v2
+# slurm.conf — BurstLab Gen 5
+# Slurm 24.05.x on Ubuntu 24.04 with AWS Plugin for Slurm v2
 #
 # This is a template. Variables in $${VAR} are substituted by Terraform
 # at deploy time via templatefile(). Written to /opt/slurm/etc/slurm.conf

@@ -52,7 +52,7 @@ resource "aws_instance" "compute" {
     tags = {
       Name       = "${var.cluster_name}-compute${format("%02d", count.index + 1)}-root"
       Project    = "burstlab"
-      Generation = "gen1"
+      Generation = var.generation
       ManagedBy  = "terraform"
     }
   }
@@ -86,7 +86,7 @@ resource "aws_instance" "compute" {
     # The init script sets the OS hostname to match this tag.
     Name       = "${var.cluster_name}-compute${format("%02d", count.index + 1)}"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
     Role       = "compute-node"
     # NodeIndex is stored as a tag for debugging — which EC2 instance is which node.

@@ -44,7 +44,7 @@ resource "aws_iam_role" "burst_node" {
   tags = {
     Name       = "${var.cluster_name}-burst-node-role"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -83,7 +83,7 @@ resource "aws_iam_policy" "burst_node_permissions" {
   tags = {
     Name       = "${var.cluster_name}-burst-node-policy"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -109,7 +109,7 @@ resource "aws_iam_instance_profile" "burst_node" {
   tags = {
     Name       = "${var.cluster_name}-burst-node-profile"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -139,7 +139,7 @@ resource "aws_iam_role" "head_node" {
   tags = {
     Name       = "${var.cluster_name}-head-node-role"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -212,7 +212,7 @@ resource "aws_iam_policy" "head_node_permissions" {
   tags = {
     Name       = "${var.cluster_name}-head-node-policy"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }
@@ -238,7 +238,7 @@ resource "aws_iam_instance_profile" "head_node" {
   tags = {
     Name       = "${var.cluster_name}-head-node-profile"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }

@@ -80,6 +80,7 @@ module "vpc" {
   source = "../../modules/vpc"
 
   cluster_name           = var.cluster_name
+  generation             = "gen2"
   vpc_cidr               = "10.0.0.0/16"
   management_subnet_cidr = "10.0.0.0/24"
   onprem_subnet_cidr     = "10.0.1.0/24"
@@ -96,6 +97,7 @@ module "iam" {
   source = "../../modules/iam"
 
   cluster_name = var.cluster_name
+  generation   = "gen2"
 }
 
 # =============================================================================
@@ -154,6 +156,7 @@ module "shared_storage" {
   source = "../../modules/shared-storage"
 
   cluster_name         = var.cluster_name
+  generation           = "gen2"
   vpc_id               = module.vpc.vpc_id
   efs_sg_id            = module.vpc.efs_sg_id
   management_subnet_id = module.vpc.management_subnet_id
@@ -173,6 +176,7 @@ module "head_node" {
   source = "../../modules/head-node"
 
   cluster_name          = var.cluster_name
+  generation            = "gen2"
   ami_id                = var.head_node_ami
   instance_type         = var.head_node_instance_type
   key_name              = var.key_name
@@ -235,6 +239,7 @@ module "compute_nodes" {
   source = "../../modules/compute-nodes"
 
   cluster_name       = var.cluster_name
+  generation         = "gen2"
   ami_id             = local.effective_compute_ami
   instance_type      = var.compute_node_instance_type
   key_name           = var.key_name

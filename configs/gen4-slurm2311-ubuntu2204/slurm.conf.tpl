@@ -1,12 +1,12 @@
 # =============================================================================
-# slurm.conf — BurstLab Gen 2
-# Slurm 23.11.x on Rocky Linux 9 with AWS Plugin for Slurm v2
+# slurm.conf — BurstLab Gen 4
+# Slurm 23.11.x on Ubuntu 22.04 with AWS Plugin for Slurm v2
 #
 # This is a template. Variables in $${VAR} are substituted by Terraform
 # at deploy time via templatefile(). Written to /opt/slurm/etc/slurm.conf
 # on every node via EFS.
 #
-# Gen 2 additions vs Gen 1 (22.05/Rocky 8):
+# Same Slurm 23.11 recipe as Gen 2 (Rocky 9). Additions vs Gen 1 (22.05/Rocky 8):
 #   - SlurmctldParameters=idle_on_node_suspend: powered-down cloud nodes
 #     appear as IDLE (not IDLE~) in sinfo — cleaner for demos and users
 #   - TaskPlugin simplified to task/cgroup (affinity still works but cgroup

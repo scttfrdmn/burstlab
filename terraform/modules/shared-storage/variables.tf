@@ -22,3 +22,8 @@ variable "cloud_subnet_b_id" {
   description = "Subnet ID for cloud burst subnet B (us-west-2b). Mount target here serves burst nodes launched in AZ-B."
   type        = string
 }
+
+variable "generation" {
+  description = "BurstLab generation label (gen1 … gen6). Applied as the Generation tag so resources from different generations in one account can be told apart."
+  type        = string
+}

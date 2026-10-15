@@ -124,7 +124,7 @@ resource "aws_launch_template" "burst" {
   tags = {
     Name       = "${var.cluster_name}-burst-node-lt"
     Project    = "burstlab"
-    Generation = "gen1"
+    Generation = var.generation
     ManagedBy  = "terraform"
   }
 }

@@ -126,3 +126,8 @@ variable "scripts_bucket_name" {
   type        = string
 }
 
+
+variable "generation" {
+  description = "BurstLab generation label (gen1 … gen6). Applied as the Generation tag so resources from different generations in one account can be told apart."
+  type        = string
+}
