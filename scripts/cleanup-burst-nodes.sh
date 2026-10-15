@@ -123,7 +123,7 @@ fi
 
 # If we have access to the head node, also reset any down/failed burst nodes in Slurm
 if [ -n "$HEAD_NODE_IP" ]; then
-  KEY="${KEY:-~/.ssh/burstlab-key.pem}"
+  KEY="${KEY:-${SSH_KEY:-$HOME/.ssh/burstlab-key.pem}}"
   [ -n "$SSH_USER" ] || { echo "ERROR: SSH_USER unknown (rocky / ubuntu / ec2-user). Set SSH_USER or run from a generation directory." >&2; exit 1; }
   _info "Resetting failed/down burst nodes in Slurm on $HEAD_NODE_IP..."
   ssh -i "$KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$SSH_USER@$HEAD_NODE_IP" "
@@ -149,7 +149,7 @@ if [ -n "$HEAD_NODE_IP" ]; then
 
     echo 'Current cluster state:'
     \$SBIN/sinfo 2>/dev/null
-  " || _warn "Could not SSH to head node — Slurm node reset skipped."
+  " || _warn "Could not SSH to head node ($SSH_USER@$HEAD_NODE_IP, key $KEY) — Slurm node reset skipped."
 fi
 
 echo

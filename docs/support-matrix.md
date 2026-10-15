@@ -49,7 +49,7 @@ see [prerequisites.md](prerequisites.md).
 |------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
 | Core cluster + cloud bursting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | EFS workloads (Scenario 1–3) | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 |
-| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | ✅ |
+| FSx Lustre client available | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
 | FSx workloads end-to-end (Scenario 4) | ✅ | 🧪 | 🧪 | 🧪 | 🧪 | 🧪 |
 | Lifecycle 0 — Chain | ✅ | — | — | — | — | — |
 | Lifecycle A — Wrapper | ✅ | — | — | — | — | — |
@@ -64,8 +64,11 @@ there shook out six fixes now in the code: five AL2023 packaging/init issues
 (kernel-headers conflict, curl-minimal, cronie, git, `ec2-user` SSH user), the Local-Zone
 AZ selection bug (all gens), and the defunct `cloud_reg_addrs` parameter (all gens — see
 below). Gen 6's EFS/FSx-workload and lifecycle rows are 🧪 (not yet exercised), matching
-the other recent generations. Note: AL2023 has **native Lustre packages** (installed from
-the AWS FSx repo during init), so unlike Gen 3–5 it needs no burstlab-lustre.
+the other recent generations. Note: AL2023 has **native Lustre packages** (`lustre-client`, installed from the
+AL2023 repos during init), so unlike Gen 3–5 it needs no burstlab-lustre. Until #38
+the init scripts sent AL2023 down the Rocky 8/9 path (a nonexistent `el/2023` repo) and
+hid the failure, so the Gen 6 client row is 🧪 until `lfs --version` is confirmed on a
+live Gen 6 head, compute and burst node.
 
 ### Notes
 

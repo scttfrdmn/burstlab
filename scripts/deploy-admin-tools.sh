@@ -19,7 +19,7 @@ set -uo pipefail
 _tf_out() { [ -f main.tf ] && command -v terraform >/dev/null 2>&1 && terraform output -raw "$1" 2>/dev/null; }
 
 HEAD_NODE_IP="${1:-${HEAD_NODE_IP:-$(_tf_out head_node_public_ip)}}"
-KEY="${2:-${KEY:-~/.ssh/burstlab-key.pem}}"
+KEY="${2:-${KEY:-${SSH_KEY:-$HOME/.ssh/burstlab-key.pem}}}"
 SSH_USER="${SSH_USER:-$(_tf_out ssh_user)}"
 
 [ -n "$HEAD_NODE_IP" ] || { echo "Usage: $0 <head_node_ip> [key.pem]  (or run from a generation directory)"; exit 1; }

@@ -124,7 +124,7 @@ resource "null_resource" "write_sysconfig" {
     command = <<-EOT
       ssh -i ${var.key_path} -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
         ${local.ssh_user}@${local.head_node_ip} \
-        "sudo tee /etc/sysconfig/burstlab-workloads > /dev/null << 'EOF'
+        "sudo mkdir -p /etc/sysconfig && sudo tee /etc/sysconfig/burstlab-workloads > /dev/null << 'EOF'
 AWS_REGION=${local.aws_region}
 BURST_SUBNET_ID=${local.burst_subnet_id}
 FSX_SG_ID=${local.fsx_sg_id}

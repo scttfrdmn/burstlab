@@ -23,7 +23,8 @@
 set -uo pipefail
 
 SKIP_DESTROY="${SKIP_DESTROY:-false}"
-KEY="${KEY:-~/.ssh/burstlab-key.pem}"
+# SSH key: KEY, else the SSH_KEY the README/quickstart export, else the default.
+KEY="${KEY:-${SSH_KEY:-$HOME/.ssh/burstlab-key.pem}}"
 
 # Read a value from `terraform output` when run from a generation directory.
 _tf_out() { [ -f main.tf ] && command -v terraform >/dev/null 2>&1 && terraform output -raw "$1" 2>/dev/null; }
@@ -59,8 +60,9 @@ if [ -n "$HEAD_NODE_IP" ]; then
     SBIN=/opt/slurm/bin
 
     echo 'Cancelling all running and pending jobs...'
-    \$SBIN/scancel --state=RUNNING 2>/dev/null || true
-    \$SBIN/scancel --state=PENDING 2>/dev/null || true
+    # sudo: the SSH user isn't a Slurm user, so a plain scancel can't touch alice's jobs.
+    sudo SLURM_CONF=\$SLURM_CONF \$SBIN/scancel --state=RUNNING || echo '[WARN] scancel RUNNING failed'
+    sudo SLURM_CONF=\$SLURM_CONF \$SBIN/scancel --state=PENDING || echo '[WARN] scancel PENDING failed'
     sleep 2
 
     echo 'Triggering power-down on all burst nodes...'
@@ -83,7 +85,7 @@ if [ -n "$HEAD_NODE_IP" ]; then
     sudo systemctl stop munge     2>/dev/null || true
 
     echo 'Head node drained.'
-  " && _info "Cluster drained." || _warn "SSH drain failed — will force-terminate via EC2 API."
+  " && _info "Cluster drained." || _warn "SSH drain failed ($SSH_USER@$HEAD_NODE_IP, key $KEY) — will force-terminate via EC2 API."
 fi
 
 # -----------------------------------------------------------------------------

@@ -23,6 +23,8 @@
 #SBATCH --error=/home/alice/logs/efs-destroy-%j.err
 
 set -euo pipefail
+# sbatch --export=<list> does not propagate PATH; the AWS CLI lives in /usr/local/bin.
+export PATH="/usr/local/bin:${PATH}"
 mkdir -p /home/alice/logs
 
 source /opt/slurm/etc/workloads/lib/efs-lifecycle.sh
