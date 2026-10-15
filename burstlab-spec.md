@@ -22,10 +22,10 @@ This is **not** a demo or a canned walkthrough — it's a transferable architect
 
 ### Context
 
-This project supports the AWS BD work around academic HPC cloud adoption (CloudRamp). The immediate driver is the TCU/Hannabyte engagement, where we discovered that:
+This project grew out of HPC cloud-bursting engagements, where a typical on-prem cluster showed problems like these:
 
-- TCU runs Scyld ClusterWare with Slurm under `/opt/scyld/slurm/`
-- Their `slurm.conf` had diverged between head node (hpccw01) and login node (hpclogin)
+- Slurm is installed by a cluster-management distribution under a non-standard prefix
+- `slurm.conf` had diverged between the head node and the login node
 - The `serializer/json` plugin was missing, preventing slurmctld from starting
 - Cloud bursting directives were commented out on the controller but active on login node
 - `SelectType` was mismatched across nodes
@@ -67,7 +67,7 @@ The key insight: we don't need to support every Slurm point release. We target t
 
 ### Generation 1: "Classic Power Save" — Slurm 22.05.x on CentOS 8 ← START HERE
 
-**Why this matters:** This is where most university pain lives right now. CentOS 8 is EOL (repos at vault.centos.org), Slurm 22.05 uses the traditional `SuspendProgram`/`ResumeProgram` model, and the Plugin v2 configuration is well-understood but fiddly. The TCU engagement falls in this generation.
+**Why this matters:** This is where most HPC sites' pain lives right now. CentOS 8 is EOL (repos at vault.centos.org), Slurm 22.05 uses the traditional `SuspendProgram`/`ResumeProgram` model, and the Plugin v2 configuration is well-understood but fiddly. Most first-time bursting engagements fall in this generation.
 
 | Parameter | Value |
 |-----------|-------|
@@ -387,7 +387,7 @@ If cloud-init scripts take too long (building Slurm from source is ~10 min), pre
 
 ## Design Principles
 
-1. **Correctness over cleverness.** Every config file should be something a university sysadmin can read and understand. No magic.
+1. **Correctness over cleverness.** Every config file should be something an HPC sysadmin can read and understand. No magic.
 2. **Ephemeral by default.** `terraform destroy` / `cdk destroy` cleans up everything. No orphaned resources.
 3. **Match reality.** Use CentOS 8 with broken repos, not some idealized image. The point is to show it working in the messy conditions customers actually have.
 4. **Configs are the product.** The IaC is scaffolding. The real value is the known-good `slurm.conf`, `partitions.json`, IAM policies, and security groups for each generation.

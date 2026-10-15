@@ -6,7 +6,7 @@
 # at deploy time via templatefile(). The resulting file is written to
 # /opt/slurm/etc/slurm.conf on every node via EFS.
 #
-# TCU context: This configuration mirrors what a corrected hpccw01/hpclogin
+# On-prem context: This configuration mirrors what a corrected head-node/login-node
 # config would look like — all nodes use the same file, directives are
 # consistent, and the Plugin v2 power-save section is complete.
 # =============================================================================
@@ -121,7 +121,7 @@ ReturnToService=2
 # DebugFlags=NO_CONF_HASH: disables config file hash checking between nodes.
 # Required for cloud nodes because they read slurm.conf from EFS after the
 # controller started — hash mismatch would prevent slurmd from starting.
-# TCU's hpclogin/hpccw01 divergence is exactly this problem.
+# A head-node/login-node config divergence is exactly this problem.
 DebugFlags=NO_CONF_HASH
 
 # --- On-Prem Compute Nodes ---------------------------------------------------

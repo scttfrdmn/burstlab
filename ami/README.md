@@ -192,8 +192,8 @@ CentOS 8 reached EOL in December 2021 and the official CentOS AWS account no lon
 CentOS 8 AMIs. Rocky Linux 8 is the direct community successor: binary-compatible with RHEL 8,
 same package versions, same kernel series (4.18.x), same systemd. For BurstLab purposes it is
 functionally identical to CentOS 8. Rocky 8 repos are actively maintained — no vault redirect
-needed on the AMI itself (the vault fix is documented in UserData scripts for TCU's actual
-CentOS 8 machines).
+needed on the AMI itself (the vault fix is documented in UserData scripts for sites still
+running CentOS 8).
 
 ---
 
